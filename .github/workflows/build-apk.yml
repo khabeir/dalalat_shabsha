@@ -33,20 +33,11 @@ jobs:
           p = Path("android/app/src/main/AndroidManifest.xml")
           s = p.read_text()
 
-          permission = '    <uses-permission android:name="android.permission.INTERNET"/>'
+          permission = '    <uses-permission android:name="android.permission.INTERNET" />'
 
           if 'android.permission.INTERNET' not in s:
-              s = s.replace(
-                  '<manifest',
-                  '<manifest',
-                  1
-              )
-              lines = s.splitlines()
-              for i, line in enumerate(lines):
-                  if '<manifest ' in line:
-                      lines.insert(i + 1, permission)
-                      break
-              s = '\\n'.join(lines) + '\\n'
+              marker = '<application'
+              s = s.replace(marker, permission + '\\n\\n    ' + marker, 1)
 
           p.write_text(s)
           PY2
