@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'listing_details_screen.dart';
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -126,11 +128,18 @@ class _HomeScreenState extends State<HomeScreen> {
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('سنضيف صفحة تفاصيل الإعلان في المرحلة القادمة'),
-            ),
-          );
+          final listingId = listing['id'];
+
+          if (listingId is int) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ListingDetailsScreen(
+                  listingId: listingId,
+                ),
+              ),
+            );
+          }
         },
         child: Padding(
           padding: const EdgeInsets.all(14),
