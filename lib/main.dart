@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'screens/auth_screen.dart';
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -8,6 +10,7 @@ Future<void> main() async {
     url: const String.fromEnvironment('SUPABASE_URL'),
     publishableKey: const String.fromEnvironment('SUPABASE_ANON_KEY'),
   );
+
   runApp(const DalalatShabshaApp());
 }
 
@@ -23,29 +26,7 @@ class DalalatShabshaApp extends StatelessWidget {
         useMaterial3: true,
       ),
       locale: const Locale('ar'),
-      home: const HomeScreen(),
-    );
-  }
-}
-
-class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('دلالة شبشة'),
-        ),
-        body: const Center(
-          child: Text(
-            'مرحباً بك في دلالة شبشة',
-            style: TextStyle(fontSize: 24),
-          ),
-        ),
-      ),
+      home: const AuthScreen(),
     );
   }
 }
