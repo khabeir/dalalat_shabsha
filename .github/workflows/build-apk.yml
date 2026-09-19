@@ -25,6 +25,9 @@ jobs:
         run: |
           flutter create --platforms=android --project-name dalalat_shabsha .
 
+      - name: Remove default test
+        run: rm -f test/widget_test.dart
+
       - name: Get dependencies
         run: flutter pub get
 
