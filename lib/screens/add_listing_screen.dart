@@ -176,7 +176,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
                     const SizedBox(height: 20),
 
                     DropdownButtonFormField<int>(
-                      value: _selectedCategoryId,
+            initialValue: _selectedCategoryId,
                       decoration: const InputDecoration(
                         labelText: 'التصنيف',
                         prefixIcon: Icon(Icons.category_outlined),
