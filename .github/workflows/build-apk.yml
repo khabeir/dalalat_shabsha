@@ -28,6 +28,22 @@ jobs:
       - name: Remove default test
         run: rm -f test/widget_test.dart
 
+      - name: Set Arabic app name
+        run: |
+          python - <<'PY2'
+          from pathlib import Path
+
+          p = Path("android/app/src/main/AndroidManifest.xml")
+          s = p.read_text()
+
+          s = s.replace(
+              'android:label="dalalat_shabsha"',
+              'android:label="دلالة شبشة"'
+          )
+
+          p.write_text(s)
+          PY2
+
       - name: Get dependencies
         run: flutter pub get
 
