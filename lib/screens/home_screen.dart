@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'listing_details_screen.dart';
+import 'add_listing_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -287,6 +288,20 @@ class _HomeScreenState extends State<HomeScreen> {
         appBar: AppBar(
           title: const Text('دلالة شبشة'),
           actions: [
+            IconButton(
+              tooltip: 'إضافة إعلان',
+              onPressed: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const AddListingScreen(),
+                  ),
+                );
+
+                _loadData();
+              },
+              icon: const Icon(Icons.add_circle_outline),
+            ),
             IconButton(
               tooltip: 'تحديث',
               onPressed: _loadData,
