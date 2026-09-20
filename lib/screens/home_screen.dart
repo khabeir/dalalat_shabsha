@@ -384,7 +384,7 @@ class _HomeScreenState extends State<HomeScreen> {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
               child: Text(
                 name == null || name.isEmpty
-                    ? 'مرحباً بك في سوق شبشب'
+                    ? 'مرحباً بك في دلالة شبشة'
                     : 'مرحباً يا $name',
                 style: const TextStyle(
                   fontSize: 20,
