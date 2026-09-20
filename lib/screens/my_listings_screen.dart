@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'edit_listing_screen.dart';
 import 'listing_details_screen.dart';
 
 class MyListingsScreen extends StatefulWidget {
@@ -31,8 +32,8 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
     final response = await _supabase
         .from('listings')
         .select(
-          'id, title, description, price, currency, price_type, '
-          'condition, area, status, created_at',
+          'id, category_id, title, description, price, currency, price_type, '
+          'condition, area, contact_phone, status, created_at',
         )
         .eq('seller_id', user.id)
         .order('created_at', ascending: false);
@@ -48,6 +49,23 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
     });
 
     await newFuture;
+  }
+
+  Future<void> _editListing(Map<String, dynamic> listing) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => EditListingScreen(
+          listing: listing,
+        ),
+      ),
+    );
+
+    if (result == true && mounted) {
+      setState(() {
+        _listingsFuture = _loadMyListings();
+      });
+    }
   }
 
   String _statusText(String? status) {
@@ -113,7 +131,9 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => ListingDetailsScreen(listingId: listingId),
+        builder: (_) => ListingDetailsScreen(
+          listingId: listingId,
+        ),
       ),
     );
   }
@@ -124,7 +144,10 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
     final area = listing['area']?.toString() ?? '';
 
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      margin: const EdgeInsets.symmetric(
+        horizontal: 12,
+        vertical: 6,
+      ),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () => _openListing(listing),
@@ -151,7 +174,9 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
                       vertical: 5,
                     ),
                     decoration: BoxDecoration(
-                      color: _statusColor(status).withValues(alpha: 0.12),
+                      color: _statusColor(status).withValues(
+                        alpha: 0.12,
+                      ),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
@@ -165,7 +190,9 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
                   ),
                 ],
               ),
+
               const SizedBox(height: 10),
+
               Text(
                 _priceText(listing),
                 style: const TextStyle(
@@ -173,16 +200,21 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
                   fontWeight: FontWeight.w600,
                 ),
               ),
+
               if (area.isNotEmpty) ...[
                 const SizedBox(height: 6),
                 Row(
                   children: [
-                    const Icon(Icons.location_on_outlined, size: 18),
+                    const Icon(
+                      Icons.location_on_outlined,
+                      size: 18,
+                    ),
                     const SizedBox(width: 4),
                     Text(area),
                   ],
                 ),
               ],
+
               if ((listing['description']?.toString() ?? '').isNotEmpty) ...[
                 const SizedBox(height: 8),
                 Text(
@@ -191,7 +223,26 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
-              const SizedBox(height: 8),
+
+              const SizedBox(height: 12),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _editListing(listing),
+                      icon: const Icon(
+                        Icons.edit_outlined,
+                        size: 19,
+                      ),
+                      label: const Text('تعديل'),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 4),
+
               const Align(
                 alignment: Alignment.centerLeft,
                 child: Icon(Icons.chevron_left),
@@ -227,7 +278,9 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
           future: _listingsFuture,
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
+              return const Center(
+                child: CircularProgressIndicator(),
+              );
             }
 
             if (snapshot.hasError) {
@@ -235,9 +288,14 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
                 physics: const AlwaysScrollableScrollPhysics(),
                 children: [
                   const SizedBox(height: 120),
-                  const Icon(Icons.error_outline, size: 48),
+                  const Icon(
+                    Icons.error_outline,
+                    size: 48,
+                  ),
                   const SizedBox(height: 12),
-                  const Center(child: Text('تعذر تحميل إعلاناتك.')),
+                  const Center(
+                    child: Text('تعذر تحميل إعلاناتك.'),
+                  ),
                   const SizedBox(height: 8),
                   Center(
                     child: Text(
@@ -268,7 +326,10 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
                   physics: const AlwaysScrollableScrollPhysics(),
                   children: const [
                     SizedBox(height: 150),
-                    Icon(Icons.inventory_2_outlined, size: 60),
+                    Icon(
+                      Icons.inventory_2_outlined,
+                      size: 60,
+                    ),
                     SizedBox(height: 16),
                     Center(
                       child: Text(
@@ -277,7 +338,11 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
                       ),
                     ),
                     SizedBox(height: 8),
-                    Center(child: Text('اسحب الشاشة إلى الأسفل للتحديث.')),
+                    Center(
+                      child: Text(
+                        'اسحب الشاشة إلى الأسفل للتحديث.',
+                      ),
+                    ),
                   ],
                 ),
               );
@@ -290,7 +355,9 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 itemCount: listings.length,
                 itemBuilder: (context, index) {
-                  return _buildListingCard(listings[index]);
+                  return _buildListingCard(
+                    listings[index],
+                  );
                 },
               ),
             );
