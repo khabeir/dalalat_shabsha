@@ -68,6 +68,85 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
     }
   }
 
+  Future<void> _deleteListing(Map<String, dynamic> listing) async {
+    final title = listing['title']?.toString() ?? 'هذا الإعلان';
+    final listingId = listing['id'];
+
+    if (listingId is! int) {
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: AlertDialog(
+            title: const Text('حذف الإعلان'),
+            content: Text(
+              'هل أنت متأكد من حذف:\n\n$title\n\nلا يمكن التراجع عن هذه العملية.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(dialogContext, false);
+                },
+                child: const Text('إلغاء'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  Navigator.pop(dialogContext, true);
+                },
+                child: const Text('حذف'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (confirmed != true || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _listingsFuture = _deleteAndReload(listingId);
+    });
+
+    try {
+      await _listingsFuture;
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('تم حذف الإعلان بنجاح.'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('تعذر حذف الإعلان: $e'),
+        ),
+      );
+
+      setState(() {
+        _listingsFuture = _loadMyListings();
+      });
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> _deleteAndReload(int listingId) async {
+    await _supabase
+        .from('listings')
+        .delete()
+        .eq('id', listingId);
+
+    return _loadMyListings();
+  }
+
   String _statusText(String? status) {
     switch (status) {
       case 'pending':
@@ -126,7 +205,9 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
   void _openListing(Map<String, dynamic> listing) {
     final listingId = listing['id'];
 
-    if (listingId is! int) return;
+    if (listingId is! int) {
+      return;
+    }
 
     Navigator.push(
       context,
@@ -236,6 +317,20 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
                         size: 19,
                       ),
                       label: const Text('تعديل'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _deleteListing(listing),
+                      icon: const Icon(
+                        Icons.delete_outline,
+                        size: 19,
+                      ),
+                      label: const Text('حذف'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.red,
+                      ),
                     ),
                   ),
                 ],
