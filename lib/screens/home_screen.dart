@@ -1,4 +1,5 @@
 import 'my_listings_screen.dart';
+import 'profile_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -289,6 +290,18 @@ class _HomeScreenState extends State<HomeScreen> {
         appBar: AppBar(
           title: const Text('دلالة شبشة'),
           actions: [
+            IconButton(
+              tooltip: 'الملف الشخصي',
+              icon: const Icon(Icons.person_outline),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const ProfileScreen(),
+                  ),
+                );
+              },
+            ),
             IconButton(
               tooltip: 'إضافة إعلان',
               onPressed: () async {
