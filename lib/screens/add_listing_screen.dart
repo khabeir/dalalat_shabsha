@@ -24,7 +24,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
   final _imagePicker = ImagePicker();
 
   List<Map<String, dynamic>> _categories = [];
-  List<XFile> _selectedImages = [];
+  final List<XFile> _selectedImages = [];
 
   int? _selectedCategoryId;
   String _priceType = 'negotiable';
