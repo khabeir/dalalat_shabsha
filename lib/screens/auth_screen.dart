@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+دimport 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AuthScreen extends StatefulWidget {
@@ -48,11 +48,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
         if (!mounted) return;
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('تم تسجيل الدخول بنجاح'),
-          ),
-        );
+        Navigator.pop(context, true);
       } else {
         final response = await _supabase.auth.signUp(
           email: _emailController.text.trim(),
