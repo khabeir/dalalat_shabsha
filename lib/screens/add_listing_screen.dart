@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AddListingScreen extends StatefulWidget {
@@ -18,8 +21,10 @@ class _AddListingScreenState extends State<AddListingScreen> {
   final _phoneController = TextEditingController();
 
   final _supabase = Supabase.instance.client;
+  final _imagePicker = ImagePicker();
 
   List<Map<String, dynamic>> _categories = [];
+  List<XFile> _selectedImages = [];
 
   int? _selectedCategoryId;
   String _priceType = 'negotiable';
@@ -27,6 +32,8 @@ class _AddListingScreenState extends State<AddListingScreen> {
 
   bool _loadingCategories = true;
   bool _saving = false;
+
+  static const int _maxImages = 6;
 
   @override
   void initState() {
@@ -73,6 +80,112 @@ class _AddListingScreenState extends State<AddListingScreen> {
     }
   }
 
+  Future<void> _pickImages() async {
+    if (_selectedImages.length >= _maxImages) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('يمكنك اختيار 6 صور كحد أقصى'),
+        ),
+      );
+      return;
+    }
+
+    try {
+      final images = await _imagePicker.pickMultiImage(
+        imageQuality: 80,
+        maxWidth: 1600,
+        maxHeight: 1600,
+      );
+
+      if (images.isEmpty) return;
+
+      final remaining = _maxImages - _selectedImages.length;
+
+      setState(() {
+        _selectedImages.addAll(
+          images.take(remaining),
+        );
+      });
+
+      if (images.length > remaining && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تمت إضافة 6 صور فقط كحد أقصى'),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('تعذر اختيار الصور: $e'),
+        ),
+      );
+    }
+  }
+
+  void _removeImage(int index) {
+    setState(() {
+      _selectedImages.removeAt(index);
+    });
+  }
+
+  Future<void> _uploadImages(int listingId) async {
+    for (int i = 0; i < _selectedImages.length; i++) {
+      final image = _selectedImages[i];
+
+      final originalExtension = image.path.contains('.')
+          ? image.path.split('.').last.toLowerCase()
+          : 'jpg';
+
+      final extension = originalExtension == 'jpeg'
+          ? 'jpg'
+          : originalExtension;
+
+      final fileName =
+          '${DateTime.now().millisecondsSinceEpoch}_$i.$extension';
+
+      final imagePath = '$listingId/$fileName';
+
+      final fileBytes = await image.readAsBytes();
+
+      await _supabase.storage
+          .from('listing-images')
+          .uploadBinary(
+            imagePath,
+            fileBytes,
+            fileOptions: FileOptions(
+              contentType: _contentType(extension),
+              upsert: false,
+            ),
+          );
+
+      await _supabase.from('listing_images').insert({
+        'listing_id': listingId,
+        'image_path': imagePath,
+        'sort_order': i,
+      });
+    }
+  }
+
+  String _contentType(String extension) {
+    switch (extension) {
+      case 'png':
+        return 'image/png';
+      case 'webp':
+        return 'image/webp';
+      case 'heic':
+        return 'image/heic';
+      case 'gif':
+        return 'image/gif';
+      case 'jpg':
+      case 'jpeg':
+      default:
+        return 'image/jpeg';
+    }
+  }
+
   Future<void> _saveListing() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -99,28 +212,44 @@ class _AddListingScreenState extends State<AddListingScreen> {
     setState(() => _saving = true);
 
     try {
-      await _supabase.from('listings').insert({
-        'seller_id': user.id,
-        'category_id': _selectedCategoryId,
-        'title': _titleController.text.trim(),
-        'description': _descriptionController.text.trim(),
-        'price': _priceType == 'contact'
-            ? null
-            : double.tryParse(_priceController.text.trim()),
-        'currency': 'SDG',
-        'price_type': _priceType,
-        'condition': _condition,
-        'area': _areaController.text.trim(),
-        'contact_phone': _phoneController.text.trim(),
-        'status': 'pending',
-      });
+      final listingResponse = await _supabase
+          .from('listings')
+          .insert({
+            'seller_id': user.id,
+            'category_id': _selectedCategoryId,
+            'title': _titleController.text.trim(),
+            'description': _descriptionController.text.trim(),
+            'price': _priceType == 'contact'
+                ? null
+                : double.tryParse(_priceController.text.trim()),
+            'currency': 'SDG',
+            'price_type': _priceType,
+            'condition': _condition,
+            'area': _areaController.text.trim(),
+            'contact_phone': _phoneController.text.trim(),
+            'status': 'pending',
+          })
+          .select('id')
+          .single();
+
+      final listingId = listingResponse['id'];
+
+      if (listingId is! int) {
+        throw Exception('تعذر الحصول على رقم الإعلان');
+      }
+
+      if (_selectedImages.isNotEmpty) {
+        await _uploadImages(listingId);
+      }
 
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(
-            'تم إرسال الإعلان بنجاح، وهو الآن بانتظار المراجعة.',
+            _selectedImages.isEmpty
+                ? 'تم إرسال الإعلان بنجاح، وهو الآن بانتظار المراجعة.'
+                : 'تم إرسال الإعلان مع الصور بنجاح، وهو الآن بانتظار المراجعة.',
           ),
         ),
       );
@@ -134,12 +263,24 @@ class _AddListingScreenState extends State<AddListingScreen> {
           content: Text('تعذر حفظ الإعلان: ${e.message}'),
         ),
       );
+    } on StorageException catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'تم إنشاء الإعلان، لكن تعذر رفع إحدى الصور: ${e.message}',
+          ),
+          duration: const Duration(seconds: 5),
+        ),
+      );
     } catch (e) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('حدث خطأ غير متوقع أثناء حفظ الإعلان'),
+        SnackBar(
+          content: Text('حدث خطأ أثناء حفظ الإعلان: $e'),
+          duration: const Duration(seconds: 5),
         ),
       );
     } finally {
@@ -147,6 +288,117 @@ class _AddListingScreenState extends State<AddListingScreen> {
         setState(() => _saving = false);
       }
     }
+  }
+
+  Widget _buildImagesSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'صور الإعلان',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 17,
+          ),
+        ),
+
+        const SizedBox(height: 6),
+
+        Text(
+          'يمكنك إضافة حتى $_maxImages صور',
+          style: TextStyle(
+            color: Colors.grey.shade600,
+            fontSize: 13,
+          ),
+        ),
+
+        const SizedBox(height: 12),
+
+        if (_selectedImages.isNotEmpty)
+          SizedBox(
+            height: 105,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: _selectedImages.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 10),
+              itemBuilder: (context, index) {
+                final image = _selectedImages[index];
+
+                return Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.file(
+                        File(image.path),
+                        width: 105,
+                        height: 105,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+
+                    Positioned(
+                      top: -7,
+                      right: -7,
+                      child: Material(
+                        color: Colors.red,
+                        shape: const CircleBorder(),
+                        child: InkWell(
+                          customBorder: const CircleBorder(),
+                          onTap: () => _removeImage(index),
+                          child: const Padding(
+                            padding: EdgeInsets.all(5),
+                            child: Icon(
+                              Icons.close,
+                              color: Colors.white,
+                              size: 18,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    Positioned(
+                      bottom: 5,
+                      left: 5,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.black54,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '${index + 1}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+
+        if (_selectedImages.isNotEmpty)
+          const SizedBox(height: 12),
+
+        OutlinedButton.icon(
+          onPressed: _saving ? null : _pickImages,
+          icon: const Icon(Icons.add_photo_alternate_outlined),
+          label: Text(
+            _selectedImages.isEmpty
+                ? 'إضافة صور'
+                : 'إضافة صور أخرى (${_selectedImages.length}/$_maxImages)',
+          ),
+        ),
+      ],
+    );
   }
 
   @override
@@ -173,10 +425,11 @@ class _AddListingScreenState extends State<AddListingScreen> {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
+
                     const SizedBox(height: 20),
 
                     DropdownButtonFormField<int>(
-            initialValue: _selectedCategoryId,
+                      initialValue: _selectedCategoryId,
                       decoration: const InputDecoration(
                         labelText: 'التصنيف',
                         prefixIcon: Icon(Icons.category_outlined),
@@ -246,6 +499,10 @@ class _AddListingScreenState extends State<AddListingScreen> {
                     ),
 
                     const SizedBox(height: 16),
+
+                    _buildImagesSection(),
+
+                    const SizedBox(height: 20),
 
                     const Text(
                       'نوع السعر',
@@ -370,6 +627,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
                         if (value == null || value.trim().isEmpty) {
                           return 'أدخل رقم التواصل';
                         }
+
                         return null;
                       },
                     ),
@@ -391,7 +649,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
                             : const Icon(Icons.publish),
                         label: Text(
                           _saving
-                              ? 'جاري الحفظ...'
+                              ? 'جاري الحفظ والرفع...'
                               : 'نشر الإعلان',
                           style: const TextStyle(fontSize: 17),
                         ),
