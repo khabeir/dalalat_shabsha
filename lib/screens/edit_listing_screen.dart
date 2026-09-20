@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class EditListingScreen extends StatefulWidget {
@@ -15,6 +18,7 @@ class EditListingScreen extends StatefulWidget {
 
 class _EditListingScreenState extends State<EditListingScreen> {
   final SupabaseClient _supabase = Supabase.instance.client;
+  final ImagePicker _imagePicker = ImagePicker();
 
   final _formKey = GlobalKey<FormState>();
 
@@ -30,8 +34,14 @@ class _EditListingScreenState extends State<EditListingScreen> {
 
   List<Map<String, dynamic>> _categories = [];
 
+  List<Map<String, dynamic>> _existingImages = [];
+  final List<XFile> _newImages = [];
+
   bool _loadingCategories = true;
+  bool _loadingImages = true;
   bool _saving = false;
+
+  static const int _maxImages = 6;
 
   @override
   void initState() {
@@ -69,6 +79,7 @@ class _EditListingScreenState extends State<EditListingScreen> {
         widget.listing['condition']?.toString() ?? 'not_applicable';
 
     _loadCategories();
+    _loadImages();
   }
 
   @override
@@ -110,6 +121,244 @@ class _EditListingScreenState extends State<EditListingScreen> {
     }
   }
 
+  Future<void> _loadImages() async {
+    try {
+      final listingId = widget.listing['id'];
+
+      if (listingId is! int) {
+        throw Exception('رقم الإعلان غير صحيح');
+      }
+
+      final response = await _supabase
+          .from('listing_images')
+          .select('id, image_path, sort_order')
+          .eq('listing_id', listingId)
+          .order('sort_order');
+
+      if (!mounted) return;
+
+      setState(() {
+        _existingImages = List<Map<String, dynamic>>.from(response);
+        _loadingImages = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _loadingImages = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('تعذر تحميل صور الإعلان: $e'),
+        ),
+      );
+    }
+  }
+
+  int get _totalImages {
+    return _existingImages.length + _newImages.length;
+  }
+
+  Future<void> _pickImages() async {
+    final remaining = _maxImages - _totalImages;
+
+    if (remaining <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('يمكنك الاحتفاظ بـ 6 صور كحد أقصى للإعلان'),
+        ),
+      );
+      return;
+    }
+
+    try {
+      final images = await _imagePicker.pickMultiImage(
+        imageQuality: 80,
+        maxWidth: 1600,
+        maxHeight: 1600,
+      );
+
+      if (images.isEmpty) return;
+
+      final selected = images.take(remaining).toList();
+
+      setState(() {
+        _newImages.addAll(selected);
+      });
+
+      if (images.length > remaining && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'تمت إضافة $remaining صورة فقط لأن الحد الأقصى هو $_maxImages صور',
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('تعذر اختيار الصور: $e'),
+        ),
+      );
+    }
+  }
+
+  Future<void> _deleteExistingImage(int index) async {
+    if (_saving) return;
+
+    final image = _existingImages[index];
+
+    final imageId = image['id'];
+    final imagePath = image['image_path']?.toString();
+
+    if (imageId is! int || imagePath == null || imagePath.isEmpty) {
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: AlertDialog(
+            title: const Text('حذف الصورة'),
+            content: const Text(
+              'هل تريد حذف هذه الصورة من الإعلان؟',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(dialogContext, false);
+                },
+                child: const Text('إلغاء'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  Navigator.pop(dialogContext, true);
+                },
+                child: const Text('حذف'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    try {
+      setState(() {
+        _saving = true;
+      });
+
+      await _supabase
+          .from('listing_images')
+          .delete()
+          .eq('id', imageId);
+
+      try {
+        await _supabase.storage
+            .from('listing-images')
+            .remove([imagePath]);
+      } catch (_) {
+        // إذا كان ملف Storage غير موجود، لا نمنع حذف سجل الصورة.
+      }
+
+      if (!mounted) return;
+
+      setState(() {
+        _existingImages.removeAt(index);
+        _saving = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('تم حذف الصورة'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _saving = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('تعذر حذف الصورة: $e'),
+        ),
+      );
+    }
+  }
+
+  void _removeNewImage(int index) {
+    if (_saving) return;
+
+    setState(() {
+      _newImages.removeAt(index);
+    });
+  }
+
+  String _contentType(String extension) {
+    switch (extension.toLowerCase()) {
+      case 'png':
+        return 'image/png';
+      case 'webp':
+        return 'image/webp';
+      case 'heic':
+        return 'image/heic';
+      case 'gif':
+        return 'image/gif';
+      case 'jpg':
+      case 'jpeg':
+      default:
+        return 'image/jpeg';
+    }
+  }
+
+  Future<void> _uploadNewImages(int listingId) async {
+    for (int i = 0; i < _newImages.length; i++) {
+      final image = _newImages[i];
+
+      final originalExtension = image.path.contains('.')
+          ? image.path.split('.').last.toLowerCase()
+          : 'jpg';
+
+      final extension =
+          originalExtension == 'jpeg' ? 'jpg' : originalExtension;
+
+      final fileName =
+          '${DateTime.now().millisecondsSinceEpoch}_$i.$extension';
+
+      final imagePath = '$listingId/$fileName';
+
+      final fileBytes = await image.readAsBytes();
+
+      await _supabase.storage
+          .from('listing-images')
+          .uploadBinary(
+            imagePath,
+            fileBytes,
+            fileOptions: FileOptions(
+              contentType: _contentType(extension),
+              upsert: false,
+            ),
+          );
+
+      final sortOrder = _existingImages.length + i;
+
+      await _supabase.from('listing_images').insert({
+        'listing_id': listingId,
+        'image_path': imagePath,
+        'sort_order': sortOrder,
+      });
+    }
+  }
+
   Future<void> _saveChanges() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -130,6 +379,17 @@ class _EditListingScreenState extends State<EditListingScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('أدخل سعراً صحيحاً.'),
+        ),
+      );
+      return;
+    }
+
+    final listingId = widget.listing['id'];
+
+    if (listingId is! int) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('رقم الإعلان غير صحيح.'),
         ),
       );
       return;
@@ -156,7 +416,11 @@ class _EditListingScreenState extends State<EditListingScreen> {
             'area': _areaController.text.trim(),
             'contact_phone': _phoneController.text.trim(),
           })
-          .eq('id', widget.listing['id']);
+          .eq('id', listingId);
+
+      if (_newImages.isNotEmpty) {
+        await _uploadNewImages(listingId);
+      }
 
       if (!mounted) return;
 
@@ -167,18 +431,40 @@ class _EditListingScreenState extends State<EditListingScreen> {
       );
 
       Navigator.pop(context, true);
-    } catch (e) {
+    } on PostgrestException catch (e) {
       if (!mounted) return;
-
-      setState(() {
-        _saving = false;
-      });
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('تعذر تعديل الإعلان: $e'),
+          content: Text('تعذر تعديل الإعلان: ${e.message}'),
         ),
       );
+    } on StorageException catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'تم تعديل بيانات الإعلان، لكن تعذر رفع إحدى الصور: ${e.message}',
+          ),
+          duration: const Duration(seconds: 5),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('حدث خطأ أثناء تعديل الإعلان: $e'),
+          duration: const Duration(seconds: 5),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _saving = false;
+        });
+      }
     }
   }
 
@@ -187,6 +473,236 @@ class _EditListingScreenState extends State<EditListingScreen> {
       labelText: label,
       prefixIcon: Icon(icon),
       border: const OutlineInputBorder(),
+    );
+  }
+
+  Widget _buildImagesSection() {
+    if (_loadingImages) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(20),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'صور الإعلان',
+          style: TextStyle(
+            fontSize: 17,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+
+        const SizedBox(height: 6),
+
+        Text(
+          '$_totalImages / $_maxImages صور',
+          style: TextStyle(
+            color: Colors.grey.shade600,
+            fontSize: 13,
+          ),
+        ),
+
+        const SizedBox(height: 12),
+
+        if (_existingImages.isNotEmpty)
+          SizedBox(
+            height: 115,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: _existingImages.length,
+              separatorBuilder: (_, __) {
+                return const SizedBox(width: 10);
+              },
+              itemBuilder: (context, index) {
+                final image = _existingImages[index];
+                final imagePath = image['image_path']?.toString() ?? '';
+
+                final imageUrl = imagePath.isEmpty
+                    ? ''
+                    : _supabase.storage
+                        .from('listing-images')
+                        .getPublicUrl(imagePath);
+
+                return Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: imageUrl.isEmpty
+                          ? Container(
+                              width: 110,
+                              height: 110,
+                              color: Colors.grey.shade200,
+                              child: const Icon(
+                                Icons.broken_image_outlined,
+                                size: 35,
+                              ),
+                            )
+                          : Image.network(
+                              imageUrl,
+                              width: 110,
+                              height: 110,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) {
+                                return Container(
+                                  width: 110,
+                                  height: 110,
+                                  color: Colors.grey.shade200,
+                                  child: const Icon(
+                                    Icons.broken_image_outlined,
+                                    size: 35,
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+
+                    Positioned(
+                      top: -7,
+                      right: -7,
+                      child: Material(
+                        color: Colors.red,
+                        shape: const CircleBorder(),
+                        child: InkWell(
+                          customBorder: const CircleBorder(),
+                          onTap: _saving
+                              ? null
+                              : () => _deleteExistingImage(index),
+                          child: const Padding(
+                            padding: EdgeInsets.all(5),
+                            child: Icon(
+                              Icons.close,
+                              color: Colors.white,
+                              size: 18,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    Positioned(
+                      bottom: 5,
+                      left: 5,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.black54,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '${index + 1}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+
+        if (_newImages.isNotEmpty) ...[
+          const SizedBox(height: 12),
+
+          SizedBox(
+            height: 115,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: _newImages.length,
+              separatorBuilder: (_, __) {
+                return const SizedBox(width: 10);
+              },
+              itemBuilder: (context, index) {
+                final image = _newImages[index];
+
+                return Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.file(
+                        File(image.path),
+                        width: 110,
+                        height: 110,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+
+                    Positioned(
+                      top: -7,
+                      right: -7,
+                      child: Material(
+                        color: Colors.red,
+                        shape: const CircleBorder(),
+                        child: InkWell(
+                          customBorder: const CircleBorder(),
+                          onTap: _saving
+                              ? null
+                              : () => _removeNewImage(index),
+                          child: const Padding(
+                            padding: EdgeInsets.all(5),
+                            child: Icon(
+                              Icons.close,
+                              color: Colors.white,
+                              size: 18,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    Positioned(
+                      bottom: 5,
+                      left: 5,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.black54,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Text(
+                          'جديدة',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ],
+
+        const SizedBox(height: 12),
+
+        OutlinedButton.icon(
+          onPressed:
+              _saving || _totalImages >= _maxImages ? null : _pickImages,
+          icon: const Icon(Icons.add_photo_alternate_outlined),
+          label: Text(
+            _totalImages >= _maxImages
+                ? 'تم الوصول إلى الحد الأقصى'
+                : 'إضافة صور',
+          ),
+        ),
+      ],
     );
   }
 
@@ -273,7 +789,11 @@ class _EditListingScreenState extends State<EditListingScreen> {
                       maxLines: 7,
                     ),
 
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 20),
+
+                    _buildImagesSection(),
+
+                    const SizedBox(height: 20),
 
                     DropdownButtonFormField<String>(
                       initialValue: _priceType,
@@ -319,7 +839,8 @@ class _EditListingScreenState extends State<EditListingScreen> {
                           'السعر',
                           Icons.attach_money,
                         ),
-                        keyboardType: const TextInputType.numberWithOptions(
+                        keyboardType:
+                            const TextInputType.numberWithOptions(
                           decimal: true,
                         ),
                       ),
@@ -395,7 +916,9 @@ class _EditListingScreenState extends State<EditListingScreen> {
                               )
                             : const Icon(Icons.save_outlined),
                         label: Text(
-                          _saving ? 'جاري الحفظ...' : 'حفظ التعديلات',
+                          _saving
+                              ? 'جاري الحفظ والرفع...'
+                              : 'حفظ التعديلات',
                         ),
                       ),
                     ),
