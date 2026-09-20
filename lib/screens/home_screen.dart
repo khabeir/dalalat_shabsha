@@ -1,5 +1,6 @@
 import 'my_listings_screen.dart';
 import 'profile_screen.dart';
+import 'favorites_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -81,7 +82,9 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تعذر تسجيل الخروج، حاول مرة أخرى')),
+        const SnackBar(
+          content: Text('تعذر تسجيل الخروج، حاول مرة أخرى'),
+        ),
       );
     }
   }
@@ -168,10 +171,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 6),
                 Row(
                   children: [
-                    const Icon(Icons.location_on_outlined, size: 18),
+                    const Icon(
+                      Icons.location_on_outlined,
+                      size: 18,
+                    ),
                     const SizedBox(width: 4),
                     Expanded(
-                      child: Text(listing['area'].toString()),
+                      child: Text(
+                        listing['area'].toString(),
+                      ),
                     ),
                   ],
                 ),
@@ -193,7 +201,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildBody() {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
     }
 
     if (_error != null) {
@@ -203,9 +213,15 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.wifi_off, size: 48),
+              const Icon(
+                Icons.wifi_off,
+                size: 48,
+              ),
               const SizedBox(height: 12),
-              Text(_error!, textAlign: TextAlign.center),
+              Text(
+                _error!,
+                textAlign: TextAlign.center,
+              ),
               const SizedBox(height: 16),
               FilledButton(
                 onPressed: _loadData,
@@ -225,7 +241,10 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           const Text(
             'التصنيفات',
-            style: TextStyle(fontSize: 21, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              fontSize: 21,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(height: 12),
           if (_categories.isEmpty)
@@ -254,7 +273,10 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 24),
           const Text(
             'أحدث الإعلانات',
-            style: TextStyle(fontSize: 21, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              fontSize: 21,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(height: 12),
           if (_listings.isEmpty)
@@ -262,7 +284,10 @@ class _HomeScreenState extends State<HomeScreen> {
               padding: EdgeInsets.symmetric(vertical: 32),
               child: Column(
                 children: [
-                  Icon(Icons.storefront_outlined, size: 56),
+                  Icon(
+                    Icons.storefront_outlined,
+                    size: 56,
+                  ),
                   SizedBox(height: 12),
                   Text(
                     'لا توجد إعلانات معتمدة حالياً',
@@ -298,6 +323,18 @@ class _HomeScreenState extends State<HomeScreen> {
                   context,
                   MaterialPageRoute(
                     builder: (_) => const ProfileScreen(),
+                  ),
+                );
+              },
+            ),
+            IconButton(
+              tooltip: 'المفضلة',
+              icon: const Icon(Icons.favorite_border),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const FavoritesScreen(),
                   ),
                 );
               },
@@ -347,7 +384,7 @@ class _HomeScreenState extends State<HomeScreen> {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
               child: Text(
                 name == null || name.isEmpty
-                    ? 'مرحباً بك في سوق شبشة'
+                    ? 'مرحباً بك في سوق شبشب'
                     : 'مرحباً يا $name',
                 style: const TextStyle(
                   fontSize: 20,
@@ -355,7 +392,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             ),
-            Expanded(child: _buildBody()),
+            Expanded(
+              child: _buildBody(),
+            ),
           ],
         ),
       ),
