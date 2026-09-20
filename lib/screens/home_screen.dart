@@ -1,6 +1,8 @@
 import 'my_listings_screen.dart';
 import 'profile_screen.dart';
 import 'favorites_screen.dart';
+import 'auth_screen.dart';
+
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -87,6 +89,37 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       );
     }
+  }
+
+  Future<void> _openAddListing() async {
+    final user = _supabase.auth.currentUser;
+
+    if (user == null) {
+      final loginResult = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const AuthScreen(),
+        ),
+      );
+
+      if (!mounted) return;
+
+      if (loginResult != true ||
+          _supabase.auth.currentUser == null) {
+        return;
+      }
+    }
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const AddListingScreen(),
+      ),
+    );
+
+    if (!mounted) return;
+
+    _loadData();
   }
 
   String _formatPrice(Map<String, dynamic> listing) {
@@ -341,16 +374,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             IconButton(
               tooltip: 'إضافة إعلان',
-              onPressed: () async {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const AddListingScreen(),
-                  ),
-                );
-
-                _loadData();
-              },
+              onPressed: _openAddListing,
               icon: const Icon(Icons.add_circle_outline),
             ),
             IconButton(
@@ -358,23 +382,25 @@ class _HomeScreenState extends State<HomeScreen> {
               onPressed: _loadData,
               icon: const Icon(Icons.refresh),
             ),
-            IconButton(
-              tooltip: 'إعلاناتي',
-              icon: const Icon(Icons.inventory_2_outlined),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const MyListingsScreen(),
-                  ),
-                );
-              },
-            ),
-            IconButton(
-              tooltip: 'تسجيل الخروج',
-              onPressed: _signOut,
-              icon: const Icon(Icons.logout),
-            ),
+            if (user != null)
+              IconButton(
+                tooltip: 'إعلاناتي',
+                icon: const Icon(Icons.inventory_2_outlined),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const MyListingsScreen(),
+                    ),
+                  );
+                },
+              ),
+            if (user != null)
+              IconButton(
+                tooltip: 'تسجيل الخروج',
+                onPressed: _signOut,
+                icon: const Icon(Icons.logout),
+              ),
           ],
         ),
         body: Column(
@@ -384,7 +410,7 @@ class _HomeScreenState extends State<HomeScreen> {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
               child: Text(
                 name == null || name.isEmpty
-                    ? 'مرحباً بك في دلالة شبشة'
+                    ? 'مرحباً بك في سوق شبشة'
                     : 'مرحباً يا $name',
                 style: const TextStyle(
                   fontSize: 20,
