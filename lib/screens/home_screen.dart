@@ -1,3 +1,4 @@
+import 'my_listings_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -306,6 +307,18 @@ class _HomeScreenState extends State<HomeScreen> {
               tooltip: 'تحديث',
               onPressed: _loadData,
               icon: const Icon(Icons.refresh),
+            ),
+            IconButton(
+              tooltip: 'إعلاناتي',
+              icon: const Icon(Icons.inventory_2_outlined),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const MyListingsScreen(),
+                  ),
+                );
+              },
             ),
             IconButton(
               tooltip: 'تسجيل الخروج',
