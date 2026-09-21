@@ -2,6 +2,7 @@ import 'my_listings_screen.dart';
 import 'profile_screen.dart';
 import 'favorites_screen.dart';
 import 'auth_screen.dart';
+import 'admin_listings_screen.dart';
 
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -23,6 +24,8 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Map<String, dynamic>> _listings = [];
 
   bool _loading = true;
+  bool _isAdmin = false;
+
   String? _error;
   int? _selectedCategoryId;
 
@@ -30,6 +33,41 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _loadData();
+    _checkAdminStatus();
+  }
+
+  Future<void> _checkAdminStatus() async {
+    try {
+      final user = _supabase.auth.currentUser;
+
+      if (user == null) {
+        if (!mounted) return;
+
+        setState(() {
+          _isAdmin = false;
+        });
+
+        return;
+      }
+
+      final profile = await _supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .maybeSingle();
+
+      if (!mounted) return;
+
+      setState(() {
+        _isAdmin = profile?['role'] == 'admin';
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _isAdmin = false;
+      });
+    }
   }
 
   Future<void> _loadData() async {
@@ -83,7 +121,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
       if (!mounted) return;
 
-      setState(() {});
+      setState(() {
+        _isAdmin = false;
+      });
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -118,6 +158,8 @@ class _HomeScreenState extends State<HomeScreen> {
           _supabase.auth.currentUser == null) {
         return;
       }
+
+      await _checkAdminStatus();
     }
 
     await Navigator.push(
@@ -130,6 +172,20 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!mounted) return;
 
     _loadData();
+  }
+
+  Future<void> _openAdminPanel() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const AdminListingsScreen(),
+      ),
+    );
+
+    if (!mounted) return;
+
+    await _checkAdminStatus();
+    await _loadData();
   }
 
   String _formatPrice(Map<String, dynamic> listing) {
@@ -358,6 +414,12 @@ class _HomeScreenState extends State<HomeScreen> {
         appBar: AppBar(
           title: const Text('دلالة شبشة'),
           actions: [
+            if (_isAdmin)
+              IconButton(
+                tooltip: 'لوحة تحكم الأدمن',
+                icon: const Icon(Icons.admin_panel_settings_outlined),
+                onPressed: _openAdminPanel,
+              ),
             IconButton(
               tooltip: 'الملف الشخصي',
               icon: const Icon(Icons.person_outline),
@@ -389,7 +451,10 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             IconButton(
               tooltip: 'تحديث',
-              onPressed: _loadData,
+              onPressed: () {
+                _loadData();
+                _checkAdminStatus();
+              },
               icon: const Icon(Icons.refresh),
             ),
             if (user != null)
