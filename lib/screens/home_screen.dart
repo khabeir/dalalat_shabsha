@@ -282,11 +282,11 @@ _loadData();
 
 }
 
-Future<void> openAdminPanel() async {
+Future<void> _openAdminPanel() async {
 await Navigator.push(
 context,
 MaterialPageRoute(
-builder: () => const AdminListingsScreen(),
+builder: (_) => const AdminListingsScreen(),
 ),
 );
 
