@@ -232,21 +232,6 @@ Future<void> _openAdminPanel() async {
   await _loadData();
 }
 
-Future<void> openAdminPanel() async {
-await Navigator.push(
-context,
-MaterialPageRoute(
-builder: () => const AdminListingsScreen(),
-),
-);
-
-if (!mounted) return;
-
-await _checkAdminStatus();
-await _loadData();
-
-}
-
 String _formatPrice(Map<String, dynamic> listing) {
 final price = listing['price'];
 final currency = listing['currency'] ?? 'SDG';
