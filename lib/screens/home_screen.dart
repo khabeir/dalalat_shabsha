@@ -143,7 +143,7 @@ try {
   var listingsQuery = _supabase
       .from('listings')
       .select(
-        'id, title, description, price, currency, price_type, area, created_at',
+        'id, title, description, price, currency, price_type, area, category_id, created_at',
       )
       .eq('status', 'approved');
 
@@ -693,217 +693,445 @@ return Card(
 }
 
 Widget _buildBody() {
-if (_loading) {
-return const Center(
-child: CircularProgressIndicator(),
-);
-}
+  if (_loading) {
+    return const Center(
+      child: CircularProgressIndicator(),
+    );
+  }
 
-if (_error != null) {
-  return Center(
-    child: Padding(
-      padding:
-          const EdgeInsets.all(24),
-      child: Column(
-        mainAxisSize:
-            MainAxisSize.min,
-        children: [
-          const Icon(
-            Icons.wifi_off,
-            size: 48,
-          ),
-          const SizedBox(height: 12),
-          Text(
-            _error!,
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 16),
-          FilledButton(
-            onPressed: _loadData,
-            child: const Text(
-              'إعادة المحاولة',
+  if (_error != null) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.wifi_off,
+              size: 48,
             ),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-return RefreshIndicator(
-  onRefresh: _loadData,
-  child: ListView(
-    physics:
-        const AlwaysScrollableScrollPhysics(),
-    padding:
-        const EdgeInsets.all(16),
-    children: [
-      const Text(
-        'التصنيفات',
-        style: TextStyle(
-          fontSize: 21,
-          fontWeight:
-              FontWeight.bold,
+            const SizedBox(height: 12),
+            Text(
+              _error!,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            FilledButton(
+              onPressed: _loadData,
+              child: const Text(
+                'إعادة المحاولة',
+              ),
+            ),
+          ],
         ),
       ),
+    );
+  }
 
-      const SizedBox(height: 12),
+  return RefreshIndicator(
+    onRefresh: _loadData,
+    child: ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(
+        16,
+        8,
+        16,
+        24,
+      ),
+      children: [
+        // البحث
+        TextField(
+          controller: _searchController,
+          textInputAction: TextInputAction.search,
+          decoration: InputDecoration(
+            hintText: 'ابحث عن إعلان أو منطقة...',
+            prefixIcon: const Icon(
+              Icons.search,
+            ),
+            suffixIcon: _searchQuery.isNotEmpty
+                ? IconButton(
+                    onPressed: () {
+                      _searchController.clear();
 
-      if (_categories.isEmpty)
-        const Text(
-          'لا توجد تصنيفات متاحة حالياً',
-        )
-      else
-        SizedBox(
-          height: 48,
-          child: ListView(
-            scrollDirection:
-                Axis.horizontal,
-            children: [
-              Padding(
-                padding:
-                    const EdgeInsetsDirectional.only(
-                  end: 8,
+                      setState(() {
+                        _searchQuery = '';
+                      });
+                    },
+                    icon: const Icon(
+                      Icons.clear,
+                    ),
+                    tooltip: 'مسح البحث',
+                  )
+                : null,
+            filled: true,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide.none,
+            ),
+          ),
+          onChanged: (value) {
+            setState(() {
+              _searchQuery = value;
+            });
+          },
+        ),
+
+        const SizedBox(height: 18),
+
+        // التصنيفات
+        Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'الأقسام',
+                style: TextStyle(
+                  fontSize: 21,
+                  fontWeight: FontWeight.bold,
                 ),
-                child: ChoiceChip(
-                  selected:
-                      _selectedCategoryId ==
-                          null,
-                  label:
-                      const Text('الكل'),
-                  onSelected: (_) {
-                    setState(
-                      () =>
-                          _selectedCategoryId =
-                              null,
-                    );
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  _selectedCategoryId = null;
+                });
+
+                _loadData();
+              },
+              child: const Text(
+                'عرض الكل',
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 4),
+
+        if (_categories.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(
+              vertical: 16,
+            ),
+            child: Text(
+              'لا توجد أقسام متاحة حالياً',
+              textAlign: TextAlign.center,
+            ),
+          )
+        else
+          SizedBox(
+            height: 92,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: _categories.length,
+              separatorBuilder: (_, __) {
+                return const SizedBox(
+                  width: 10,
+                );
+              },
+              itemBuilder: (context, index) {
+                final category =
+                    _categories[index];
+
+                final categoryId =
+                    category['id'] as int?;
+
+                final categoryName =
+                    category['name']?.toString() ??
+                        'بدون اسم';
+
+                final selected =
+                    _selectedCategoryId ==
+                        categoryId;
+
+                return GestureDetector(
+                  onTap: () {
+                    if (categoryId == null) {
+                      return;
+                    }
+
+                    setState(() {
+                      _selectedCategoryId =
+                          categoryId;
+                    });
 
                     _loadData();
                   },
+                  child: Container(
+                    width: 92,
+                    padding:
+                        const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: selected
+                          ? Theme.of(context)
+                              .colorScheme
+                              .primaryContainer
+                          : Theme.of(context)
+                              .colorScheme
+                              .surfaceContainerHighest,
+                      borderRadius:
+                          BorderRadius.circular(16),
+                      border: Border.all(
+                        color: selected
+                            ? Theme.of(context)
+                                .colorScheme
+                                .primary
+                            : Colors.transparent,
+                        width: 1.2,
+                      ),
+                    ),
+                    child: Column(
+                      mainAxisAlignment:
+                          MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          _categoryIcon(
+                            categoryName,
+                          ),
+                          size: 30,
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          categoryName,
+                          textAlign:
+                              TextAlign.center,
+                          maxLines: 2,
+                          overflow:
+                              TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight:
+                                FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+
+        const SizedBox(height: 26),
+
+        // نتائج البحث أو القسم المحدد
+        if (_searchQuery.isNotEmpty ||
+            _selectedCategoryId != null) ...[
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'النتائج',
+                  style: TextStyle(
+                    fontSize: 21,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
-              ..._categories
-                  .map(_buildCategoryItem),
+              Text(
+                '${_filteredListings.length} إعلان',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.grey.shade600,
+                ),
+              ),
             ],
           ),
-        ),
 
-      const SizedBox(height: 24),
+          const SizedBox(height: 12),
 
-      // عنوان الإعلانات وعدد النتائج
-      Row(
-        children: [
-          const Expanded(
-            child: Text(
+          if (_filteredListings.isEmpty)
+            Padding(
+              padding:
+                  const EdgeInsets.symmetric(
+                vertical: 32,
+              ),
+              child: Column(
+                children: [
+                  const Icon(
+                    Icons.search_off_outlined,
+                    size: 56,
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    _searchQuery.isEmpty
+                        ? 'لا توجد إعلانات في هذا القسم'
+                        : 'لم نجد إعلانات تطابق بحثك',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 16,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            ..._filteredListings
+                .map(_buildListingCard),
+        ] else ...[
+          // الصفحة الرئيسية: إعلانات حسب القسم
+          if (_listings.isEmpty)
+            Padding(
+              padding:
+                  const EdgeInsets.symmetric(
+                vertical: 32,
+              ),
+              child: Column(
+                children: [
+                  const Icon(
+                    Icons.inventory_2_outlined,
+                    size: 56,
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'لا توجد إعلانات معتمدة حالياً',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 16,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else ...[
+            const Text(
               'أحدث الإعلانات',
               style: TextStyle(
                 fontSize: 21,
-                fontWeight:
-                    FontWeight.bold,
+                fontWeight: FontWeight.bold,
               ),
             ),
-          ),
 
-          if (_searchQuery.isNotEmpty)
-            Text(
-              '${_filteredListings.length} نتيجة',
-              style: TextStyle(
-                fontSize: 13,
-                color:
-                    Colors.grey.shade600,
+            const SizedBox(height: 12),
+
+            SizedBox(
+              height: 330,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: _listings.length,
+                separatorBuilder: (_, __) {
+                  return const SizedBox(
+                    width: 12,
+                  );
+                },
+                itemBuilder: (context, index) {
+                  return SizedBox(
+                    width: 250,
+                    child: _buildListingCard(
+                      _listings[index],
+                    ),
+                  );
+                },
               ),
             ),
-        ],
-      ),
 
-      const SizedBox(height: 12),
+            const SizedBox(height: 28),
 
-      // شريط البحث
-      TextField(
-        controller:
-            _searchController,
-        textInputAction:
-            TextInputAction.search,
-        decoration: InputDecoration(
-          hintText:
-              'ابحث عن إعلان أو منطقة...',
-          prefixIcon:
-              const Icon(Icons.search),
-          suffixIcon:
-              _searchQuery.isNotEmpty
-                  ? IconButton(
-                      onPressed: () {
-                        _searchController
-                            .clear();
+            // أقسام الإعلانات
+            ..._categories.map((category) {
+              final categoryId =
+                  category['id'] as int?;
 
-                        setState(() {
-                          _searchQuery =
-                              '';
-                        });
-                      },
-                      icon:
-                          const Icon(
-                        Icons.clear,
-                      ),
-                      tooltip:
-                          'مسح البحث',
-                    )
-                  : null,
-          filled: true,
-          border:
-              OutlineInputBorder(
-            borderRadius:
-                BorderRadius.circular(
-              14,
-            ),
-            borderSide:
-                BorderSide.none,
-          ),
-        ),
-        onChanged: (value) {
-          setState(() {
-            _searchQuery = value;
-          });
-        },
-      ),
+              final categoryName =
+                  category['name']?.toString() ??
+                      'بدون اسم';
 
-      const SizedBox(height: 16),
+              if (categoryId == null) {
+                return const SizedBox.shrink();
+              }
 
-      // نتائج الإعلانات
-      if (_filteredListings.isEmpty)
-        Padding(
-          padding:
-              const EdgeInsets.symmetric(
-            vertical: 32,
-          ),
-          child: Column(
-            children: [
-              const Icon(
-                Icons.search_off_outlined,
-                size: 56,
-              ),
-              const SizedBox(height: 12),
-              Text(
-                _searchQuery.isEmpty
-                    ? 'لا توجد إعلانات معتمدة حالياً'
-                    : 'لم نجد إعلانات تطابق بحثك',
-                textAlign:
-                    TextAlign.center,
-                style:
-                    const TextStyle(
-                  fontSize: 16,
+              final categoryListings =
+                  _listings.where((listing) {
+                return listing['category_id'] ==
+                    categoryId;
+              }).toList();
+
+              if (categoryListings.isEmpty) {
+                return const SizedBox.shrink();
+              }
+
+              return Padding(
+                padding:
+                    const EdgeInsets.only(
+                  bottom: 28,
                 ),
-              ),
-            ],
-          ),
-        )
-      else
-        ..._filteredListings
-            .map(_buildListingCard),
-    ],
-  ),
-);
+                child: Column(
+                  crossAxisAlignment:
+                      CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          _categoryIcon(
+                            categoryName,
+                          ),
+                          size: 22,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            categoryName,
+                            style:
+                                const TextStyle(
+                              fontSize: 19,
+                              fontWeight:
+                                  FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            setState(() {
+                              _selectedCategoryId =
+                                  categoryId;
+                            });
 
+                            _loadData();
+                          },
+                          child: const Text(
+                            'عرض الكل',
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 8),
+
+                    SizedBox(
+                      height: 330,
+                      child:
+                          ListView.separated(
+                        scrollDirection:
+                            Axis.horizontal,
+                        itemCount:
+                            categoryListings.length,
+                        separatorBuilder:
+                            (_, __) {
+                          return const SizedBox(
+                            width: 12,
+                          );
+                        },
+                        itemBuilder:
+                            (context, index) {
+                          return SizedBox(
+                            width: 250,
+                            child:
+                                _buildListingCard(
+                              categoryListings[
+                                  index],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
+        ],
+      ],
+    ),
+  );
 }
 
 @override
