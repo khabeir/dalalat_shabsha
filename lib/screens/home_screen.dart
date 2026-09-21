@@ -367,91 +367,153 @@ return Padding(
 }
 
 Widget _buildListingCard(Map<String, dynamic> listing) {
-return Card(
-margin: const EdgeInsets.only(bottom: 12),
-clipBehavior: Clip.antiAlias,
-child: InkWell(
-onTap: () {
-final listingId = listing['id'];
+  final title = listing['title']?.toString().trim().isNotEmpty == true
+      ? listing['title'].toString()
+      : 'إعلان بدون عنوان';
 
-      if (listingId is int) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ListingDetailsScreen(
-              listingId: listingId,
+  final area = listing['area']?.toString().trim() ?? '';
+  final price = _formatPrice(listing);
+
+  return Card(
+    margin: const EdgeInsets.only(bottom: 16),
+    elevation: 2,
+    shadowColor: Colors.black26,
+    clipBehavior: Clip.antiAlias,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(16),
+    ),
+    child: InkWell(
+      onTap: () {
+        final listingId = listing['id'];
+
+        if (listingId is int) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ListingDetailsScreen(
+                listingId: listingId,
+              ),
             ),
-          ),
-        );
-      }
-    },
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildListingImage(listing),
+          );
+        }
+      },
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // صورة الإعلان
+          _buildListingImage(listing),
 
-        Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                listing['title']?.toString() ??
-                    'إعلان بدون عنوان',
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // عنوان الإعلان
+                Text(
+                  title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    height: 1.3,
+                  ),
                 ),
-              ),
 
-              const SizedBox(height: 8),
+                const SizedBox(height: 10),
 
-              Text(
-                _formatPrice(listing),
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-
-              if ((listing['area'] ?? '')
-                  .toString()
-                  .isNotEmpty) ...[
-                const SizedBox(height: 6),
+                // السعر
                 Row(
                   children: [
                     const Icon(
-                      Icons.location_on_outlined,
-                      size: 18,
+                      Icons.sell_outlined,
+                      size: 20,
                     ),
-                    const SizedBox(width: 4),
+                    const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        listing['area'].toString(),
+                        price,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ],
                 ),
-              ],
 
-              if ((listing['description'] ?? '')
-                  .toString()
-                  .isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Text(
-                  listing['description'].toString(),
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
+                // المنطقة
+                if (area.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.location_on_outlined,
+                        size: 19,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          area,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+
+                const SizedBox(height: 14),
+
+                // زر عرض الإعلان
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      final listingId = listing['id'];
+
+                      if (listingId is int) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ListingDetailsScreen(
+                              listingId: listingId,
+                            ),
+                          ),
+                        );
+                      }
+                    },
+                    icon: const Icon(
+                      Icons.arrow_back_ios_new,
+                      size: 16,
+                    ),
+                    label: const Text(
+                      'عرض الإعلان',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(44),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
                 ),
               ],
-            ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     ),
-  ),
-);
-
+  );
 }
 
 Widget _buildBody() {
