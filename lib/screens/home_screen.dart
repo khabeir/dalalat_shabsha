@@ -276,24 +276,42 @@ return _supabase.storage
 Widget _buildListingImage(Map<String, dynamic> listing) {
   final imageUrl = _imageUrl(listing['image_path']);
 
-  if (imageUrl == null) {
+  Widget buildNoImage() {
     return Container(
       height: 200,
       width: double.infinity,
       decoration: BoxDecoration(
-        color: Colors.grey.shade200,
+        color: Colors.grey.shade100,
         borderRadius: const BorderRadius.vertical(
           top: Radius.circular(12),
         ),
       ),
       child: const Center(
-        child: Icon(
-          Icons.image_outlined,
-          size: 70,
-          color: Colors.grey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.photo_library_outlined,
+              size: 52,
+              color: Colors.grey,
+            ),
+            SizedBox(height: 10),
+            Text(
+              'لا توجد صور لهذا الإعلان',
+              style: TextStyle(
+                color: Colors.grey,
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
         ),
       ),
     );
+  }
+
+  if (imageUrl == null) {
+    return buildNoImage();
   }
 
   return ClipRRect(
@@ -306,18 +324,7 @@ Widget _buildListingImage(Map<String, dynamic> listing) {
       width: double.infinity,
       fit: BoxFit.cover,
       errorBuilder: (context, error, stackTrace) {
-        return Container(
-          height: 200,
-          width: double.infinity,
-          color: Colors.grey.shade200,
-          child: const Center(
-            child: Icon(
-              Icons.image_outlined,
-              size: 70,
-              color: Colors.grey,
-            ),
-          ),
-        );
+        return buildNoImage();
       },
       loadingBuilder: (context, child, loadingProgress) {
         if (loadingProgress == null) {
@@ -327,7 +334,7 @@ Widget _buildListingImage(Map<String, dynamic> listing) {
         return Container(
           height: 200,
           width: double.infinity,
-          color: Colors.grey.shade200,
+          color: Colors.grey.shade100,
           child: const Center(
             child: CircularProgressIndicator(),
           ),
