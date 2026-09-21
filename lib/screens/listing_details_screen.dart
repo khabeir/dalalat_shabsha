@@ -18,6 +18,7 @@ final _supabase = Supabase.instance.client;
 
 Map<String, dynamic>? _listing;
 List<Map<String, dynamic>> _images = [];
+int _currentImageIndex = 0;
 
 bool _loading = true;
 bool _favorite = false;
@@ -449,17 +450,37 @@ return ListView(
   padding: const EdgeInsets.all(16),
   children: [
     if (_images.isNotEmpty)
-      SizedBox(
-        height: 260,
-        child: PageView.builder(
-          itemCount: _images.length,
-          itemBuilder: (context, index) {
-            final path =
-                _images[index]['image_path']?.toString() ?? '';
+      Column(
+        children: [
+          SizedBox(
+            height: 260,
+            child: PageView.builder(
+              itemCount: _images.length,
+              onPageChanged: (index) {
+                setState(() {
+                  _currentImageIndex = index;
+                });
+              },
+              itemBuilder: (context, index) {
+                final path =
+                    _images[index]['image_path']?.toString() ?? '';
 
-            return _buildImage(path);
-          },
-        ),
+                return _buildImage(path);
+              },
+            ),
+          ),
+
+          if (_images.length > 1) ...[
+            const SizedBox(height: 10),
+            Text(
+              '${_currentImageIndex + 1} / ${_images.length}',
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ],
       )
     else
       Container(
