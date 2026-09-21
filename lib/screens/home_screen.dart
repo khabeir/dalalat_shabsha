@@ -282,11 +282,11 @@ _loadData();
 
 }
 
-Future<void> _openAdminPanel() async {
+Future<void> openAdminPanel() async {
 await Navigator.push(
 context,
 MaterialPageRoute(
-builder: (_) => const AdminListingsScreen(),
+builder: () => const AdminListingsScreen(),
 ),
 );
 
@@ -873,6 +873,178 @@ return Directionality(
   textDirection:
       TextDirection.rtl,
   child: Scaffold(
+    drawer: Drawer(
+    child: SafeArea(
+      child: ListView(
+        padding: EdgeInsets.zero,
+        children: [
+          UserAccountsDrawerHeader(
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            accountName: Text(
+              name == null || name.isEmpty
+                  ? 'مرحباً بك في دلالة شبشة'
+                  : name,
+            ),
+            accountEmail: user?.email,
+            currentAccountPicture: CircleAvatar(
+              backgroundColor:
+                  Theme.of(context).colorScheme.onPrimary,
+              child: Icon(
+                Icons.storefront_rounded,
+                size: 32,
+                color:
+                    Theme.of(context).colorScheme.primary,
+              ),
+            ),
+          ),
+
+          ListTile(
+            leading: const Icon(Icons.person_outline),
+            title: const Text('الملف الشخصي'),
+            onTap: () {
+              Navigator.pop(context);
+
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const ProfileScreen(),
+                ),
+              );
+            },
+          ),
+
+          const Divider(),
+
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: Text(
+              'الأقسام',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+
+          ListTile(
+            leading: const Icon(Icons.work_outline),
+            title: const Text('وظائف'),
+            onTap: () {
+              Navigator.pop(context);
+            },
+          ),
+
+          ListTile(
+            leading: const Icon(Icons.build_outlined),
+            title: const Text('خدمات'),
+            onTap: () {
+              Navigator.pop(context);
+            },
+          ),
+
+          ListTile(
+            leading: const Icon(Icons.directions_car_outlined),
+            title: const Text('سيارات ومركبات'),
+            onTap: () {
+              Navigator.pop(context);
+            },
+          ),
+
+          ListTile(
+            leading: const Icon(Icons.home_work_outlined),
+            title: const Text('عقارات'),
+            onTap: () {
+              Navigator.pop(context);
+            },
+          ),
+
+          ListTile(
+            leading: const Icon(Icons.phone_android_outlined),
+            title: const Text('أجهزة وإلكترونيات'),
+            onTap: () {
+              Navigator.pop(context);
+            },
+          ),
+
+        ListTile(
+          leading: const Icon(Icons.weekend_outlined),
+          title: const Text('أثاث ومنزل'),
+          onTap: () {
+            Navigator.pop(context);
+          },
+        ),
+
+        const Divider(),
+
+        ListTile(
+          leading: const Icon(Icons.favorite_border),
+          title: const Text('المفضلة'),
+          onTap: () {
+            Navigator.pop(context);
+
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const FavoritesScreen(),
+              ),
+            );
+          },
+        ),
+
+        if (user != null)
+          ListTile(
+            leading: const Icon(
+              Icons.inventory_2_outlined,
+            ),
+            title: const Text('إعلاناتي'),
+            onTap: () {
+              Navigator.pop(context);
+
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const MyListingsScreen(),
+                ),
+              );
+            },
+          ),
+
+        if (user == null)
+          ListTile(
+            leading: const Icon(Icons.login),
+            title: const Text('تسجيل الدخول'),
+            onTap: () async {
+              Navigator.pop(context);
+
+              final result = await Navigator.push<bool>(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const AuthScreen(),
+                ),
+              );
+
+              if (result == true && mounted) {
+                setState(() {});
+                await _checkAdminStatus();
+              }
+            },
+          ),
+
+        if (user != null)
+          ListTile(
+            leading: const Icon(Icons.logout),
+            title: const Text('تسجيل الخروج'),
+            onTap: () {
+              Navigator.pop(context);
+              _signOut();
+            },
+          ),
+      ],
+    ),
+  ),
+),
     appBar: AppBar(
       title: Row(
         mainAxisSize: MainAxisSize.min,
