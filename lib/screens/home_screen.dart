@@ -19,6 +19,7 @@ State<HomeScreen> createState() => _HomeScreenState();
 
 class _HomeScreenState extends State<HomeScreen> {
 final _supabase = Supabase.instance.client;
+final _searchController = TextEditingController();
 
 List<Map<String, dynamic>> _categories = [];
 List<Map<String, dynamic>> _listings = [];
@@ -27,6 +28,7 @@ bool _loading = true;
 bool _isAdmin = false;
 
 String? _error;
+String _searchQuery = '';
 int? _selectedCategoryId;
 
 @override
@@ -34,6 +36,36 @@ void initState() {
 super.initState();
 _loadData();
 _checkAdminStatus();
+}
+
+@override
+void dispose() {
+_searchController.dispose();
+super.dispose();
+}
+
+List<Map<String, dynamic>> get _filteredListings {
+final query = _searchQuery.trim().toLowerCase();
+
+if (query.isEmpty) {
+  return _listings;
+}
+
+return _listings.where((listing) {
+  final title =
+      listing['title']?.toString().toLowerCase() ?? '';
+
+  final description =
+      listing['description']?.toString().toLowerCase() ?? '';
+
+  final area =
+      listing['area']?.toString().toLowerCase() ?? '';
+
+  return title.contains(query) ||
+      description.contains(query) ||
+      area.contains(query);
+}).toList();
+
 }
 
 Future<void> _checkAdminStatus() async {
@@ -99,7 +131,10 @@ try {
   }
 
   final listingsResponse =
-      await listingsQuery.order('created_at', ascending: false);
+      await listingsQuery.order(
+    'created_at',
+    ascending: false,
+  );
 
   final listings =
       List<Map<String, dynamic>>.from(listingsResponse);
@@ -114,7 +149,9 @@ try {
     if (listingIds.isNotEmpty) {
       final imagesResponse = await _supabase
           .from('listing_images')
-          .select('listing_id, image_path, sort_order')
+          .select(
+            'listing_id, image_path, sort_order',
+          )
           .inFilter('listing_id', listingIds)
           .order('sort_order');
 
@@ -138,9 +175,11 @@ try {
   if (!mounted) return;
 
   setState(() {
-    _categories = List<Map<String, dynamic>>.from(
+    _categories =
+        List<Map<String, dynamic>>.from(
       categoriesResponse,
     );
+
     _listings = listings;
     _loading = false;
   });
@@ -148,7 +187,8 @@ try {
   if (!mounted) return;
 
   setState(() {
-    _error = 'تعذر تحميل البيانات. تحقق من اتصال الإنترنت وحاول مجدداً.';
+    _error =
+        'تعذر تحميل البيانات. تحقق من اتصال الإنترنت وحاول مجدداً.';
     _loading = false;
   });
 }
@@ -175,7 +215,9 @@ await _supabase.auth.signOut();
 
   ScaffoldMessenger.of(context).showSnackBar(
     const SnackBar(
-      content: Text('تعذر تسجيل الخروج، حاول مرة أخرى'),
+      content: Text(
+        'تعذر تسجيل الخروج، حاول مرة أخرى',
+      ),
     ),
   );
 }
@@ -218,18 +260,19 @@ _loadData();
 
 }
 
-Future<void> _openAdminPanel() async {
-  await Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => const AdminListingsScreen(),
-    ),
-  );
+Future<void> openAdminPanel() async {
+await Navigator.push(
+context,
+MaterialPageRoute(
+builder: () => const AdminListingsScreen(),
+),
+);
 
-  if (!mounted) return;
+if (!mounted) return;
 
-  await _checkAdminStatus();
-  await _loadData();
+await _checkAdminStatus();
+await _loadData();
+
 }
 
 String _formatPrice(Map<String, dynamic> listing) {
@@ -273,92 +316,112 @@ return _supabase.storage
 
 }
 
-Widget _buildListingImage(Map<String, dynamic> listing) {
-  final imageUrl = _imageUrl(listing['image_path']);
+Widget _buildListingImage(
+Map<String, dynamic> listing,
+) {
+final imageUrl =
+_imageUrl(listing['image_path']);
 
-  Widget buildNoImage() {
-    return Container(
-      height: 200,
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: Colors.grey.shade100,
-        borderRadius: const BorderRadius.vertical(
-          top: Radius.circular(12),
-        ),
+Widget buildNoImage() {
+  return Container(
+    height: 200,
+    width: double.infinity,
+    decoration: BoxDecoration(
+      color: Colors.grey.shade100,
+      borderRadius:
+          const BorderRadius.vertical(
+        top: Radius.circular(12),
       ),
-      child: const Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.photo_library_outlined,
-              size: 52,
-              color: Colors.grey,
-            ),
-            SizedBox(height: 10),
-            Text(
-              'لا توجد صور لهذا الإعلان',
-              style: TextStyle(
-                color: Colors.grey,
-                fontSize: 15,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  if (imageUrl == null) {
-    return buildNoImage();
-  }
-
-  return ClipRRect(
-    borderRadius: const BorderRadius.vertical(
-      top: Radius.circular(12),
     ),
-    child: Image.network(
-      imageUrl,
-      height: 200,
-      width: double.infinity,
-      fit: BoxFit.cover,
-      errorBuilder: (context, error, stackTrace) {
-        return buildNoImage();
-      },
-      loadingBuilder: (context, child, loadingProgress) {
-        if (loadingProgress == null) {
-          return child;
-        }
-
-        return Container(
-          height: 200,
-          width: double.infinity,
-          color: Colors.grey.shade100,
-          child: const Center(
-            child: CircularProgressIndicator(),
+    child: const Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.photo_library_outlined,
+            size: 52,
+            color: Colors.grey,
           ),
-        );
-      },
+          SizedBox(height: 10),
+          Text(
+            'لا توجد صور لهذا الإعلان',
+            style: TextStyle(
+              color: Colors.grey,
+              fontSize: 15,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
     ),
   );
 }
 
-Widget _buildCategoryItem(Map<String, dynamic> category) {
+if (imageUrl == null) {
+  return buildNoImage();
+}
+
+return ClipRRect(
+  borderRadius:
+      const BorderRadius.vertical(
+    top: Radius.circular(12),
+  ),
+  child: Image.network(
+    imageUrl,
+    height: 200,
+    width: double.infinity,
+    fit: BoxFit.cover,
+    errorBuilder:
+        (context, error, stackTrace) {
+      return buildNoImage();
+    },
+    loadingBuilder:
+        (context, child, loadingProgress) {
+      if (loadingProgress == null) {
+        return child;
+      }
+
+      return Container(
+        height: 200,
+        width: double.infinity,
+        color: Colors.grey.shade100,
+        child: const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    },
+  ),
+);
+
+}
+
+Widget _buildCategoryItem(
+Map<String, dynamic> category,
+) {
 final id = category['id'] as int;
-final selected = _selectedCategoryId == id;
-final icon = category['icon'] as String?;
-final name = category['name'] as String? ?? '';
+final selected =
+_selectedCategoryId == id;
+final icon =
+category['icon'] as String?;
+final name =
+category['name'] as String? ?? '';
 
 return Padding(
-  padding: const EdgeInsetsDirectional.only(end: 8),
+  padding:
+      const EdgeInsetsDirectional.only(
+    end: 8,
+  ),
   child: ChoiceChip(
     selected: selected,
-    label: Text('${icon ?? '📦'} $name'),
+    label: Text(
+      '${icon ?? '📦'} $name',
+    ),
     onSelected: (_) {
       setState(() {
-        _selectedCategoryId = selected ? null : id;
+        _selectedCategoryId =
+            selected ? null : id;
       });
+
       _loadData();
     },
   ),
@@ -366,154 +429,197 @@ return Padding(
 
 }
 
-Widget _buildListingCard(Map<String, dynamic> listing) {
-  final title = listing['title']?.toString().trim().isNotEmpty == true
-      ? listing['title'].toString()
-      : 'إعلان بدون عنوان';
+Widget _buildListingCard(
+Map<String, dynamic> listing,
+) {
+final title =
+listing['title']?.toString().trim().isNotEmpty ==
+true
+? listing['title'].toString()
+: 'إعلان بدون عنوان';
 
-  final area = listing['area']?.toString().trim() ?? '';
-  final price = _formatPrice(listing);
+final area =
+    listing['area']?.toString().trim() ?? '';
 
-  return Card(
-    margin: const EdgeInsets.only(bottom: 16),
-    elevation: 2,
-    shadowColor: Colors.black26,
-    clipBehavior: Clip.antiAlias,
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(16),
-    ),
-    child: InkWell(
-      onTap: () {
-        final listingId = listing['id'];
+final price = _formatPrice(listing);
 
-        if (listingId is int) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => ListingDetailsScreen(
-                listingId: listingId,
-              ),
+return Card(
+  margin:
+      const EdgeInsets.only(bottom: 16),
+  elevation: 2,
+  shadowColor: Colors.black26,
+  clipBehavior: Clip.antiAlias,
+  shape: RoundedRectangleBorder(
+    borderRadius:
+        BorderRadius.circular(16),
+  ),
+  child: InkWell(
+    onTap: () {
+      final listingId =
+          listing['id'];
+
+      if (listingId is int) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) =>
+                ListingDetailsScreen(
+              listingId: listingId,
             ),
-          );
-        }
-      },
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // صورة الإعلان
-          _buildListingImage(listing),
+          ),
+        );
+      }
+    },
+    child: Column(
+      crossAxisAlignment:
+          CrossAxisAlignment.start,
+      children: [
+        // صورة الإعلان
+        _buildListingImage(listing),
 
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // عنوان الإعلان
-                Text(
-                  title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    height: 1.3,
-                  ),
+        Padding(
+          padding:
+              const EdgeInsets.fromLTRB(
+            14,
+            12,
+            14,
+            14,
+          ),
+          child: Column(
+            crossAxisAlignment:
+                CrossAxisAlignment.start,
+            children: [
+              // عنوان الإعلان
+              Text(
+                title,
+                maxLines: 2,
+                overflow:
+                    TextOverflow.ellipsis,
+                style:
+                    const TextStyle(
+                  fontSize: 18,
+                  fontWeight:
+                      FontWeight.bold,
+                  height: 1.3,
                 ),
+              ),
 
-                const SizedBox(height: 10),
+              const SizedBox(height: 10),
 
-                // السعر
+              // السعر
+              Row(
+                children: [
+                  const Icon(
+                    Icons.sell_outlined,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      price,
+                      maxLines: 1,
+                      overflow:
+                          TextOverflow.ellipsis,
+                      style:
+                          const TextStyle(
+                        fontSize: 17,
+                        fontWeight:
+                            FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              // المنطقة
+              if (area.isNotEmpty) ...[
+                const SizedBox(height: 8),
                 Row(
                   children: [
                     const Icon(
-                      Icons.sell_outlined,
-                      size: 20,
+                      Icons
+                          .location_on_outlined,
+                      size: 19,
                     ),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        price,
+                        area,
                         maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.bold,
+                        overflow:
+                            TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors
+                              .grey
+                              .shade700,
                         ),
                       ),
                     ),
                   ],
                 ),
+              ],
 
-                // المنطقة
-                if (area.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.location_on_outlined,
-                        size: 19,
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          area,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey.shade700,
+              const SizedBox(height: 14),
+
+              // زر عرض الإعلان
+              SizedBox(
+                width: double.infinity,
+                child:
+                    OutlinedButton.icon(
+                  onPressed: () {
+                    final listingId =
+                        listing['id'];
+
+                    if (listingId is int) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              ListingDetailsScreen(
+                            listingId:
+                                listingId,
                           ),
                         ),
-                      ),
-                    ],
+                      );
+                    }
+                  },
+                  icon: const Icon(
+                    Icons
+                        .arrow_back_ios_new,
+                    size: 16,
                   ),
-                ],
-
-                const SizedBox(height: 14),
-
-                // زر عرض الإعلان
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      final listingId = listing['id'];
-
-                      if (listingId is int) {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => ListingDetailsScreen(
-                              listingId: listingId,
-                            ),
-                          ),
-                        );
-                      }
-                    },
-                    icon: const Icon(
-                      Icons.arrow_back_ios_new,
-                      size: 16,
+                  label: const Text(
+                    'عرض الإعلان',
+                    style: TextStyle(
+                      fontWeight:
+                          FontWeight.w600,
                     ),
-                    label: const Text(
-                      'عرض الإعلان',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                      ),
+                  ),
+                  style:
+                      OutlinedButton.styleFrom(
+                    minimumSize:
+                        const Size.fromHeight(
+                      44,
                     ),
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size.fromHeight(44),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
+                    shape:
+                        RoundedRectangleBorder(
+                      borderRadius:
+                          BorderRadius.circular(
+                        10,
                       ),
                     ),
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     ),
-  );
+  ),
+);
+
 }
 
 Widget _buildBody() {
@@ -526,9 +632,11 @@ child: CircularProgressIndicator(),
 if (_error != null) {
   return Center(
     child: Padding(
-      padding: const EdgeInsets.all(24),
+      padding:
+          const EdgeInsets.all(24),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisSize:
+            MainAxisSize.min,
         children: [
           const Icon(
             Icons.wifi_off,
@@ -542,7 +650,9 @@ if (_error != null) {
           const SizedBox(height: 16),
           FilledButton(
             onPressed: _loadData,
-            child: const Text('إعادة المحاولة'),
+            child: const Text(
+              'إعادة المحاولة',
+            ),
           ),
         ],
       ),
@@ -553,78 +663,173 @@ if (_error != null) {
 return RefreshIndicator(
   onRefresh: _loadData,
   child: ListView(
-    physics: const AlwaysScrollableScrollPhysics(),
-    padding: const EdgeInsets.all(16),
+    physics:
+        const AlwaysScrollableScrollPhysics(),
+    padding:
+        const EdgeInsets.all(16),
     children: [
       const Text(
         'التصنيفات',
         style: TextStyle(
           fontSize: 21,
-          fontWeight: FontWeight.bold,
+          fontWeight:
+              FontWeight.bold,
         ),
       ),
 
       const SizedBox(height: 12),
 
       if (_categories.isEmpty)
-        const Text('لا توجد تصنيفات متاحة حالياً')
+        const Text(
+          'لا توجد تصنيفات متاحة حالياً',
+        )
       else
         SizedBox(
           height: 48,
           child: ListView(
-            scrollDirection: Axis.horizontal,
+            scrollDirection:
+                Axis.horizontal,
             children: [
               Padding(
                 padding:
-                    const EdgeInsetsDirectional.only(end: 8),
+                    const EdgeInsetsDirectional.only(
+                  end: 8,
+                ),
                 child: ChoiceChip(
-                  selected: _selectedCategoryId == null,
-                  label: const Text('الكل'),
+                  selected:
+                      _selectedCategoryId ==
+                          null,
+                  label:
+                      const Text('الكل'),
                   onSelected: (_) {
                     setState(
-                      () => _selectedCategoryId = null,
+                      () =>
+                          _selectedCategoryId =
+                              null,
                     );
+
                     _loadData();
                   },
                 ),
               ),
-              ..._categories.map(_buildCategoryItem),
+              ..._categories
+                  .map(_buildCategoryItem),
             ],
           ),
         ),
 
       const SizedBox(height: 24),
 
-      const Text(
-        'أحدث الإعلانات',
-        style: TextStyle(
-          fontSize: 21,
-          fontWeight: FontWeight.bold,
-        ),
+      // عنوان الإعلانات وعدد النتائج
+      Row(
+        children: [
+          const Expanded(
+            child: Text(
+              'أحدث الإعلانات',
+              style: TextStyle(
+                fontSize: 21,
+                fontWeight:
+                    FontWeight.bold,
+              ),
+            ),
+          ),
+
+          if (_searchQuery.isNotEmpty)
+            Text(
+              '${_filteredListings.length} نتيجة',
+              style: TextStyle(
+                fontSize: 13,
+                color:
+                    Colors.grey.shade600,
+              ),
+            ),
+        ],
       ),
 
       const SizedBox(height: 12),
 
-      if (_listings.isEmpty)
-        const Padding(
-          padding: EdgeInsets.symmetric(vertical: 32),
+      // شريط البحث
+      TextField(
+        controller:
+            _searchController,
+        textInputAction:
+            TextInputAction.search,
+        decoration: InputDecoration(
+          hintText:
+              'ابحث عن إعلان أو منطقة...',
+          prefixIcon:
+              const Icon(Icons.search),
+          suffixIcon:
+              _searchQuery.isNotEmpty
+                  ? IconButton(
+                      onPressed: () {
+                        _searchController
+                            .clear();
+
+                        setState(() {
+                          _searchQuery =
+                              '';
+                        });
+                      },
+                      icon:
+                          const Icon(
+                        Icons.clear,
+                      ),
+                      tooltip:
+                          'مسح البحث',
+                    )
+                  : null,
+          filled: true,
+          border:
+              OutlineInputBorder(
+            borderRadius:
+                BorderRadius.circular(
+              14,
+            ),
+            borderSide:
+                BorderSide.none,
+          ),
+        ),
+        onChanged: (value) {
+          setState(() {
+            _searchQuery = value;
+          });
+        },
+      ),
+
+      const SizedBox(height: 16),
+
+      // نتائج الإعلانات
+      if (_filteredListings.isEmpty)
+        Padding(
+          padding:
+              const EdgeInsets.symmetric(
+            vertical: 32,
+          ),
           child: Column(
             children: [
-              Icon(
-                Icons.storefront_outlined,
+              const Icon(
+                Icons.search_off_outlined,
                 size: 56,
               ),
-              SizedBox(height: 12),
+              const SizedBox(height: 12),
               Text(
-                'لا توجد إعلانات معتمدة حالياً',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 16),
+                _searchQuery.isEmpty
+                    ? 'لا توجد إعلانات معتمدة حالياً'
+                    : 'لم نجد إعلانات تطابق بحثك',
+                textAlign:
+                    TextAlign.center,
+                style:
+                    const TextStyle(
+                  fontSize: 16,
+                ),
               ),
             ],
           ),
         )
       else
-        ..._listings.map(_buildListingCard),
+        ..._filteredListings
+            .map(_buildListingCard),
     ],
   ),
 );
@@ -632,34 +837,48 @@ return RefreshIndicator(
 }
 
 @override
-Widget build(BuildContext context) {
-final user = _supabase.auth.currentUser;
+Widget build(
+BuildContext context,
+) {
+final user =
+_supabase.auth.currentUser;
+
 final name =
-user?.userMetadata?['full_name'] as String?;
+    user?.userMetadata?['full_name']
+        as String?;
 
 return Directionality(
-  textDirection: TextDirection.rtl,
+  textDirection:
+      TextDirection.rtl,
   child: Scaffold(
     appBar: AppBar(
-      title: const Text('دلالة شبشة'),
+      title:
+          const Text('دلالة شبشة'),
       actions: [
-          if (_isAdmin)
-            IconButton(
-              tooltip: 'لوحة تحكم الأدمن',
-              icon: const Icon(
-                Icons.admin_panel_settings_outlined,
-              ),
-              onPressed: _openAdminPanel,
+        if (_isAdmin)
+          IconButton(
+            tooltip:
+                'لوحة تحكم الأدمن',
+            icon: const Icon(
+              Icons
+                  .admin_panel_settings_outlined,
             ),
-            
+            onPressed:
+                _openAdminPanel,
+          ),
+
         IconButton(
-          tooltip: 'الملف الشخصي',
-          icon: const Icon(Icons.person_outline),
+          tooltip:
+              'الملف الشخصي',
+          icon: const Icon(
+            Icons.person_outline,
+          ),
           onPressed: () {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => const ProfileScreen(),
+                builder: (_) =>
+                    const ProfileScreen(),
               ),
             );
           },
@@ -667,12 +886,15 @@ return Directionality(
 
         IconButton(
           tooltip: 'المفضلة',
-          icon: const Icon(Icons.favorite_border),
+          icon: const Icon(
+            Icons.favorite_border,
+          ),
           onPressed: () {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => const FavoritesScreen(),
+                builder: (_) =>
+                    const FavoritesScreen(),
               ),
             );
           },
@@ -680,9 +902,11 @@ return Directionality(
 
         IconButton(
           tooltip: 'إضافة إعلان',
-          onPressed: _openAddListing,
+          onPressed:
+              _openAddListing,
           icon: const Icon(
-            Icons.add_circle_outline,
+            Icons
+                .add_circle_outline,
           ),
         ),
 
@@ -692,20 +916,24 @@ return Directionality(
             _loadData();
             _checkAdminStatus();
           },
-          icon: const Icon(Icons.refresh),
+          icon: const Icon(
+            Icons.refresh,
+          ),
         ),
 
         if (user != null)
           IconButton(
             tooltip: 'إعلاناتي',
             icon: const Icon(
-              Icons.inventory_2_outlined,
+              Icons
+                  .inventory_2_outlined,
             ),
             onPressed: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => const MyListingsScreen(),
+                  builder: (_) =>
+                      const MyListingsScreen(),
                 ),
               );
             },
@@ -713,9 +941,12 @@ return Directionality(
 
         if (user != null)
           IconButton(
-            tooltip: 'تسجيل الخروج',
+            tooltip:
+                'تسجيل الخروج',
             onPressed: _signOut,
-            icon: const Icon(Icons.logout),
+            icon: const Icon(
+              Icons.logout,
+            ),
           ),
       ],
     ),
@@ -726,14 +957,22 @@ return Directionality(
       children: [
         Padding(
           padding:
-              const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              const EdgeInsets.fromLTRB(
+            16,
+            12,
+            16,
+            8,
+          ),
           child: Text(
-            name == null || name.isEmpty
+            name == null ||
+                    name.isEmpty
                 ? 'مرحباً بك في سوق شبشة'
                 : 'مرحباً يا $name',
-            style: const TextStyle(
+            style:
+                const TextStyle(
               fontSize: 20,
-              fontWeight: FontWeight.bold,
+              fontWeight:
+                  FontWeight.bold,
             ),
           ),
         ),
