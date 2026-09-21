@@ -261,44 +261,6 @@ try {
 
 }
 
-void _contactSeller() {
-final phone = _listing?['contact_phone']?.toString();
-
-if (phone == null || phone.isEmpty) {
-  ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(
-      content: Text('رقم التواصل غير متوفر'),
-    ),
-  );
-  return;
-}
-
-showDialog(
-  context: context,
-  builder: (context) {
-    return AlertDialog(
-      title: const Text('التواصل مع البائع'),
-      content: SelectableText(
-        phone,
-        textAlign: TextAlign.center,
-        style: const TextStyle(
-          fontSize: 22,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('إغلاق'),
-        ),
-      ],
-    );
-  },
-);
-
-}
-
-
 Future<void> _callSeller() async {
   final phone = _listing?['contact_phone']?.toString().trim();
 
