@@ -282,11 +282,11 @@ _loadData();
 
 }
 
-Future<void> _openAdminPanel() async {
+Future<void> openAdminPanel() async {
 await Navigator.push(
 context,
 MaterialPageRoute(
-builder: (_) => const AdminListingsScreen(),
+builder: () => const AdminListingsScreen(),
 ),
 );
 
@@ -1005,24 +1005,51 @@ return Directionality(
           CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding:
-              const EdgeInsets.fromLTRB(
+          padding: const EdgeInsets.fromLTRB(
             16,
-            12,
+            18,
             16,
-            8,
+            10,
           ),
-          child: Text(
-            name == null ||
-                    name.isEmpty
-                ? 'مرحباً بك في سوق شبشة'
-                : 'مرحباً يا $name',
-            style:
-                const TextStyle(
-              fontSize: 20,
-              fontWeight:
-                  FontWeight.bold,
-            ),
+          child: Column(
+            children: [
+              Text(
+                name == null || name.isEmpty
+                    ? 'مرحباً بك في دلالة شبشة 👋'
+                    : 'مرحباً يا $name 👋',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 23,
+                  fontWeight: FontWeight.bold,
+                  height: 1.3,
+                ),
+              ),
+
+              const SizedBox(height: 8),
+
+              const Text(
+                'تسوّق أو أعلن معنا',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+
+              const SizedBox(height: 6),
+
+              Text(
+                'دلالة شبشة — بيع وشراء بدون وسيط',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 15,
+                  color: Theme.of(context)
+                      .colorScheme
+                      .primary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
           ),
         ),
 
