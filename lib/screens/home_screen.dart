@@ -218,6 +218,20 @@ _loadData();
 
 }
 
+Future<void> _openAdminPanel() async {
+  await Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => const AdminListingsScreen(),
+    ),
+  );
+
+  if (!mounted) return;
+
+  await _checkAdminStatus();
+  await _loadData();
+}
+
 Future<void> openAdminPanel() async {
 await Navigator.push(
 context,
@@ -576,15 +590,15 @@ return Directionality(
     appBar: AppBar(
       title: const Text('دلالة شبشة'),
       actions: [
-        if (_isAdmin)
-          IconButton(
-            tooltip: 'لوحة تحكم الأدمن',
-            icon: const Icon(
-              Icons.admin_panel_settings_outlined,
+          if (_isAdmin)
+            IconButton(
+              tooltip: 'لوحة تحكم الأدمن',
+              icon: const Icon(
+                Icons.admin_panel_settings_outlined,
+              ),
+              onPressed: _openAdminPanel,
             ),
-            onPressed: _openAdminPanel,
-          ),
-
+            
         IconButton(
           tooltip: 'الملف الشخصي',
           icon: const Icon(Icons.person_outline),
