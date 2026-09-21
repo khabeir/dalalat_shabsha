@@ -15,17 +15,12 @@ class _AuthScreenState extends State<AuthScreen> {
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  final _otpController = TextEditingController();
 
   bool _isLogin = true;
   bool _loading = false;
-  bool _showOtpScreen = false;
 
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
-
-  String _verificationMethod = 'sms';
-  String _verifiedPhone = '';
 
   final _supabase = Supabase.instance.client;
 
@@ -35,7 +30,6 @@ class _AuthScreenState extends State<AuthScreen> {
     _phoneController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
-    _otpController.dispose();
     super.dispose();
   }
 
@@ -51,38 +45,45 @@ class _AuthScreenState extends State<AuthScreen> {
     }
 
     // إزالة المسافات والشرطات والأقواس
-    phone = phone.replaceAll(RegExp(r'[\s\-\(\)]'), '');
+    phone = phone.replaceAll(
+      RegExp(r'[\s\-\(\)]'),
+      '',
+    );
 
-    // إذا بدأ بـ 00 نحوله إلى +
+    // 00XXXXXXXXX -> +XXXXXXXXX
     if (phone.startsWith('00')) {
       phone = '+${phone.substring(2)}';
     }
 
-    // رقم سوداني محلي:
-    // 09XXXXXXXX
+    // الرقم السوداني المحلي:
+    // 09XXXXXXXX -> +2499XXXXXXXX
     if (phone.startsWith('0')) {
       phone = '+249${phone.substring(1)}';
     }
 
-    // 249XXXXXXXX
+    // 249XXXXXXXX -> +249XXXXXXXX
     if (phone.startsWith('249')) {
       phone = '+$phone';
     }
 
-    // التأكد من أنه يبدأ +
+    // يجب أن يبدأ الرقم بـ +
     if (!phone.startsWith('+')) {
       return null;
     }
 
-    // التحقق من الأرقام فقط بعد +
     final digits = phone.substring(1);
 
+    // أرقام دولية من 8 إلى 15 رقمًا
     if (!RegExp(r'^\d{8,15}$').hasMatch(digits)) {
       return null;
     }
 
     return phone;
   }
+
+  // ============================================================
+  // التحقق من رقم الهاتف
+  // ============================================================
 
   String? _validatePhone(String? value) {
     if (value == null || value.trim().isEmpty) {
@@ -99,7 +100,7 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   // ============================================================
-  // التسجيل / تسجيل الدخول
+  // تسجيل الدخول / إنشاء الحساب
   // ============================================================
 
   Future<void> _submit() async {
@@ -107,7 +108,9 @@ class _AuthScreenState extends State<AuthScreen> {
       return;
     }
 
-    final phone = _normalizePhone(_phoneController.text);
+    final phone = _normalizePhone(
+      _phoneController.text,
+    );
 
     if (phone == null) {
       _showMessage('رقم الهاتف غير صحيح');
@@ -119,11 +122,11 @@ class _AuthScreenState extends State<AuthScreen> {
     });
 
     try {
-      if (_isLogin) {
-        // --------------------------------------------------------
-        // تسجيل الدخول برقم الهاتف + كلمة المرور
-        // --------------------------------------------------------
+      // ==========================================================
+      // تسجيل الدخول
+      // ==========================================================
 
+      if (_isLogin) {
         await _supabase.auth.signInWithPassword(
           phone: phone,
           password: _passwordController.text,
@@ -136,42 +139,57 @@ class _AuthScreenState extends State<AuthScreen> {
         );
 
         Navigator.of(context).pop(true);
-      } else {
-        // --------------------------------------------------------
-        // إنشاء الحساب
-        // --------------------------------------------------------
+        return;
+      }
 
-        final response = await _supabase.auth.signUp(
-          phone: phone,
-          password: _passwordController.text,
-          data: {
-            'full_name': _nameController.text.trim(),
-            'phone': phone,
-          },
+      // ==========================================================
+      // إنشاء حساب جديد
+      // ==========================================================
+
+      final response = await _supabase.auth.signUp(
+        phone: phone,
+        password: _passwordController.text,
+        data: {
+          'full_name': _nameController.text.trim(),
+          'phone': phone,
+        },
+      );
+
+      if (!mounted) return;
+
+      if (response.user == null) {
+        _showMessage(
+          'تعذر إنشاء الحساب',
+        );
+        return;
+      }
+
+      // ==========================================================
+      // إذا أنشأ Supabase جلسة مباشرة
+      // ==========================================================
+
+      if (response.session != null) {
+        _showMessage(
+          'تم إنشاء الحساب وتسجيل الدخول بنجاح',
         );
 
-        if (!mounted) return;
-
-        if (response.user == null) {
-          _showMessage('تعذر إنشاء الحساب');
-          return;
-        }
-
-        _verifiedPhone = phone;
-
-        // --------------------------------------------------------
-        // إرسال رمز التحقق
-        // --------------------------------------------------------
-
-        await _sendOtp(phone);
-
-        if (!mounted) return;
-
-        setState(() {
-          _showOtpScreen = true;
-          _otpController.clear();
-        });
+        Navigator.of(context).pop(true);
+        return;
       }
+
+      // ==========================================================
+      // في حال لم يتم إنشاء جلسة
+      // ==========================================================
+
+      _showMessage(
+        'تم إنشاء الحساب. يمكنك الآن تسجيل الدخول.',
+      );
+
+      setState(() {
+        _isLogin = true;
+        _passwordController.clear();
+        _confirmPasswordController.clear();
+      });
     } on AuthException catch (e) {
       if (!mounted) return;
 
@@ -194,133 +212,7 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   // ============================================================
-  // إرسال OTP
-  // ============================================================
-
-  Future<void> _sendOtp(String phone) async {
-    if (_verificationMethod == 'sms') {
-      await _supabase.auth.signInWithOtp(
-        phone: phone,
-      );
-    } else {
-      // WhatsApp
-      //
-      // Supabase يعتمد على إعداد مزود WhatsApp في لوحة
-      // Authentication > Providers > Phone.
-      //
-      // إذا كان مشروع Supabase مضبوطًا لاستخدام WhatsApp
-      // كقناة OTP، يمكن استخدام channel: OtpChannel.whatsapp.
-
-      await _supabase.auth.signInWithOtp(
-        phone: phone,
-        channel: OtpChannel.whatsapp,
-      );
-    }
-  }
-
-  // ============================================================
-  // التحقق من رمز OTP
-  // ============================================================
-
-  Future<void> _verifyOtp() async {
-    final otp = _otpController.text.trim();
-
-    if (otp.length < 4) {
-      _showMessage('أدخل رمز التحقق');
-      return;
-    }
-
-    setState(() {
-      _loading = true;
-    });
-
-    try {
-      final response = await _supabase.auth.verifyOTP(
-        phone: _verifiedPhone,
-        token: otp,
-        type: OtpType.sms,
-      );
-
-      if (!mounted) return;
-
-      if (response.user != null) {
-        _showMessage(
-          'تم تأكيد رقم الهاتف وإنشاء الحساب بنجاح',
-        );
-
-        Navigator.of(context).pop(true);
-      } else {
-        _showMessage(
-          'تعذر تأكيد رقم الهاتف',
-        );
-      }
-    } on AuthException catch (e) {
-      if (!mounted) return;
-
-      _showMessage(
-        _translateAuthError(e.message),
-      );
-    } catch (e) {
-      if (!mounted) return;
-
-      _showMessage(
-        'حدث خطأ أثناء التحقق',
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _loading = false;
-        });
-      }
-    }
-  }
-
-  // ============================================================
-  // إعادة إرسال الرمز
-  // ============================================================
-
-  Future<void> _resendOtp() async {
-    if (_verifiedPhone.isEmpty) {
-      return;
-    }
-
-    setState(() {
-      _loading = true;
-    });
-
-    try {
-      await _sendOtp(_verifiedPhone);
-
-      if (!mounted) return;
-
-      _showMessage(
-        _verificationMethod == 'sms'
-            ? 'تم إرسال رمز جديد عبر SMS'
-            : 'تم إرسال رمز جديد عبر WhatsApp',
-      );
-    } on AuthException catch (e) {
-      if (!mounted) return;
-
-      _showMessage(
-        _translateAuthError(e.message),
-      );
-    } catch (e) {
-      if (!mounted) return;
-
-      _showMessage(
-        'تعذر إرسال رمز جديد',
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _loading = false;
-        });
-      }
-    }
-  }
-
-  // ============================================================
-  // أخطاء Supabase
+  // ترجمة أخطاء Supabase
   // ============================================================
 
   String _translateAuthError(String message) {
@@ -334,22 +226,28 @@ class _AuthScreenState extends State<AuthScreen> {
       return 'رقم الهاتف مسجل بالفعل';
     }
 
-    if (text.contains('phone number') &&
-        text.contains('invalid')) {
+    if (text.contains('phone signups are disabled')) {
+      return 'تسجيل الحسابات برقم الهاتف غير مفعّل في Supabase';
+    }
+
+    if (text.contains('phone provider is disabled')) {
+      return 'مزود تسجيل الهاتف غير مفعّل في Supabase';
+    }
+
+    if (text.contains('invalid phone')) {
       return 'رقم الهاتف غير صحيح';
+    }
+
+    if (text.contains('phone number')) {
+      return 'رقم الهاتف غير صحيح أو غير مدعوم';
     }
 
     if (text.contains('password should be at least')) {
       return 'كلمة المرور يجب أن تكون 6 أحرف على الأقل';
     }
 
-    if (text.contains('invalid otp') ||
-        text.contains('invalid token')) {
-      return 'رمز التحقق غير صحيح';
-    }
-
-    if (text.contains('expired')) {
-      return 'رمز التحقق منتهي الصلاحية، اطلب رمزًا جديدًا';
+    if (text.contains('weak password')) {
+      return 'كلمة المرور ضعيفة، اختر كلمة مرور أقوى';
     }
 
     if (text.contains('too many requests')) {
@@ -357,15 +255,7 @@ class _AuthScreenState extends State<AuthScreen> {
     }
 
     if (text.contains('rate limit')) {
-      return 'تم تجاوز الحد المسموح لإرسال الرموز. حاول لاحقًا';
-    }
-
-    if (text.contains('sms')) {
-      return 'تعذر إرسال رسالة SMS. تحقق من إعدادات خدمة الرسائل';
-    }
-
-    if (text.contains('whatsapp')) {
-      return 'تعذر إرسال رمز WhatsApp. تحقق من إعدادات WhatsApp';
+      return 'تم تجاوز الحد المسموح. حاول مرة أخرى لاحقًا';
     }
 
     return message;
@@ -388,7 +278,7 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   // ============================================================
-  // التحقق من الحقول
+  // الحقول المطلوبة
   // ============================================================
 
   String? _required(
@@ -403,170 +293,11 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   // ============================================================
-  // شاشة OTP
+  // واجهة التطبيق
   // ============================================================
 
-  Widget _buildOtpScreen() {
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('تأكيد رقم الهاتف'),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: _loading
-                ? null
-                : () {
-                    setState(() {
-                      _showOtpScreen = false;
-                      _otpController.clear();
-                    });
-                  },
-          ),
-        ),
-        body: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(
-                  maxWidth: 500,
-                ),
-                child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.stretch,
-                  children: [
-                    const Text(
-                      '🔐',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 60,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-
-                    const Text(
-                      'تأكيد رقم الهاتف',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    Text(
-                      _verificationMethod == 'sms'
-                          ? 'أرسلنا رمز التحقق عبر SMS'
-                          : 'أرسلنا رمز التحقق عبر WhatsApp',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 16,
-                      ),
-                    ),
-
-                    const SizedBox(height: 8),
-
-                    Text(
-                      _verifiedPhone,
-                      textAlign: TextAlign.center,
-                      textDirection: TextDirection.ltr,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-
-                    const SizedBox(height: 30),
-
-                    TextFormField(
-                      controller: _otpController,
-                      keyboardType: TextInputType.number,
-                      textAlign: TextAlign.center,
-                      maxLength: 6,
-                      decoration: const InputDecoration(
-                        labelText: 'رمز التحقق',
-                        prefixIcon: Icon(
-                          Icons.verified_outlined,
-                        ),
-                        border: OutlineInputBorder(),
-                        counterText: '',
-                      ),
-                      onFieldSubmitted: (_) {
-                        if (!_loading) {
-                          _verifyOtp();
-                        }
-                      },
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    SizedBox(
-                      height: 52,
-                      child: FilledButton(
-                        onPressed:
-                            _loading ? null : _verifyOtp,
-                        child: _loading
-                            ? const SizedBox(
-                                width: 24,
-                                height: 24,
-                                child:
-                                    CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Text(
-                                'تأكيد الرمز',
-                                style: TextStyle(
-                                  fontSize: 17,
-                                ),
-                              ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    TextButton(
-                      onPressed:
-                          _loading ? null : _resendOtp,
-                      child: Text(
-                        _verificationMethod == 'sms'
-                            ? 'إعادة إرسال الرمز عبر SMS'
-                            : 'إعادة إرسال الرمز عبر WhatsApp',
-                      ),
-                    ),
-
-                    const SizedBox(height: 8),
-
-                    TextButton(
-                      onPressed: _loading
-                          ? null
-                          : () {
-                              setState(() {
-                                _showOtpScreen = false;
-                                _otpController.clear();
-                              });
-                            },
-                      child: const Text(
-                        'تغيير رقم الهاتف أو طريقة التحقق',
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ============================================================
-  // شاشة تسجيل الدخول / إنشاء الحساب
-  // ============================================================
-
-  Widget _buildAuthScreen() {
+  @override
+  Widget build(BuildContext context) {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
@@ -584,6 +315,10 @@ class _AuthScreenState extends State<AuthScreen> {
                     crossAxisAlignment:
                         CrossAxisAlignment.stretch,
                     children: [
+                      // ==================================================
+                      // الشعار
+                      // ==================================================
+
                       const Text(
                         '🛒',
                         textAlign: TextAlign.center,
@@ -618,7 +353,7 @@ class _AuthScreenState extends State<AuthScreen> {
                       const SizedBox(height: 30),
 
                       // ==================================================
-                      // الاسم عند التسجيل
+                      // الاسم - التسجيل فقط
                       // ==================================================
 
                       if (!_isLogin) ...[
@@ -632,7 +367,8 @@ class _AuthScreenState extends State<AuthScreen> {
                             prefixIcon: Icon(
                               Icons.person_outline,
                             ),
-                            border: OutlineInputBorder(),
+                            border:
+                                OutlineInputBorder(),
                           ),
                           validator: (value) =>
                               _required(
@@ -649,7 +385,8 @@ class _AuthScreenState extends State<AuthScreen> {
                       // ==================================================
 
                       TextFormField(
-                        controller: _phoneController,
+                        controller:
+                            _phoneController,
                         keyboardType:
                             TextInputType.phone,
                         textInputAction:
@@ -662,69 +399,13 @@ class _AuthScreenState extends State<AuthScreen> {
                           prefixIcon: Icon(
                             Icons.phone_outlined,
                           ),
-                          border: OutlineInputBorder(),
+                          border:
+                              OutlineInputBorder(),
                         ),
                         validator: _validatePhone,
                       ),
 
                       const SizedBox(height: 16),
-
-                      // ==================================================
-                      // طريقة التحقق عند التسجيل
-                      // ==================================================
-
-                      if (!_isLogin) ...[
-                        const Text(
-                          'طريقة استلام رمز التحقق',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-
-                        const SizedBox(height: 8),
-
-                        RadioGroup<String>(
-                          groupValue:
-                              _verificationMethod,
-                          onChanged: (value) {
-                            if (value == null) return;
-
-                            setState(() {
-                              _verificationMethod =
-                                  value;
-                            });
-                          },
-                          child: Column(
-                            children: [
-                              RadioListTile<String>(
-                                value: 'sms',
-                                title:
-                                    const Text('SMS'),
-                                subtitle: const Text(
-                                  'استلام الرمز برسالة نصية',
-                                ),
-                                secondary: const Icon(
-                                  Icons.sms_outlined,
-                                ),
-                              ),
-                              RadioListTile<String>(
-                                value: 'whatsapp',
-                                title:
-                                    const Text('WhatsApp'),
-                                subtitle: const Text(
-                                  'استلام الرمز عبر WhatsApp',
-                                ),
-                                secondary:
-                                    const Icon(
-                                  Icons.chat_outlined,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        const SizedBox(height: 8),
-                      ],
 
                       // ==================================================
                       // كلمة المرور
@@ -856,7 +537,7 @@ class _AuthScreenState extends State<AuthScreen> {
                       const SizedBox(height: 24),
 
                       // ==================================================
-                      // زر التنفيذ
+                      // زر تسجيل الدخول / إنشاء الحساب
                       // ==================================================
 
                       SizedBox(
@@ -898,10 +579,13 @@ class _AuthScreenState extends State<AuthScreen> {
                                 setState(() {
                                   _isLogin =
                                       !_isLogin;
+
                                   _formKey.currentState
                                       ?.reset();
+
                                   _passwordController
                                       .clear();
+
                                   _confirmPasswordController
                                       .clear();
                                 });
@@ -921,18 +605,5 @@ class _AuthScreenState extends State<AuthScreen> {
         ),
       ),
     );
-  }
-
-  // ============================================================
-  // Build
-  // ============================================================
-
-  @override
-  Widget build(BuildContext context) {
-    if (_showOtpScreen) {
-      return _buildOtpScreen();
-    }
-
-    return _buildAuthScreen();
   }
 }
