@@ -465,40 +465,6 @@ return ClipRRect(
 
 }
 
-Widget _buildCategoryItem(
-Map<String, dynamic> category,
-) {
-final id = category['id'] as int;
-final selected =
-_selectedCategoryId == id;
-final icon =
-category['icon'] as String?;
-final name =
-category['name'] as String? ?? '';
-
-return Padding(
-  padding:
-      const EdgeInsetsDirectional.only(
-    end: 8,
-  ),
-  child: ChoiceChip(
-    selected: selected,
-    label: Text(
-      '${icon ?? '📦'} $name',
-    ),
-    onSelected: (_) {
-      setState(() {
-        _selectedCategoryId =
-            selected ? null : id;
-      });
-
-      _loadData();
-    },
-  ),
-);
-
-}
-
 Widget _buildListingCard(
 Map<String, dynamic> listing,
 ) {
