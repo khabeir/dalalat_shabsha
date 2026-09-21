@@ -282,11 +282,11 @@ _loadData();
 
 }
 
-Future<void> openAdminPanel() async {
+Future<void> _openAdminPanel() async {
 await Navigator.push(
 context,
 MaterialPageRoute(
-builder: () => const AdminListingsScreen(),
+builder: (_) => const AdminListingsScreen(),
 ),
 );
 
@@ -887,7 +887,7 @@ return Directionality(
                   ? 'مرحباً بك في دلالة شبشة'
                   : name,
             ),
-            accountEmail: user?.email,
+            accountEmail: user == null ? null : Text(user.email ?? ''),
             currentAccountPicture: CircleAvatar(
               backgroundColor:
                   Theme.of(context).colorScheme.onPrimary,
