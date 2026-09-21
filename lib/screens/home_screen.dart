@@ -274,68 +274,67 @@ return _supabase.storage
 }
 
 Widget _buildListingImage(Map<String, dynamic> listing) {
-final url = _imageUrl(listing['image_path']);
+  final imageUrl = _imageUrl(listing['image_path']);
 
-if (url == null) {
-  return Container(
-    width: double.infinity,
-    height: 190,
-    color: Theme.of(context)
-        .colorScheme
-        .surfaceContainerHighest,
-    child: const Center(
-      child: Icon(
-        Icons.image_outlined,
-        size: 70,
+  if (imageUrl == null) {
+    return Container(
+      height: 200,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.grey.shade200,
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(12),
+        ),
       ),
+      child: const Center(
+        child: Icon(
+          Icons.image_outlined,
+          size: 70,
+          color: Colors.grey,
+        ),
+      ),
+    );
+  }
+
+  return ClipRRect(
+    borderRadius: const BorderRadius.vertical(
+      top: Radius.circular(12),
+    ),
+    child: Image.network(
+      imageUrl,
+      height: 200,
+      width: double.infinity,
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) {
+        return Container(
+          height: 200,
+          width: double.infinity,
+          color: Colors.grey.shade200,
+          child: const Center(
+            child: Icon(
+              Icons.image_outlined,
+              size: 70,
+              color: Colors.grey,
+            ),
+          ),
+        );
+      },
+      loadingBuilder: (context, child, loadingProgress) {
+        if (loadingProgress == null) {
+          return child;
+        }
+
+        return Container(
+          height: 200,
+          width: double.infinity,
+          color: Colors.grey.shade200,
+          child: const Center(
+            child: CircularProgressIndicator(),
+          ),
+        );
+      },
     ),
   );
-}
-
-return SizedBox(
-  width: double.infinity,
-  height: 190,
-  child: Image.network(
-    url,
-    fit: BoxFit.cover,
-    loadingBuilder: (
-      context,
-      child,
-      loadingProgress,
-    ) {
-      if (loadingProgress == null) {
-        return child;
-      }
-
-      return Container(
-        color: Theme.of(context)
-            .colorScheme
-            .surfaceContainerHighest,
-        child: const Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
-    },
-    errorBuilder: (
-      context,
-      error,
-      stackTrace,
-    ) {
-      return Container(
-        color: Theme.of(context)
-            .colorScheme
-            .surfaceContainerHighest,
-        child: const Center(
-          child: Icon(
-            Icons.broken_image_outlined,
-            size: 70,
-          ),
-        ),
-      );
-    },
-  ),
-);
-
 }
 
 Widget _buildCategoryItem(Map<String, dynamic> category) {
