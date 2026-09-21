@@ -282,11 +282,11 @@ _loadData();
 
 }
 
-Future<void> _openAdminPanel() async {
+Future<void> openAdminPanel() async {
 await Navigator.push(
 context,
 MaterialPageRoute(
-builder: (_) => const AdminListingsScreen(),
+builder: () => const AdminListingsScreen(),
 ),
 );
 
@@ -874,8 +874,35 @@ return Directionality(
       TextDirection.rtl,
   child: Scaffold(
     appBar: AppBar(
-      title:
-          const Text('دلالة شبشة'),
+      title: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primaryContainer,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              Icons.storefront_rounded,
+              size: 25,
+              color: Theme.of(context).colorScheme.onPrimaryContainer,
+            ),
+          ),
+          const SizedBox(width: 10),
+          const Flexible(
+            child: Text(
+              'دلالة شبشة',
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
       actions: [
         if (_isAdmin)
           IconButton(
