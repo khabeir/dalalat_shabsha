@@ -928,55 +928,47 @@ return Directionality(
             ),
           ),
 
-          ListTile(
-            leading: const Icon(Icons.work_outline),
-            title: const Text('وظائف'),
-            onTap: () {
-              Navigator.pop(context);
-            },
-          ),
+          if (_categories.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 8,
+              ),
+              child: Text(
+                'لا توجد أقسام حالياً',
+                style: TextStyle(
+                  color: Colors.grey,
+                ),
+              ),
+            )
+          else
+            ..._categories.map((category) {
+              final categoryId = category['id'] as int?;
+              final categoryName =
+                  category['name']?.toString() ?? 'بدون اسم';
 
-          ListTile(
-            leading: const Icon(Icons.build_outlined),
-            title: const Text('خدمات'),
-            onTap: () {
-              Navigator.pop(context);
-            },
-          ),
+              return ListTile(
+                leading: const Icon(
+                  Icons.category_outlined,
+                ),
+                title: Text(categoryName),
+                selected:
+                    _selectedCategoryId == categoryId,
+                onTap: () {
+                  Navigator.pop(context);
 
-          ListTile(
-            leading: const Icon(Icons.directions_car_outlined),
-            title: const Text('سيارات ومركبات'),
-            onTap: () {
-              Navigator.pop(context);
-            },
-          ),
+                  if (categoryId == null) return;
 
-          ListTile(
-            leading: const Icon(Icons.home_work_outlined),
-            title: const Text('عقارات'),
-            onTap: () {
-              Navigator.pop(context);
-            },
-          ),
+                  setState(() {
+                    _selectedCategoryId = categoryId;
+                  });
 
-          ListTile(
-            leading: const Icon(Icons.phone_android_outlined),
-            title: const Text('أجهزة وإلكترونيات'),
-            onTap: () {
-              Navigator.pop(context);
-            },
-          ),
+                  _loadData();
+                },
+              );
+            }),
 
-        ListTile(
-          leading: const Icon(Icons.weekend_outlined),
-          title: const Text('أثاث ومنزل'),
-          onTap: () {
-            Navigator.pop(context);
-          },
-        ),
-
-        const Divider(),
+          const Divider(),
 
         ListTile(
           leading: const Icon(Icons.favorite_border),
