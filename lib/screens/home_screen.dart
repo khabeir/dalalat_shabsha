@@ -297,6 +297,54 @@ await _loadData();
 
 }
 
+IconData _categoryIcon(String name) {
+  final value = name.trim();
+
+  switch (value) {
+    case 'سيارات ومركبات':
+      return Icons.directions_car_outlined;
+
+    case 'عقارات':
+      return Icons.home_work_outlined;
+
+    case 'موبايلات وإلكترونيات':
+      return Icons.phone_android_outlined;
+
+    case 'أجهزة كهربائية':
+      return Icons.electrical_services_outlined;
+
+    case 'ملابس وأحذية':
+      return Icons.checkroom_outlined;
+
+    case 'أثاث ومستلزمات منزلية':
+      return Icons.weekend_outlined;
+
+    case 'مواشي وحيوانات':
+      return Icons.pets_outlined;
+
+    case 'محاصيل زراعية':
+      return Icons.agriculture_outlined;
+
+    case 'مواد غذائية':
+      return Icons.restaurant_outlined;
+
+    case 'أدوات ومعدات':
+      return Icons.build_outlined;
+
+    case 'خدمات':
+      return Icons.handyman_outlined;
+
+    case 'وظائف':
+      return Icons.work_outline;
+
+    case 'أخرى':
+      return Icons.more_horiz_outlined;
+
+    default:
+      return Icons.category_outlined;
+  }
+}
+
 String _formatPrice(Map<String, dynamic> listing) {
 final price = listing['price'];
 final currency = listing['currency'] ?? 'SDG';
@@ -948,8 +996,8 @@ return Directionality(
                   category['name']?.toString() ?? 'بدون اسم';
 
               return ListTile(
-                leading: const Icon(
-                  Icons.category_outlined,
+                leading: Icon(
+                  _categoryIcon(categoryName),
                 ),
                 title: Text(categoryName),
                 selected:
