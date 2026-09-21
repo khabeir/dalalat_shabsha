@@ -44,28 +44,50 @@ _searchController.dispose();
 super.dispose();
 }
 
-List<Map<String, dynamic>> get _filteredListings {
-final query = _searchQuery.trim().toLowerCase();
-
-if (query.isEmpty) {
-  return _listings;
+String _normalizeSearchText(String text) {
+  return text
+      .toLowerCase()
+      // إزالة التشكيل والحركات العربية
+      .replaceAll(RegExp(r'[\u064B-\u065F\u0670]'), '')
+      // توحيد أشكال الألف
+      .replaceAll('أ', 'ا')
+      .replaceAll('إ', 'ا')
+      .replaceAll('آ', 'ا')
+      // توحيد الياء والألف المقصورة
+      .replaceAll('ى', 'ي')
+      // توحيد التاء المربوطة
+      .replaceAll('ة', 'ه')
+      // إزالة التطويل
+      .replaceAll('ـ', '')
+      // توحيد المسافات
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
 }
 
-return _listings.where((listing) {
-  final title =
-      listing['title']?.toString().toLowerCase() ?? '';
+List<Map<String, dynamic>> get _filteredListings {
+  final query = _normalizeSearchText(_searchQuery);
 
-  final description =
-      listing['description']?.toString().toLowerCase() ?? '';
+  if (query.isEmpty) {
+    return _listings;
+  }
 
-  final area =
-      listing['area']?.toString().toLowerCase() ?? '';
+  return _listings.where((listing) {
+    final title = _normalizeSearchText(
+      listing['title']?.toString() ?? '',
+    );
 
-  return title.contains(query) ||
-      description.contains(query) ||
-      area.contains(query);
-}).toList();
+    final description = _normalizeSearchText(
+      listing['description']?.toString() ?? '',
+    );
 
+    final area = _normalizeSearchText(
+      listing['area']?.toString() ?? '',
+    );
+
+    return title.contains(query) ||
+        description.contains(query) ||
+        area.contains(query);
+  }).toList();
 }
 
 Future<void> _checkAdminStatus() async {
@@ -260,11 +282,11 @@ _loadData();
 
 }
 
-Future<void> _openAdminPanel() async {
+Future<void> openAdminPanel() async {
 await Navigator.push(
 context,
 MaterialPageRoute(
-builder: (_) => const AdminListingsScreen(),
+builder: () => const AdminListingsScreen(),
 ),
 );
 
