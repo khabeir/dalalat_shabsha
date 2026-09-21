@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -12,7 +13,7 @@ class _AuthScreenState extends State<AuthScreen> {
   final _formKey = GlobalKey<FormState>();
 
   final _nameController = TextEditingController();
-  final _phoneController = TextEditingController();
+  final _identifierController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
@@ -24,17 +25,8 @@ class _AuthScreenState extends State<AuthScreen> {
 
   final _supabase = Supabase.instance.client;
 
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _phoneController.dispose();
-    _passwordController.dispose();
-    _confirmPasswordController.dispose();
-    super.dispose();
-  }
-
   // ============================================================
-  // تحويل رقم الهاتف إلى الصيغة الدولية
+  // رقم الهاتف
   // ============================================================
 
   String? _normalizePhone(String value) {
@@ -44,36 +36,29 @@ class _AuthScreenState extends State<AuthScreen> {
       return null;
     }
 
-    // إزالة المسافات والشرطات والأقواس
     phone = phone.replaceAll(
       RegExp(r'[\s\-\(\)]'),
       '',
     );
 
-    // 00XXXXXXXXX -> +XXXXXXXXX
     if (phone.startsWith('00')) {
       phone = '+${phone.substring(2)}';
     }
 
-    // الرقم السوداني المحلي:
-    // 09XXXXXXXX -> +2499XXXXXXXX
     if (phone.startsWith('0')) {
       phone = '+249${phone.substring(1)}';
     }
 
-    // 249XXXXXXXX -> +249XXXXXXXX
     if (phone.startsWith('249')) {
       phone = '+$phone';
     }
 
-    // يجب أن يبدأ الرقم بـ +
     if (!phone.startsWith('+')) {
       return null;
     }
 
     final digits = phone.substring(1);
 
-    // أرقام دولية من 8 إلى 15 رقمًا
     if (!RegExp(r'^\d{8,15}$').hasMatch(digits)) {
       return null;
     }
@@ -82,18 +67,38 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   // ============================================================
-  // التحقق من رقم الهاتف
+  // هل الإدخال بريد إلكتروني؟
   // ============================================================
 
-  String? _validatePhone(String? value) {
+  bool _isEmail(String value) {
+    return RegExp(
+      r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
+    ).hasMatch(value.trim());
+  }
+
+  // ============================================================
+  // التحقق من البريد أو الهاتف
+  // ============================================================
+
+  String? _validateIdentifier(String? value) {
     if (value == null || value.trim().isEmpty) {
-      return 'أدخل رقم الهاتف';
+      return 'أدخل البريد الإلكتروني أو رقم الهاتف';
     }
 
-    final phone = _normalizePhone(value);
+    final text = value.trim();
 
-    if (phone == null) {
-      return 'أدخل رقم هاتف صحيح';
+    // بريد إلكتروني
+    if (text.contains('@')) {
+      if (!_isEmail(text)) {
+        return 'أدخل بريدًا إلكترونيًا صحيحًا';
+      }
+
+      return null;
+    }
+
+    // رقم هاتف
+    if (_normalizePhone(text) == null) {
+      return 'أدخل بريدًا إلكترونيًا أو رقم هاتف صحيحًا';
     }
 
     return null;
@@ -108,14 +113,8 @@ class _AuthScreenState extends State<AuthScreen> {
       return;
     }
 
-    final phone = _normalizePhone(
-      _phoneController.text,
-    );
-
-    if (phone == null) {
-      _showMessage('رقم الهاتف غير صحيح');
-      return;
-    }
+    final identifier =
+        _identifierController.text.trim();
 
     setState(() {
       _loading = true;
@@ -127,16 +126,38 @@ class _AuthScreenState extends State<AuthScreen> {
       // ==========================================================
 
       if (_isLogin) {
-        await _supabase.auth.signInWithPassword(
-          phone: phone,
-          password: _passwordController.text,
-        );
+        // --------------------------------------------------------
+        // تسجيل الدخول بالبريد الإلكتروني
+        // --------------------------------------------------------
+
+        if (_isEmail(identifier)) {
+          await _supabase.auth.signInWithPassword(
+            email: identifier,
+            password: _passwordController.text,
+          );
+        }
+
+        // --------------------------------------------------------
+        // تسجيل الدخول برقم الهاتف
+        // --------------------------------------------------------
+
+        else {
+          final phone = _normalizePhone(identifier);
+
+          if (phone == null) {
+            _showMessage('رقم الهاتف غير صحيح');
+            return;
+          }
+
+          await _loginWithPhone(
+            phone: phone,
+            password: _passwordController.text,
+          );
+        }
 
         if (!mounted) return;
 
-        _showMessage(
-          'تم تسجيل الدخول بنجاح',
-        );
+        _showMessage('تم تسجيل الدخول بنجاح');
 
         Navigator.of(context).pop(true);
         return;
@@ -146,50 +167,104 @@ class _AuthScreenState extends State<AuthScreen> {
       // إنشاء حساب جديد
       // ==========================================================
 
-      final response = await _supabase.auth.signUp(
+      final fullName =
+          _nameController.text.trim();
+
+      // ----------------------------------------------------------
+      // التسجيل بالبريد الإلكتروني
+      // ----------------------------------------------------------
+
+      if (_isEmail(identifier)) {
+        final response =
+            await _supabase.auth.signUp(
+          email: identifier,
+          password: _passwordController.text,
+          data: {
+            'full_name': fullName,
+          },
+        );
+
+        if (!mounted) return;
+
+        if (response.user == null) {
+          _showMessage('تعذر إنشاء الحساب');
+          return;
+        }
+
+        if (response.session != null) {
+          _showMessage(
+            'تم إنشاء الحساب وتسجيل الدخول بنجاح',
+          );
+
+          Navigator.of(context).pop(true);
+          return;
+        }
+
+        _showMessage(
+          'تم إنشاء الحساب. يمكنك الآن تسجيل الدخول.',
+        );
+
+        setState(() {
+          _isLogin = true;
+          _passwordController.clear();
+          _confirmPasswordController.clear();
+        });
+
+        return;
+      }
+
+      // ----------------------------------------------------------
+      // التسجيل برقم الهاتف
+      // ----------------------------------------------------------
+
+      final phone = _normalizePhone(identifier);
+
+      if (phone == null) {
+        _showMessage('رقم الهاتف غير صحيح');
+        return;
+      }
+
+      final response =
+          await _phoneAuthRequest(
+        action: 'signup',
         phone: phone,
         password: _passwordController.text,
-        data: {
-          'full_name': _nameController.text.trim(),
-          'phone': phone,
-        },
+        fullName: fullName,
       );
 
       if (!mounted) return;
 
-      if (response.user == null) {
+      if (response['success'] != true) {
         _showMessage(
-          'تعذر إنشاء الحساب',
+          response['message']?.toString() ??
+              'تعذر إنشاء الحساب',
         );
         return;
       }
 
-      // ==========================================================
-      // إذا أنشأ Supabase جلسة مباشرة
-      // ==========================================================
+      // ----------------------------------------------------------
+      // حفظ Session في Supabase Flutter
+      // ----------------------------------------------------------
 
-      if (response.session != null) {
+      final session =
+          response['session'] as Map<String, dynamic>?;
+
+      if (session == null) {
         _showMessage(
-          'تم إنشاء الحساب وتسجيل الدخول بنجاح',
+          'تم إنشاء الحساب ولكن تعذر تسجيل الدخول',
         );
-
-        Navigator.of(context).pop(true);
         return;
       }
 
-      // ==========================================================
-      // في حال لم يتم إنشاء جلسة
-      // ==========================================================
+      await _setSupabaseSession(session);
+
+      if (!mounted) return;
 
       _showMessage(
-        'تم إنشاء الحساب. يمكنك الآن تسجيل الدخول.',
+        'تم إنشاء الحساب وتسجيل الدخول بنجاح',
       );
 
-      setState(() {
-        _isLogin = true;
-        _passwordController.clear();
-        _confirmPasswordController.clear();
-      });
+      Navigator.of(context).pop(true);
     } on AuthException catch (e) {
       if (!mounted) return;
 
@@ -212,6 +287,100 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   // ============================================================
+  // تسجيل الدخول بالهاتف عبر Edge Function
+  // ============================================================
+
+  Future<void> _loginWithPhone({
+    required String phone,
+    required String password,
+  }) async {
+    final response = await _phoneAuthRequest(
+      action: 'login',
+      phone: phone,
+      password: password,
+    );
+
+    if (response['success'] != true) {
+      throw Exception(
+        response['message']?.toString() ??
+            'رقم الهاتف أو كلمة المرور غير صحيحة',
+      );
+    }
+
+    final session =
+        response['session'] as Map<String, dynamic>?;
+
+    if (session == null) {
+      throw Exception(
+        'تعذر إنشاء جلسة تسجيل الدخول',
+      );
+    }
+
+    await _setSupabaseSession(session);
+  }
+
+  // ============================================================
+  // استدعاء Edge Function
+  // ============================================================
+
+  Future<Map<String, dynamic>> _phoneAuthRequest({
+    required String action,
+    required String phone,
+    required String password,
+    String fullName = '',
+  }) async {
+    final response =
+        await _supabase.functions.invoke(
+      'phone-auth',
+      body: {
+        'action': action,
+        'phone': phone,
+        'password': password,
+        if (fullName.trim().isNotEmpty)
+          'full_name': fullName.trim(),
+      },
+    );
+
+    final data = response.data;
+
+    if (data is Map) {
+      return Map<String, dynamic>.from(data);
+    }
+
+    return {
+      'success': false,
+      'message': 'استجابة غير صحيحة من الخادم',
+    };
+  }
+
+  // ============================================================
+  // حفظ جلسة Supabase
+  // ============================================================
+
+  Future<void> _setSupabaseSession(
+    Map<String, dynamic> session,
+  ) async {
+    final accessToken =
+        session['access_token']?.toString();
+
+    final refreshToken =
+        session['refresh_token']?.toString();
+
+    if (accessToken == null ||
+        accessToken.isEmpty ||
+        refreshToken == null ||
+        refreshToken.isEmpty) {
+      throw Exception(
+        'بيانات جلسة تسجيل الدخول ناقصة',
+      );
+    }
+
+    await _supabase.auth.setSession(
+      refreshToken,
+    );
+  }
+
+  // ============================================================
   // ترجمة أخطاء Supabase
   // ============================================================
 
@@ -219,27 +388,16 @@ class _AuthScreenState extends State<AuthScreen> {
     final text = message.toLowerCase();
 
     if (text.contains('invalid login credentials')) {
-      return 'رقم الهاتف أو كلمة المرور غير صحيحة';
+      return 'البريد الإلكتروني أو رقم الهاتف أو كلمة المرور غير صحيحة';
     }
 
     if (text.contains('user already registered')) {
-      return 'رقم الهاتف مسجل بالفعل';
+      return 'هذا البريد الإلكتروني مسجل بالفعل';
     }
 
-    if (text.contains('phone signups are disabled')) {
-      return 'تسجيل الحسابات برقم الهاتف غير مفعّل في Supabase';
-    }
-
-    if (text.contains('phone provider is disabled')) {
-      return 'مزود تسجيل الهاتف غير مفعّل في Supabase';
-    }
-
-    if (text.contains('invalid phone')) {
-      return 'رقم الهاتف غير صحيح';
-    }
-
-    if (text.contains('phone number')) {
-      return 'رقم الهاتف غير صحيح أو غير مدعوم';
+    if (text.contains('email address') &&
+        text.contains('invalid')) {
+      return 'أدخل بريدًا إلكترونيًا صحيحًا';
     }
 
     if (text.contains('password should be at least')) {
@@ -248,6 +406,10 @@ class _AuthScreenState extends State<AuthScreen> {
 
     if (text.contains('weak password')) {
       return 'كلمة المرور ضعيفة، اختر كلمة مرور أقوى';
+    }
+
+    if (text.contains('email not confirmed')) {
+      return 'يرجى تأكيد البريد الإلكتروني أولاً';
     }
 
     if (text.contains('too many requests')) {
@@ -293,6 +455,67 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   // ============================================================
+  // الاتصال بالدعم
+  // ============================================================
+
+  Future<void> _callSupport() async {
+    final uri = Uri(
+      scheme: 'tel',
+      path: '0914111214',
+    );
+
+    try {
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+
+      if (!launched && mounted) {
+        _showMessage(
+          'تعذر فتح تطبيق الاتصال',
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        _showMessage(
+          'تعذر فتح تطبيق الاتصال',
+        );
+      }
+    }
+  }
+
+  // ============================================================
+  // WhatsApp للدعم
+  // ============================================================
+
+  Future<void> _openSupportWhatsApp() async {
+    const phone = '249914111214';
+
+    final uri = Uri.parse(
+      'https://wa.me/$phone',
+    );
+
+    try {
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+
+      if (!launched && mounted) {
+        _showMessage(
+          'تعذر فتح WhatsApp',
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        _showMessage(
+          'تعذر فتح WhatsApp',
+        );
+      }
+    }
+  }
+
+  // ============================================================
   // واجهة التطبيق
   // ============================================================
 
@@ -315,10 +538,6 @@ class _AuthScreenState extends State<AuthScreen> {
                     crossAxisAlignment:
                         CrossAxisAlignment.stretch,
                     children: [
-                      // ==================================================
-                      // الشعار
-                      // ==================================================
-
                       const Text(
                         '🛒',
                         textAlign: TextAlign.center,
@@ -358,13 +577,16 @@ class _AuthScreenState extends State<AuthScreen> {
 
                       if (!_isLogin) ...[
                         TextFormField(
-                          controller: _nameController,
+                          controller:
+                              _nameController,
                           textInputAction:
                               TextInputAction.next,
                           decoration:
                               const InputDecoration(
-                            labelText: 'الاسم الكامل',
-                            prefixIcon: Icon(
+                            labelText:
+                                'الاسم الكامل',
+                            prefixIcon:
+                                Icon(
                               Icons.person_outline,
                             ),
                             border:
@@ -381,28 +603,32 @@ class _AuthScreenState extends State<AuthScreen> {
                       ],
 
                       // ==================================================
-                      // رقم الهاتف
+                      // البريد أو الهاتف
                       // ==================================================
 
                       TextFormField(
                         controller:
-                            _phoneController,
+                            _identifierController,
                         keyboardType:
-                            TextInputType.phone,
+                            TextInputType.emailAddress,
                         textInputAction:
                             TextInputAction.next,
                         decoration:
                             const InputDecoration(
-                          labelText: 'رقم الهاتف',
+                          labelText:
+                              'البريد الإلكتروني أو رقم الهاتف',
                           hintText:
-                              'مثال: 0912345678',
-                          prefixIcon: Icon(
-                            Icons.phone_outlined,
+                              'example@email.com أو 0912345678',
+                          prefixIcon:
+                              Icon(
+                            Icons
+                                .alternate_email_outlined,
                           ),
                           border:
                               OutlineInputBorder(),
                         ),
-                        validator: _validatePhone,
+                        validator:
+                            _validateIdentifier,
                       ),
 
                       const SizedBox(height: 16),
@@ -416,12 +642,14 @@ class _AuthScreenState extends State<AuthScreen> {
                             _passwordController,
                         obscureText:
                             _obscurePassword,
-                        textInputAction: _isLogin
-                            ? TextInputAction.done
-                            : TextInputAction.next,
+                        textInputAction:
+                            _isLogin
+                                ? TextInputAction.done
+                                : TextInputAction.next,
                         decoration:
                             InputDecoration(
-                          labelText: 'كلمة المرور',
+                          labelText:
+                              'كلمة المرور',
                           prefixIcon:
                               const Icon(
                             Icons.lock_outline,
@@ -537,14 +765,16 @@ class _AuthScreenState extends State<AuthScreen> {
                       const SizedBox(height: 24),
 
                       // ==================================================
-                      // زر تسجيل الدخول / إنشاء الحساب
+                      // زر الدخول / التسجيل
                       // ==================================================
 
                       SizedBox(
                         height: 52,
                         child: FilledButton(
                           onPressed:
-                              _loading ? null : _submit,
+                              _loading
+                                  ? null
+                                  : _submit,
                           child: _loading
                               ? const SizedBox(
                                   width: 24,
@@ -569,7 +799,7 @@ class _AuthScreenState extends State<AuthScreen> {
                       const SizedBox(height: 12),
 
                       // ==================================================
-                      // التبديل بين التسجيل والدخول
+                      // التبديل
                       // ==================================================
 
                       TextButton(
@@ -580,7 +810,8 @@ class _AuthScreenState extends State<AuthScreen> {
                                   _isLogin =
                                       !_isLogin;
 
-                                  _formKey.currentState
+                                  _formKey
+                                      .currentState
                                       ?.reset();
 
                                   _passwordController
@@ -594,6 +825,83 @@ class _AuthScreenState extends State<AuthScreen> {
                           _isLogin
                               ? 'ليس لديك حساب؟ إنشاء حساب جديد'
                               : 'لديك حساب بالفعل؟ تسجيل الدخول',
+                        ),
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // ==================================================
+                      // الدعم
+                      // ==================================================
+
+                      const Divider(),
+
+                      const SizedBox(height: 12),
+
+                      const Text(
+                        'واجهتك مشكلة في التسجيل؟',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                        ),
+                      ),
+
+                      const SizedBox(height: 4),
+
+                      const Text(
+                        'تواصل معنا',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 14,
+                        ),
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed:
+                                  _loading
+                                      ? null
+                                      : _callSupport,
+                              icon: const Icon(
+                                Icons.phone_outlined,
+                              ),
+                              label: const Text(
+                                'اتصال',
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(width: 12),
+
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed:
+                                  _loading
+                                      ? null
+                                      : _openSupportWhatsApp,
+                              icon: const Icon(
+                                Icons.chat_outlined,
+                              ),
+                              label: const Text(
+                                'WhatsApp',
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 8),
+
+                      const Text(
+                        '0914111214',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 13,
                         ),
                       ),
                     ],
