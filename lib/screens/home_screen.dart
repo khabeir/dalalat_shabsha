@@ -159,7 +159,9 @@ class _HomeScreenState extends State<HomeScreen> {
         return;
       }
 
-      await _checkAdminStatus();
+            await _checkAdminStatus();
+
+      if (!mounted) return;
     }
 
     await Navigator.push(
