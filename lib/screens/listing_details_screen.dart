@@ -1,3 +1,4 @@
+import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -297,6 +298,93 @@ showDialog(
 
 }
 
+
+Future<void> _callSeller() async {
+  final phone = _listing?['contact_phone']?.toString().trim();
+
+  if (phone == null || phone.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('رقم التواصل غير متوفر'),
+      ),
+    );
+    return;
+  }
+
+  final uri = Uri(
+    scheme: 'tel',
+    path: phone,
+  );
+
+  try {
+    final launched = await launchUrl(uri);
+
+    if (!launched && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('تعذر فتح تطبيق الاتصال'),
+        ),
+      );
+    }
+  } catch (e) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('تعذر فتح تطبيق الاتصال'),
+      ),
+    );
+  }
+}
+
+Future<void> _openWhatsApp() async {
+  final phone = _listing?['contact_phone']?.toString().trim();
+
+  if (phone == null || phone.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('رقم التواصل غير متوفر'),
+      ),
+    );
+    return;
+  }
+
+  var whatsappPhone = phone.replaceAll(RegExp(r'[^0-9+]'), '');
+
+  if (whatsappPhone.startsWith('0')) {
+    whatsappPhone = '249${whatsappPhone.substring(1)}';
+  }
+
+  whatsappPhone = whatsappPhone.replaceFirst('+', '');
+
+  final uri = Uri.parse(
+    'https://wa.me/$whatsappPhone',
+  );
+
+  try {
+    final launched = await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+    );
+
+    if (!launched && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('تعذر فتح WhatsApp'),
+        ),
+      );
+    }
+  } catch (e) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('تعذر فتح WhatsApp'),
+      ),
+    );
+  }
+}
+
 Future<void> _reportListing() async {
 final user = _supabase.auth.currentUser;
 
@@ -557,17 +645,37 @@ return ListView(
 
     const SizedBox(height: 28),
 
-    SizedBox(
-      height: 52,
-      child: FilledButton.icon(
-        onPressed: _contactSeller,
-        icon: const Icon(Icons.phone),
-        label: const Text(
-          'التواصل مع البائع',
-          style: TextStyle(fontSize: 17),
-        ),
+      Row(
+        children: [
+          Expanded(
+            child: SizedBox(
+              height: 52,
+              child: FilledButton.icon(
+                onPressed: _callSeller,
+                icon: const Icon(Icons.phone),
+                label: const Text(
+                  'اتصال',
+                  style: TextStyle(fontSize: 17),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: SizedBox(
+              height: 52,
+              child: OutlinedButton.icon(
+                onPressed: _openWhatsApp,
+                icon: const Icon(Icons.chat),
+                label: const Text(
+                  'WhatsApp',
+                  style: TextStyle(fontSize: 17),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
-    ),
 
     const SizedBox(height: 12),
 
