@@ -1242,8 +1242,7 @@ Widget _buildListingCard(
       );
     }
 
-    // لا يوجد حالياً حقل مؤكد يحدد
-    // الإعلانات المميزة في قاعدة البيانات.
+    // فصل الإعلانات التجارية عن الإعلانات العادية.
     final promotedIds = _promotedListings
     .map((listing) => listing['id'])
     .toSet();
