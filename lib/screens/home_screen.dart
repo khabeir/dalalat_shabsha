@@ -300,38 +300,34 @@ await _checkAdminStatus();
 }
 
 Future<void> _openAddListing() async {
-final user = _supabase.auth.currentUser;
+  final user = _supabase.auth.currentUser;
 
-if (user == null) {
-  final loginResult = await Navigator.push<bool>(
+  if (user == null) {
+    final loginResult = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const AuthScreen(),
+      ),
+    );
+
+    if (!mounted) return;
+
+    if (loginResult != true ||
+        _supabase.auth.currentUser == null) {
+      return;
+    }
+  }
+
+  await Navigator.push(
     context,
     MaterialPageRoute(
-      builder: (_) => const AuthScreen(),
+      builder: (_) => const AddListingScreen(),
     ),
   );
 
   if (!mounted) return;
 
-  if (loginResult != true ||
-      _supabase.auth.currentUser == null) {
-    return;
-  }
-
-  await _checkAdminStatus();
-
-  if (!mounted) return;
-}
-
-await Navigator.push(
-  context,
-  MaterialPageRoute(
-    builder: (_) => const AddListingScreen(),
-  ),
-);
-
-if (!mounted) return;
-
-await _loadData();
+  await _loadData();
 }
 
 Future<void> _openAdminPanel() async {
@@ -348,16 +344,14 @@ Future<void> _openAdminPanel() async {
   await _loadData();
 }
 
-}
-
 IconData _categoryIcon(String name) {
-final value = name.trim();
+  final value = name.trim();
 
-switch (value) {
-  case 'سيارات ومركبات':
-    return Icons.directions_car_outlined;
-  case 'عقارات':
-    return Icons.home_work_outlined;
+  switch (value) {
+    case 'سيارات ومركبات':
+      return Icons.directions_car_outlined;
+    case 'عقارات':
+      return Icons.home_work_outlined;
   case 'موبايلات وإلكترونيات':
     return Icons.phone_android_outlined;
   case 'أجهزة كهربائية':
