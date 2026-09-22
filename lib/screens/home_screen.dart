@@ -139,6 +139,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final listings =
           List<Map<String, dynamic>>.from(listingsResponse);
 
+      // جلب صور الإعلانات وربط أول صورة بكل إعلان.
       if (listings.isNotEmpty) {
         final listingIds = listings
             .map((listing) => listing['id'])
@@ -387,9 +388,7 @@ class _HomeScreenState extends State<HomeScreen> {
       return Container(
         height: height,
         width: double.infinity,
-        decoration: BoxDecoration(
-          color: Colors.grey.shade100,
-        ),
+        color: Colors.grey.shade100,
         child: const Center(
           child: Icon(
             Icons.photo_library_outlined,
@@ -402,79 +401,38 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (imageUrl == null) return noImage();
 
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        Image.network(
-          imageUrl,
+    return Image.network(
+      imageUrl,
+      height: height,
+      width: double.infinity,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => noImage(),
+      loadingBuilder: (context, child, progress) {
+        if (progress == null) return child;
+
+        return Container(
           height: height,
           width: double.infinity,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => noImage(),
-          loadingBuilder: (context, child, progress) {
-            if (progress == null) return child;
-
-            return Container(
-              height: height,
-              width: double.infinity,
-              color: Colors.grey.shade100,
-              child: const Center(
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-            );
-          },
-        ),
-
-        // تدرج خفيف يعطي الصورة عمقاً أفضل دون التأثير على وضوحها.
-        Positioned(
-          left: 0,
-          right: 0,
-          bottom: 0,
-          height: 42,
-          child: IgnorePointer(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.transparent,
-                    Colors.black.withValues(alpha: 0.16),
-                  ],
-                ),
-              ),
-            ),
+          color: Colors.grey.shade100,
+          child: const Center(
+            child: CircularProgressIndicator(strokeWidth: 2),
           ),
-        ),
-      ],
+        );
+      },
     );
   }
 
   Widget _buildAvailableBadge() {
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 7,
-        vertical: 3,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
       decoration: BoxDecoration(
-        color: Colors.green.withValues(alpha: 0.94),
+        color: Colors.green.withValues(alpha: 0.92),
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.16),
-            blurRadius: 4,
-            offset: const Offset(0, 1),
-          ),
-        ],
       ),
       child: const Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Icons.check_circle,
-            color: Colors.white,
-            size: 12,
-          ),
+          Icon(Icons.check_circle, color: Colors.white, size: 12),
           SizedBox(width: 3),
           Text(
             'متاح',
@@ -494,20 +452,12 @@ class _HomeScreenState extends State<HomeScreen> {
     final title = rawTitle.isEmpty ? 'إعلان بدون عنوان' : rawTitle;
     final area = listing['area']?.toString().trim() ?? '';
 
-    final primary = Theme.of(context).colorScheme.primary;
-    final surface = Theme.of(context).colorScheme.surface;
-
     return Card(
       margin: EdgeInsets.zero,
-      elevation: 2,
-      shadowColor: Colors.black.withValues(alpha: 0.12),
+      elevation: 1,
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(13),
-        side: BorderSide(
-          color: Colors.grey.withValues(alpha: 0.10),
-          width: 0.7,
-        ),
+        borderRadius: BorderRadius.circular(11),
       ),
       child: InkWell(
         onTap: () => _openListingDetails(listing),
@@ -518,10 +468,7 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               Stack(
                 children: [
-                  _buildListingImage(
-                    listing,
-                    height: 105,
-                  ),
+                  _buildListingImage(listing, height: 105),
                   Positioned(
                     top: 6,
                     right: 6,
@@ -529,104 +476,78 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ],
               ),
-
-              Expanded(
-                child: Container(
-                  color: surface,
-                  padding: const EdgeInsets.fromLTRB(
-                    8,
-                    6,
-                    8,
-                    3,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          height: 1.18,
-                        ),
+              Padding(
+                // تقليل الهامش السفلي داخل بطاقة الإعلان.
+                padding: const EdgeInsets.fromLTRB(8, 7, 8, 3),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        height: 1.2,
                       ),
-
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      _formatPrice(listing),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                    if (area.isNotEmpty) ...[
                       const SizedBox(height: 4),
-
-                      Text(
-                        _formatPrice(listing),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                          color: primary,
-                          height: 1.15,
-                        ),
-                      ),
-
-                      if (area.isNotEmpty) ...[
-                        const SizedBox(height: 3),
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.location_on_outlined,
-                              size: 13,
-                              color: Colors.grey.shade600,
-                            ),
-                            const SizedBox(width: 3),
-                            Expanded(
-                              child: Text(
-                                area,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 10.5,
-                                  color: Colors.grey.shade700,
-                                  height: 1.1,
-                                ),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.location_on_outlined,
+                            size: 13,
+                          ),
+                          const SizedBox(width: 3),
+                          Expanded(
+                            child: Text(
+                              area,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey.shade700,
                               ),
                             ),
-                          ],
-                        ),
-                      ],
-
-                      const Spacer(),
-
-                      SizedBox(
-                        width: double.infinity,
-                        height: 27,
-                        child: OutlinedButton(
-                          onPressed: () =>
-                              _openListingDetails(listing),
-                          style: OutlinedButton.styleFrom(
-                            padding: EdgeInsets.zero,
-                            visualDensity: VisualDensity.compact,
-                            minimumSize: const Size(0, 27),
-                            tapTargetSize:
-                                MaterialTapTargetSize.shrinkWrap,
-                            side: BorderSide(
-                              color: primary.withValues(alpha: 0.55),
-                              width: 0.9,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
                           ),
-                          child: Text(
-                            'عرض الإعلان',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: primary,
-                            ),
-                          ),
-                        ),
+                        ],
                       ),
                     ],
-                  ),
+                    const SizedBox(height: 5),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 28,
+                      child: OutlinedButton(
+                        onPressed: () => _openListingDetails(listing),
+                        style: OutlinedButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                          visualDensity: VisualDensity.compact,
+                          minimumSize: const Size(0, 28),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const Text(
+                          'عرض الإعلان',
+                          style: TextStyle(fontSize: 11),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -688,9 +609,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_categories.isEmpty) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 12),
-        child: Center(
-          child: Text('لا توجد أقسام متاحة حالياً'),
-        ),
+        child: Center(child: Text('لا توجد أقسام متاحة حالياً')),
       );
     }
 
@@ -713,8 +632,7 @@ class _HomeScreenState extends State<HomeScreen> {
               if (categoryId == null) return;
 
               setState(() {
-                _selectedCategoryId =
-                    selected ? null : categoryId;
+                _selectedCategoryId = selected ? null : categoryId;
               });
 
               _loadData();
@@ -727,9 +645,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               decoration: BoxDecoration(
                 color: selected
-                    ? Theme.of(context)
-                        .colorScheme
-                        .primaryContainer
+                    ? Theme.of(context).colorScheme.primaryContainer
                     : Theme.of(context)
                         .colorScheme
                         .surfaceContainerHighest,
@@ -743,10 +659,7 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
-                    _categoryIcon(categoryName),
-                    size: 22,
-                  ),
+                  Icon(_categoryIcon(categoryName), size: 22),
                   const SizedBox(height: 3),
                   Text(
                     categoryName,
@@ -774,15 +687,11 @@ class _HomeScreenState extends State<HomeScreen> {
       child: TextField(
         controller: _searchController,
         textInputAction: TextInputAction.search,
-        onChanged: (value) =>
-            setState(() => _searchQuery = value),
+        onChanged: (value) => setState(() => _searchQuery = value),
         decoration: InputDecoration(
           hintText: 'ابحث عن إعلان أو منطقة...',
           hintStyle: const TextStyle(fontSize: 13),
-          prefixIcon: const Icon(
-            Icons.search,
-            size: 21,
-          ),
+          prefixIcon: const Icon(Icons.search, size: 21),
           suffixIcon: _searchQuery.isNotEmpty
               ? IconButton(
                   padding: EdgeInsets.zero,
@@ -790,16 +699,12 @@ class _HomeScreenState extends State<HomeScreen> {
                     _searchController.clear();
                     setState(() => _searchQuery = '');
                   },
-                  icon: const Icon(
-                    Icons.clear,
-                    size: 19,
-                  ),
+                  icon: const Icon(Icons.clear, size: 19),
                   tooltip: 'مسح البحث',
                 )
               : null,
           filled: true,
-          contentPadding:
-              const EdgeInsets.symmetric(vertical: 8),
+          contentPadding: const EdgeInsets.symmetric(vertical: 8),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(11),
             borderSide: BorderSide.none,
@@ -830,10 +735,7 @@ class _HomeScreenState extends State<HomeScreen> {
             padding: EdgeInsets.symmetric(vertical: 35),
             child: Column(
               children: [
-                Icon(
-                  Icons.search_off_outlined,
-                  size: 45,
-                ),
+                Icon(Icons.search_off_outlined, size: 45),
                 SizedBox(height: 9),
                 Text('لم نجد إعلانات تطابق بحثك'),
               ],
@@ -856,10 +758,7 @@ class _HomeScreenState extends State<HomeScreen> {
         padding: EdgeInsets.symmetric(vertical: 32),
         child: Column(
           children: [
-            Icon(
-              Icons.inventory_2_outlined,
-              size: 45,
-            ),
+            Icon(Icons.inventory_2_outlined, size: 45),
             SizedBox(height: 10),
             Text('لا توجد إعلانات متاحة حالياً'),
           ],
@@ -867,8 +766,9 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    final featuredPreview =
-        _listings.take(5).toList();
+    // لا يوجد حالياً حقل مؤكد يحدد الإعلانات المميزة في قاعدة البيانات.
+    // لذلك تعرض هذه المساحة مجموعة من أحدث الإعلانات مؤقتاً.
+    final featuredPreview = _listings.take(5).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -878,36 +778,26 @@ class _HomeScreenState extends State<HomeScreen> {
           icon: Icons.local_offer_outlined,
         ),
         _buildHorizontalListings(featuredPreview),
-
         const SizedBox(height: 18),
-
         _sectionTitle(
           'أحدث الإعلانات',
           icon: Icons.access_time,
         ),
         _buildHorizontalListings(_listings),
-
         const SizedBox(height: 20),
-
         _sectionTitle(
           'معروضات الأقسام',
           icon: Icons.grid_view_rounded,
         ),
-
         ..._categories.map((category) {
           final categoryId = category['id'] as int?;
           final categoryName =
               category['name']?.toString() ?? 'بدون اسم';
 
-          if (categoryId == null) {
-            return const SizedBox.shrink();
-          }
+          if (categoryId == null) return const SizedBox.shrink();
 
           final categoryListings = _listings
-              .where(
-                (listing) =>
-                    listing['category_id'] == categoryId,
-              )
+              .where((listing) => listing['category_id'] == categoryId)
               .take(8)
               .toList();
 
@@ -918,27 +808,19 @@ class _HomeScreenState extends State<HomeScreen> {
           return Padding(
             padding: const EdgeInsets.only(bottom: 18),
             child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.stretch,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _sectionTitle(
                   categoryName,
                   icon: _categoryIcon(categoryName),
                   trailing: TextButton(
                     onPressed: () {
-                      setState(
-                        () => _selectedCategoryId =
-                            categoryId,
-                      );
+                      setState(() => _selectedCategoryId = categoryId);
                       _loadData();
                     },
                     style: TextButton.styleFrom(
-                      padding:
-                          const EdgeInsets.symmetric(
-                        horizontal: 7,
-                      ),
-                      visualDensity:
-                          VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: 7),
+                      visualDensity: VisualDensity.compact,
                     ),
                     child: const Text(
                       'عرض الكل',
@@ -946,9 +828,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                 ),
-                _buildHorizontalListings(
-                  categoryListings,
-                ),
+                _buildHorizontalListings(categoryListings),
               ],
             ),
           );
@@ -959,9 +839,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildBody() {
     if (_loading) {
-      return const Center(
-        child: CircularProgressIndicator(),
-      );
+      return const Center(child: CircularProgressIndicator());
     }
 
     if (_error != null) {
@@ -971,15 +849,9 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
-                Icons.wifi_off,
-                size: 42,
-              ),
+              const Icon(Icons.wifi_off, size: 42),
               const SizedBox(height: 10),
-              Text(
-                _error!,
-                textAlign: TextAlign.center,
-              ),
+              Text(_error!, textAlign: TextAlign.center),
               const SizedBox(height: 14),
               FilledButton(
                 onPressed: _loadData,
@@ -992,24 +864,16 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     final searching =
-        _searchQuery.trim().isNotEmpty ||
-            _selectedCategoryId != null;
+        _searchQuery.trim().isNotEmpty || _selectedCategoryId != null;
 
     return RefreshIndicator(
       onRefresh: _loadData,
       child: ListView(
-        physics:
-            const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(
-          13,
-          8,
-          13,
-          18,
-        ),
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(13, 8, 13, 18),
         children: [
           _buildSearchField(),
           const SizedBox(height: 12),
-
           _sectionTitle(
             'الأقسام',
             trailing: TextButton(
@@ -1023,10 +887,7 @@ class _HomeScreenState extends State<HomeScreen> {
               },
               style: TextButton.styleFrom(
                 visualDensity: VisualDensity.compact,
-                padding:
-                    const EdgeInsets.symmetric(
-                  horizontal: 7,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 7),
               ),
               child: const Text(
                 'عرض الكل',
@@ -1034,15 +895,9 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
           ),
-
           _buildCategories(),
-
           const SizedBox(height: 15),
-
-          if (searching)
-            _buildSearchResults()
-          else
-            _buildHomeSections(),
+          if (searching) _buildSearchResults() else _buildHomeSections(),
         ],
       ),
     );
@@ -1050,15 +905,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildPostListingButton() {
     return Padding(
-      padding: const EdgeInsets.symmetric(
-        vertical: 7,
-      ),
+      padding: const EdgeInsets.symmetric(vertical: 7),
       child: FilledButton(
         onPressed: _openAddListing,
         style: FilledButton.styleFrom(
           minimumSize: const Size(0, 36),
-          padding:
-              const EdgeInsets.symmetric(horizontal: 9),
+          padding: const EdgeInsets.symmetric(horizontal: 9),
           visualDensity: VisualDensity.compact,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(9),
@@ -1075,10 +927,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             SizedBox(width: 3),
-            Icon(
-              Icons.add,
-              size: 17,
-            ),
+            Icon(Icons.add, size: 17),
           ],
         ),
       ),
@@ -1089,31 +938,22 @@ class _HomeScreenState extends State<HomeScreen> {
     final user = _supabase.auth.currentUser;
 
     return IconButton(
-      tooltip: user == null
-          ? 'تسجيل الدخول'
-          : 'الملف الشخصي',
+      tooltip: user == null ? 'تسجيل الدخول' : 'الملف الشخصي',
       onPressed: _openProfile,
       icon: CircleAvatar(
         radius: 15,
-        backgroundColor: Theme.of(context)
-            .colorScheme
-            .primaryContainer,
+        backgroundColor: Theme.of(context).colorScheme.primaryContainer,
         child: Icon(
-          user == null
-              ? Icons.person_outline
-              : Icons.person,
+          user == null ? Icons.person_outline : Icons.person,
           size: 19,
-          color: Theme.of(context)
-              .colorScheme
-              .onPrimaryContainer,
+          color: Theme.of(context).colorScheme.onPrimaryContainer,
         ),
       ),
     );
   }
 
   Widget _buildBottomNavigation() {
-    final primary =
-        Theme.of(context).colorScheme.primary;
+    final primary = Theme.of(context).colorScheme.primary;
 
     Widget navItem({
       required IconData icon,
@@ -1125,18 +965,14 @@ class _HomeScreenState extends State<HomeScreen> {
         child: InkWell(
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.symmetric(
-              vertical: 7,
-            ),
+            padding: const EdgeInsets.symmetric(vertical: 7),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
                   icon,
                   size: 21,
-                  color: selected
-                      ? primary
-                      : Colors.grey.shade600,
+                  color: selected ? primary : Colors.grey.shade600,
                 ),
                 const SizedBox(height: 3),
                 Text(
@@ -1145,12 +981,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 10,
-                    fontWeight: selected
-                        ? FontWeight.bold
-                        : FontWeight.normal,
-                    color: selected
-                        ? primary
-                        : Colors.grey.shade700,
+                    fontWeight:
+                        selected ? FontWeight.bold : FontWeight.normal,
+                    color: selected ? primary : Colors.grey.shade700,
                   ),
                 ),
               ],
@@ -1164,13 +997,9 @@ class _HomeScreenState extends State<HomeScreen> {
       top: false,
       child: Container(
         decoration: BoxDecoration(
-          color:
-              Theme.of(context).colorScheme.surface,
+          color: Theme.of(context).colorScheme.surface,
           border: Border(
-            top: BorderSide(
-              color: Colors.grey.shade300,
-              width: 0.6,
-            ),
+            top: BorderSide(color: Colors.grey.shade300, width: 0.6),
           ),
         ),
         child: Row(
@@ -1195,13 +1024,12 @@ class _HomeScreenState extends State<HomeScreen> {
               onTap: _openMyListings,
             ),
 
+            // زر إضافة إعلان مميز بلون التطبيق.
             Expanded(
               child: InkWell(
                 onTap: _openAddListing,
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 4,
-                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 4),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -1210,8 +1038,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         height: 34,
                         decoration: BoxDecoration(
                           color: primary,
-                          borderRadius:
-                              BorderRadius.circular(11),
+                          borderRadius: BorderRadius.circular(11),
                         ),
                         child: const Icon(
                           Icons.add,
@@ -1241,7 +1068,6 @@ class _HomeScreenState extends State<HomeScreen> {
               label: 'المفضلة',
               onTap: _openFavorites,
             ),
-
             navItem(
               icon: Icons.person_outline,
               label: 'الملف الشخصي',
@@ -1256,8 +1082,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final user = _supabase.auth.currentUser;
-    final name =
-        user?.userMetadata?['full_name'] as String?;
+    final name = user?.userMetadata?['full_name'] as String?;
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -1269,72 +1094,49 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 UserAccountsDrawerHeader(
                   decoration: BoxDecoration(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .primary,
+                    color: Theme.of(context).colorScheme.primary,
                   ),
                   accountName: Text(
                     name == null || name.isEmpty
                         ? 'مرحباً بك في دلالة شبشة'
                         : name,
                   ),
-                  accountEmail: user == null
-                      ? null
-                      : Text(user.email ?? ''),
+                  accountEmail: user == null ? null : Text(user.email ?? ''),
                   currentAccountPicture: CircleAvatar(
-                    backgroundColor: Theme.of(context)
-                        .colorScheme
-                        .onPrimary,
+                    backgroundColor:
+                        Theme.of(context).colorScheme.onPrimary,
                     child: Icon(
                       Icons.storefront_rounded,
                       size: 31,
-                      color: Theme.of(context)
-                          .colorScheme
-                          .primary,
+                      color: Theme.of(context).colorScheme.primary,
                     ),
                   ),
                 ),
-
                 ListTile(
-                  leading:
-                      const Icon(Icons.person_outline),
+                  leading: const Icon(Icons.person_outline),
                   title: Text(
-                    user == null
-                        ? 'تسجيل الدخول'
-                        : 'الملف الشخصي',
+                    user == null ? 'تسجيل الدخول' : 'الملف الشخصي',
                   ),
                   onTap: () async {
                     Navigator.pop(context);
                     await _openProfile();
                   },
                 ),
-
                 if (_isAdmin)
                   ListTile(
                     leading: const Icon(
-                      Icons
-                          .admin_panel_settings_outlined,
+                      Icons.admin_panel_settings_outlined,
                     ),
-                    title:
-                        const Text('لوحة تحكم الإدارة'),
-                    subtitle: const Text(
-                      'إدارة ومراجعة الإعلانات',
-                    ),
+                    title: const Text('لوحة تحكم الإدارة'),
+                    subtitle: const Text('إدارة ومراجعة الإعلانات'),
                     onTap: () async {
                       Navigator.pop(context);
                       await _openAdminPanel();
                     },
                   ),
-
                 const Divider(),
-
                 const Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    16,
-                    10,
-                    16,
-                    6,
-                  ),
+                  padding: EdgeInsets.fromLTRB(16, 10, 16, 6),
                   child: Text(
                     'الأقسام',
                     style: TextStyle(
@@ -1343,40 +1145,29 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                 ),
-
                 if (_categories.isEmpty)
                   const Padding(
                     padding: EdgeInsets.all(16),
-                    child:
-                        Text('لا توجد أقسام حالياً'),
+                    child: Text('لا توجد أقسام حالياً'),
                   )
                 else
                   ..._categories.map((category) {
-                    final categoryId =
-                        category['id'] as int?;
+                    final categoryId = category['id'] as int?;
                     final categoryName =
-                        category['name']?.toString() ??
-                            'بدون اسم';
+                        category['name']?.toString() ?? 'بدون اسم';
 
                     return ListTile(
                       dense: true,
-                      leading: Icon(
-                        _categoryIcon(categoryName),
-                      ),
+                      leading: Icon(_categoryIcon(categoryName)),
                       title: Text(categoryName),
-                      selected:
-                          _selectedCategoryId ==
-                              categoryId,
+                      selected: _selectedCategoryId == categoryId,
                       onTap: () {
                         Navigator.pop(context);
 
-                        if (categoryId == null) {
-                          return;
-                        }
+                        if (categoryId == null) return;
 
                         setState(() {
-                          _selectedCategoryId =
-                              categoryId;
+                          _selectedCategoryId = categoryId;
                           _searchQuery = '';
                           _searchController.clear();
                         });
@@ -1385,37 +1176,27 @@ class _HomeScreenState extends State<HomeScreen> {
                       },
                     );
                   }),
-
                 const Divider(),
-
                 ListTile(
-                  leading: const Icon(
-                    Icons.favorite_border,
-                  ),
+                  leading: const Icon(Icons.favorite_border),
                   title: const Text('المفضلة'),
                   onTap: () {
                     Navigator.pop(context);
                     _openFavorites();
                   },
                 ),
-
                 ListTile(
-                  leading: const Icon(
-                    Icons.inventory_2_outlined,
-                  ),
+                  leading: const Icon(Icons.inventory_2_outlined),
                   title: const Text('إعلاناتي'),
                   onTap: () {
                     Navigator.pop(context);
                     _openMyListings();
                   },
                 ),
-
                 if (user != null)
                   ListTile(
-                    leading:
-                        const Icon(Icons.logout),
-                    title:
-                        const Text('تسجيل الخروج'),
+                    leading: const Icon(Icons.logout),
+                    title: const Text('تسجيل الخروج'),
                     onTap: () {
                       Navigator.pop(context);
                       _signOut();
@@ -1426,6 +1207,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
 
+        // الشريط العلوي: زر القائمة ثم اسم التطبيق، وبعدهما الأزرار.
         appBar: AppBar(
           centerTitle: false,
           titleSpacing: 0,
@@ -1435,9 +1217,7 @@ class _HomeScreenState extends State<HomeScreen> {
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w900,
-              color: Theme.of(context)
-                  .colorScheme
-                  .primary,
+              color: Theme.of(context).colorScheme.primary,
             ),
           ),
           actions: [
@@ -1455,16 +1235,10 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
 
         body: Column(
-          crossAxisAlignment:
-              CrossAxisAlignment.stretch,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(
-                13,
-                4,
-                13,
-                8,
-              ),
+              padding: const EdgeInsets.fromLTRB(13, 4, 13, 8),
               child: Column(
                 children: [
                   Text(
@@ -1473,17 +1247,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w800,
-                      color: Theme.of(context)
-                          .colorScheme
-                          .primary,
+                      color: Theme.of(context).colorScheme.primary,
                     ),
                   ),
                   if (user != null &&
                       name != null &&
                       name.trim().isNotEmpty)
                     Padding(
-                      padding:
-                          const EdgeInsets.only(top: 3),
+                      padding: const EdgeInsets.only(top: 3),
                       child: Text(
                         'مرحباً يا $name 👋',
                         textAlign: TextAlign.center,
@@ -1496,15 +1267,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
             ),
-
-            Expanded(
-              child: _buildBody(),
-            ),
+            Expanded(child: _buildBody()),
           ],
         ),
 
-        bottomNavigationBar:
-            _buildBottomNavigation(),
+        // شريط تنقل سفلي ثابت أثناء تمرير محتوى الصفحة.
+        bottomNavigationBar: _buildBottomNavigation(),
       ),
     );
   }
