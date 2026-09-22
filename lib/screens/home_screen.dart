@@ -1,14 +1,13 @@
-import 'my_listings_screen.dart';
-import 'profile_screen.dart';
-import 'favorites_screen.dart';
-import 'auth_screen.dart';
-import 'admin_listings_screen.dart';
-
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'listing_details_screen.dart';
 import 'add_listing_screen.dart';
+import 'admin_listings_screen.dart';
+import 'auth_screen.dart';
+import 'favorites_screen.dart';
+import 'listing_details_screen.dart';
+import 'my_listings_screen.dart';
+import 'profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -109,7 +108,7 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _isAdmin = profile?['role'] == 'admin';
       });
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
 
       setState(() {
@@ -133,19 +132,18 @@ class _HomeScreenState extends State<HomeScreen> {
           .eq('is_active', true)
           .order('sort_order');
 
-      // عرض الإعلانات المعتمدة فقط.
-      // sold و archived لا تظهر في السوق العام.
+      // السوق العام يعرض الإعلانات المتاحة فقط.
+      // sold و archived لا تظهر للعامة.
       var listingsQuery = _supabase
           .from('listings')
           .select(
             'id, title, description, price, currency, price_type, '
-            'area, category_id, created_at',
+            'area, category_id, status, created_at',
           )
           .eq('status', 'approved');
 
       if (_selectedCategoryId != null) {
-        listingsQuery =
-            listingsQuery.eq(
+        listingsQuery = listingsQuery.eq(
           'category_id',
           _selectedCategoryId!,
         );
@@ -156,12 +154,11 @@ class _HomeScreenState extends State<HomeScreen> {
         ascending: false,
       );
 
-      final listings =
-          List<Map<String, dynamic>>.from(
+      final listings = List<Map<String, dynamic>>.from(
         listingsResponse,
       );
 
-      // جلب صور الإعلانات الموجودة في القائمة.
+      // جلب صور الإعلانات.
       if (listings.isNotEmpty) {
         final listingIds = listings
             .map((listing) => listing['id'])
@@ -180,8 +177,7 @@ class _HomeScreenState extends State<HomeScreen> {
               )
               .order('sort_order');
 
-          final images =
-              List<Map<String, dynamic>>.from(
+          final images = List<Map<String, dynamic>>.from(
             imagesResponse,
           );
 
@@ -191,8 +187,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
             for (final image in images) {
               if (image['listing_id'] == listingId) {
-                listing['image_path'] =
-                    image['image_path'];
+                listing['image_path'] = image['image_path'];
                 break;
               }
             }
@@ -203,15 +198,14 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
 
       setState(() {
-        _categories =
-            List<Map<String, dynamic>>.from(
+        _categories = List<Map<String, dynamic>>.from(
           categoriesResponse,
         );
 
         _listings = listings;
         _loading = false;
       });
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
 
       setState(() {
@@ -237,7 +231,7 @@ class _HomeScreenState extends State<HomeScreen> {
           content: Text('تم تسجيل الخروج بنجاح'),
         ),
       );
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -254,8 +248,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final user = _supabase.auth.currentUser;
 
     if (user == null) {
-      final loginResult =
-          await Navigator.push<bool>(
+      final loginResult = await Navigator.push<bool>(
         context,
         MaterialPageRoute(
           builder: (_) => const AuthScreen(),
@@ -290,8 +283,7 @@ class _HomeScreenState extends State<HomeScreen> {
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) =>
-            const AdminListingsScreen(),
+        builder: (_) => const AdminListingsScreen(),
       ),
     );
 
@@ -307,43 +299,30 @@ class _HomeScreenState extends State<HomeScreen> {
     switch (value) {
       case 'سيارات ومركبات':
         return Icons.directions_car_outlined;
-
       case 'عقارات':
         return Icons.home_work_outlined;
-
       case 'موبايلات وإلكترونيات':
         return Icons.phone_android_outlined;
-
       case 'أجهزة كهربائية':
         return Icons.electrical_services_outlined;
-
       case 'ملابس وأحذية':
         return Icons.checkroom_outlined;
-
       case 'أثاث ومستلزمات منزلية':
         return Icons.weekend_outlined;
-
       case 'مواشي وحيوانات':
         return Icons.pets_outlined;
-
       case 'محاصيل زراعية':
         return Icons.agriculture_outlined;
-
       case 'مواد غذائية':
         return Icons.restaurant_outlined;
-
       case 'أدوات ومعدات':
         return Icons.build_outlined;
-
       case 'خدمات':
         return Icons.handyman_outlined;
-
       case 'وظائف':
         return Icons.work_outline;
-
       case 'أخرى':
         return Icons.more_horiz_outlined;
-
       default:
         return Icons.category_outlined;
     }
@@ -353,13 +332,10 @@ class _HomeScreenState extends State<HomeScreen> {
     Map<String, dynamic> listing,
   ) {
     final price = listing['price'];
-    final currency =
-        listing['currency'] ?? 'SDG';
-    final priceType =
-        listing['price_type'];
+    final currency = listing['currency'] ?? 'SDG';
+    final priceType = listing['price_type'];
 
-    if (priceType == 'contact' ||
-        price == null) {
+    if (priceType == 'contact' || price == null) {
       return 'السعر عند التواصل';
     }
 
@@ -377,8 +353,7 @@ class _HomeScreenState extends State<HomeScreen> {
       return null;
     }
 
-    final path =
-        imagePath.toString().trim();
+    final path = imagePath.toString().trim();
 
     if (path.isEmpty) {
       return null;
@@ -397,8 +372,9 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildListingImage(
     Map<String, dynamic> listing,
   ) {
-    final imageUrl =
-        _imageUrl(listing['image_path']);
+    final imageUrl = _imageUrl(
+      listing['image_path'],
+    );
 
     Widget buildNoImage() {
       return Container(
@@ -406,15 +382,13 @@ class _HomeScreenState extends State<HomeScreen> {
         width: double.infinity,
         decoration: BoxDecoration(
           color: Colors.grey.shade100,
-          borderRadius:
-              const BorderRadius.vertical(
+          borderRadius: const BorderRadius.vertical(
             top: Radius.circular(12),
           ),
         ),
         child: const Center(
           child: Column(
-            mainAxisSize:
-                MainAxisSize.min,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
                 Icons.photo_library_outlined,
@@ -427,8 +401,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 style: TextStyle(
                   color: Colors.grey,
                   fontSize: 13,
-                  fontWeight:
-                      FontWeight.w500,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ],
@@ -442,8 +415,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     return ClipRRect(
-      borderRadius:
-          const BorderRadius.vertical(
+      borderRadius: const BorderRadius.vertical(
         top: Radius.circular(12),
       ),
       child: Image.network(
@@ -451,12 +423,18 @@ class _HomeScreenState extends State<HomeScreen> {
         height: 145,
         width: double.infinity,
         fit: BoxFit.cover,
-        errorBuilder:
-            (context, error, stackTrace) {
+        errorBuilder: (
+          context,
+          error,
+          stackTrace,
+        ) {
           return buildNoImage();
         },
-        loadingBuilder:
-            (context, child, loadingProgress) {
+        loadingBuilder: (
+          context,
+          child,
+          loadingProgress,
+        ) {
           if (loadingProgress == null) {
             return child;
           }
@@ -466,8 +444,7 @@ class _HomeScreenState extends State<HomeScreen> {
             width: double.infinity,
             color: Colors.grey.shade100,
             child: const Center(
-              child:
-                  CircularProgressIndicator(
+              child: CircularProgressIndicator(
                 strokeWidth: 2,
               ),
             ),
@@ -477,71 +454,100 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildAvailableBadge() {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 9,
+        vertical: 5,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.green.withValues(
+          alpha: 0.92,
+        ),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.check_circle,
+            color: Colors.white,
+            size: 15,
+          ),
+          SizedBox(width: 4),
+          Text(
+            'متاح',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 11.5,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildListingCard(
     Map<String, dynamic> listing,
   ) {
-    final title =
-        listing['title']
+    final title = listing['title']
                     ?.toString()
                     .trim()
                     .isNotEmpty ==
                 true
-            ? listing['title'].toString()
-            : 'إعلان بدون عنوان';
+        ? listing['title'].toString()
+        : 'إعلان بدون عنوان';
 
-    final area =
-        listing['area']
-                ?.toString()
-                .trim() ??
-            '';
+    final area = listing['area']
+            ?.toString()
+            .trim() ??
+        '';
 
-    final price =
-        _formatPrice(listing);
+    final price = _formatPrice(listing);
 
     return Card(
-      margin:
-          const EdgeInsets.only(
+      margin: const EdgeInsets.only(
         bottom: 12,
       ),
       elevation: 1.5,
       shadowColor: Colors.black26,
-      clipBehavior:
-          Clip.antiAlias,
-      shape:
-          RoundedRectangleBorder(
-        borderRadius:
-            BorderRadius.circular(14),
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
       ),
       child: InkWell(
         onTap: () {
-          final listingId =
-              listing['id'];
+          final listingId = listing['id'];
 
           if (listingId is int) {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) =>
-                    ListingDetailsScreen(
-                  listingId:
-                      listingId,
+                builder: (_) => ListingDetailsScreen(
+                  listingId: listingId,
                 ),
               ),
             );
           }
         },
         child: Column(
-          crossAxisAlignment:
-              CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // صورة الإعلان
-            _buildListingImage(
-              listing,
+            // صورة الإعلان + حالة متاح.
+            Stack(
+              children: [
+                _buildListingImage(listing),
+                Positioned(
+                  top: 9,
+                  right: 9,
+                  child: _buildAvailableBadge(),
+                ),
+              ],
             ),
 
             Padding(
-              padding:
-                  const EdgeInsets.fromLTRB(
+              padding: const EdgeInsets.fromLTRB(
                 11,
                 9,
                 11,
@@ -551,79 +557,63 @@ class _HomeScreenState extends State<HomeScreen> {
                 crossAxisAlignment:
                     CrossAxisAlignment.start,
                 children: [
-                  // عنوان الإعلان
+                  // عنوان الإعلان.
                   Text(
                     title,
                     maxLines: 2,
-                    overflow:
-                        TextOverflow.ellipsis,
-                    style:
-                        const TextStyle(
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
                       fontSize: 15.5,
-                      fontWeight:
-                          FontWeight.bold,
+                      fontWeight: FontWeight.bold,
                       height: 1.25,
                     ),
                   ),
 
-                  const SizedBox(
-                    height: 7,
-                  ),
+                  const SizedBox(height: 7),
 
-                  // السعر
+                  // السعر.
                   Row(
                     children: [
                       const Icon(
                         Icons.sell_outlined,
                         size: 17,
                       ),
-                      const SizedBox(
-                        width: 5,
-                      ),
+                      const SizedBox(width: 5),
                       Expanded(
                         child: Text(
                           price,
                           maxLines: 1,
                           overflow:
                               TextOverflow.ellipsis,
-                          style:
-                              const TextStyle(
+                          style: const TextStyle(
                             fontSize: 14.5,
-                            fontWeight:
-                                FontWeight.bold,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
                     ],
                   ),
 
-                  // المنطقة
+                  // المنطقة.
                   if (area.isNotEmpty) ...[
-                    const SizedBox(
-                      height: 5,
-                    ),
+                    const SizedBox(height: 5),
                     Row(
                       children: [
                         const Icon(
-                          Icons
-                              .location_on_outlined,
+                          Icons.location_on_outlined,
                           size: 16,
                         ),
-                        const SizedBox(
-                          width: 5,
-                        ),
+                        const SizedBox(width: 5),
                         Expanded(
                           child: Text(
                             area,
                             maxLines: 1,
                             overflow:
-                                TextOverflow
-                                    .ellipsis,
+                                TextOverflow.ellipsis,
                             style: TextStyle(
                               fontSize: 12.5,
-                              color: Colors
-                                  .grey
-                                  .shade700,
+                              color:
+                                  Colors.grey.shade700,
                             ),
                           ),
                         ),
@@ -631,15 +621,12 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ],
 
-                  const SizedBox(
-                    height: 8,
-                  ),
+                  const SizedBox(height: 8),
 
-                  // زر عرض الإعلان
+                  // عرض الإعلان.
                   SizedBox(
                     width: double.infinity,
-                    child:
-                        OutlinedButton.icon(
+                    child: OutlinedButton.icon(
                       onPressed: () {
                         final listingId =
                             listing['id'];
@@ -658,37 +645,27 @@ class _HomeScreenState extends State<HomeScreen> {
                         }
                       },
                       icon: const Icon(
-                        Icons
-                            .arrow_back_ios_new,
+                        Icons.arrow_back_ios_new,
                         size: 13,
                       ),
                       label: const Text(
                         'عرض الإعلان',
                         style: TextStyle(
                           fontSize: 13,
-                          fontWeight:
-                              FontWeight.w600,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                      style:
-                          OutlinedButton.styleFrom(
+                      style: OutlinedButton.styleFrom(
                         minimumSize:
-                            const Size
-                                .fromHeight(
-                          36,
-                        ),
+                            const Size.fromHeight(36),
                         padding:
-                            const EdgeInsets
-                                .symmetric(
+                            const EdgeInsets.symmetric(
                           horizontal: 8,
                         ),
                         shape:
                             RoundedRectangleBorder(
                           borderRadius:
-                              BorderRadius
-                                  .circular(
-                            9,
-                          ),
+                              BorderRadius.circular(9),
                         ),
                       ),
                     ),
@@ -705,35 +682,27 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildBody() {
     if (_loading) {
       return const Center(
-        child:
-            CircularProgressIndicator(),
+        child: CircularProgressIndicator(),
       );
     }
 
     if (_error != null) {
       return Center(
         child: Padding(
-          padding:
-              const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(24),
           child: Column(
-            mainAxisSize:
-                MainAxisSize.min,
+            mainAxisSize: MainAxisSize.min,
             children: [
               const Icon(
                 Icons.wifi_off,
                 size: 48,
               ),
-              const SizedBox(
-                height: 12,
-              ),
+              const SizedBox(height: 12),
               Text(
                 _error!,
-                textAlign:
-                    TextAlign.center,
+                textAlign: TextAlign.center,
               ),
-              const SizedBox(
-                height: 16,
-              ),
+              const SizedBox(height: 16),
               FilledButton(
                 onPressed: _loadData,
                 child: const Text(
@@ -751,26 +720,22 @@ class _HomeScreenState extends State<HomeScreen> {
       child: ListView(
         physics:
             const AlwaysScrollableScrollPhysics(),
-        padding:
-            const EdgeInsets.fromLTRB(
+        padding: const EdgeInsets.fromLTRB(
           16,
           8,
           16,
           24,
         ),
         children: [
-          // البحث
+          // البحث.
           TextField(
-            controller:
-                _searchController,
+            controller: _searchController,
             textInputAction:
                 TextInputAction.search,
-            decoration:
-                InputDecoration(
+            decoration: InputDecoration(
               hintText:
                   'ابحث عن إعلان أو منطقة...',
-              prefixIcon:
-                  const Icon(
+              prefixIcon: const Icon(
                 Icons.search,
               ),
               suffixIcon:
@@ -781,111 +746,90 @@ class _HomeScreenState extends State<HomeScreen> {
                                 .clear();
 
                             setState(() {
-                              _searchQuery =
-                                  '';
+                              _searchQuery = '';
                             });
                           },
-                          icon:
-                              const Icon(
+                          icon: const Icon(
                             Icons.clear,
                           ),
-                          tooltip:
-                              'مسح البحث',
+                          tooltip: 'مسح البحث',
                         )
                       : null,
               filled: true,
-              border:
-                  OutlineInputBorder(
+              border: OutlineInputBorder(
                 borderRadius:
-                    BorderRadius
-                        .circular(14),
-                borderSide:
-                    BorderSide.none,
+                    BorderRadius.circular(14),
+                borderSide: BorderSide.none,
               ),
             ),
             onChanged: (value) {
               setState(() {
-                _searchQuery =
-                    value;
+                _searchQuery = value;
               });
             },
           ),
 
-          const SizedBox(
-            height: 18,
-          ),
+          const SizedBox(height: 18),
 
-          // التصنيفات
+          // التصنيفات.
           Row(
             children: [
               const Expanded(
                 child: Text(
                   'الأقسام',
-                  style:
-                      TextStyle(
+                  style: TextStyle(
                     fontSize: 21,
-                    fontWeight:
-                        FontWeight.bold,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
               ),
               TextButton(
                 onPressed: () {
                   setState(() {
-                    _selectedCategoryId =
-                        null;
+                    _selectedCategoryId = null;
                   });
 
                   _loadData();
                 },
-                child:
-                    const Text(
+                child: const Text(
                   'عرض الكل',
                 ),
               ),
             ],
           ),
 
-          const SizedBox(
-            height: 4,
-          ),
+          const SizedBox(height: 4),
 
           if (_categories.isEmpty)
             const Padding(
-              padding:
-                  EdgeInsets.symmetric(
+              padding: EdgeInsets.symmetric(
                 vertical: 16,
               ),
               child: Text(
                 'لا توجد أقسام متاحة حالياً',
-                textAlign:
-                    TextAlign.center,
+                textAlign: TextAlign.center,
               ),
             )
           else
             SizedBox(
               height: 92,
-              child:
-                  ListView.separated(
-                scrollDirection:
-                    Axis.horizontal,
-                itemCount:
-                    _categories.length,
-                separatorBuilder:
-                    (_, __) {
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: _categories.length,
+                separatorBuilder: (_, __) {
                   return const SizedBox(
                     width: 10,
                   );
                 },
-                itemBuilder:
-                    (context, index) {
+                itemBuilder: (
+                  context,
+                  index,
+                ) {
                   final category =
-                      _categories[
-                          index];
+                      _categories[index];
 
                   final categoryId =
-                      category['id']
-                          as int?;
+                      category['id'] as int?;
 
                   final categoryName =
                       category['name']
@@ -898,8 +842,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
                   return GestureDetector(
                     onTap: () {
-                      if (categoryId ==
-                          null) {
+                      if (categoryId == null) {
                         return;
                       }
 
@@ -910,50 +853,34 @@ class _HomeScreenState extends State<HomeScreen> {
 
                       _loadData();
                     },
-                    child:
-                        Container(
+                    child: Container(
                       width: 92,
                       padding:
-                          const EdgeInsets
-                              .all(
-                        8,
-                      ),
-                      decoration:
-                          BoxDecoration(
+                          const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
                         color: selected
-                            ? Theme.of(
-                                context,
-                              )
+                            ? Theme.of(context)
                                 .colorScheme
                                 .primaryContainer
-                            : Theme.of(
-                                context,
-                              )
+                            : Theme.of(context)
                                 .colorScheme
                                 .surfaceContainerHighest,
                         borderRadius:
-                            BorderRadius
-                                .circular(
+                            BorderRadius.circular(
                           16,
                         ),
-                        border:
-                            Border.all(
+                        border: Border.all(
                           color: selected
-                              ? Theme.of(
-                                  context,
-                                )
-                                    .colorScheme
-                                    .primary
-                              : Colors
-                                  .transparent,
+                              ? Theme.of(context)
+                                  .colorScheme
+                                  .primary
+                              : Colors.transparent,
                           width: 1.2,
                         ),
                       ),
-                      child:
-                          Column(
+                      child: Column(
                         mainAxisAlignment:
-                            MainAxisAlignment
-                                .center,
+                            MainAxisAlignment.center,
                         children: [
                           Icon(
                             _categoryIcon(
@@ -961,24 +888,18 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                             size: 30,
                           ),
-                          const SizedBox(
-                            height: 6,
-                          ),
+                          const SizedBox(height: 6),
                           Text(
                             categoryName,
                             textAlign:
-                                TextAlign
-                                    .center,
+                                TextAlign.center,
                             maxLines: 2,
                             overflow:
-                                TextOverflow
-                                    .ellipsis,
-                            style:
-                                const TextStyle(
+                                TextOverflow.ellipsis,
+                            style: const TextStyle(
                               fontSize: 12,
                               fontWeight:
-                                  FontWeight
-                                      .w600,
+                                  FontWeight.w600,
                             ),
                           ),
                         ],
@@ -989,24 +910,19 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
 
-          const SizedBox(
-            height: 26,
-          ),
+          const SizedBox(height: 26),
 
-          // نتائج البحث أو القسم المحدد
+          // نتائج البحث أو القسم المحدد.
           if (_searchQuery.isNotEmpty ||
-              _selectedCategoryId !=
-                  null) ...[
+              _selectedCategoryId != null) ...[
             Row(
               children: [
                 const Expanded(
                   child: Text(
                     'النتائج',
-                    style:
-                        TextStyle(
+                    style: TextStyle(
                       fontSize: 21,
-                      fontWeight:
-                          FontWeight.bold,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
@@ -1014,45 +930,34 @@ class _HomeScreenState extends State<HomeScreen> {
                   '${_filteredListings.length} إعلان',
                   style: TextStyle(
                     fontSize: 13,
-                    color: Colors
-                        .grey
-                        .shade600,
+                    color: Colors.grey.shade600,
                   ),
                 ),
               ],
             ),
 
-            const SizedBox(
-              height: 12,
-            ),
+            const SizedBox(height: 12),
 
-            if (_filteredListings
-                .isEmpty)
+            if (_filteredListings.isEmpty)
               Padding(
                 padding:
-                    const EdgeInsets
-                        .symmetric(
+                    const EdgeInsets.symmetric(
                   vertical: 32,
                 ),
                 child: Column(
                   children: [
                     const Icon(
-                      Icons
-                          .search_off_outlined,
+                      Icons.search_off_outlined,
                       size: 56,
                     ),
-                    const SizedBox(
-                      height: 12,
-                    ),
+                    const SizedBox(height: 12),
                     Text(
-                      _searchQuery
-                              .isEmpty
+                      _searchQuery.isEmpty
                           ? 'لا توجد إعلانات في هذا القسم'
                           : 'لم نجد إعلانات تطابق بحثك',
                       textAlign:
                           TextAlign.center,
-                      style:
-                          const TextStyle(
+                      style: const TextStyle(
                         fontSize: 16,
                       ),
                     ),
@@ -1060,35 +965,29 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               )
             else
-              ..._filteredListings
-                  .map(
-                    _buildListingCard,
-                  ),
+              ..._filteredListings.map(
+                _buildListingCard,
+              ),
           ] else ...[
-            // الصفحة الرئيسية
+            // الصفحة الرئيسية.
             if (_listings.isEmpty)
               Padding(
                 padding:
-                    const EdgeInsets
-                        .symmetric(
+                    const EdgeInsets.symmetric(
                   vertical: 32,
                 ),
                 child: Column(
                   children: [
                     const Icon(
-                      Icons
-                          .inventory_2_outlined,
+                      Icons.inventory_2_outlined,
                       size: 56,
                     ),
-                    const SizedBox(
-                      height: 12,
-                    ),
+                    const SizedBox(height: 12),
                     const Text(
-                      'لا توجد إعلانات معتمدة حالياً',
+                      'لا توجد إعلانات متاحة حالياً',
                       textAlign:
                           TextAlign.center,
-                      style:
-                          TextStyle(
+                      style: TextStyle(
                         fontSize: 16,
                       ),
                     ),
@@ -1098,66 +997,53 @@ class _HomeScreenState extends State<HomeScreen> {
             else ...[
               const Text(
                 'أحدث الإعلانات',
-                style:
-                    TextStyle(
+                style: TextStyle(
                   fontSize: 21,
-                  fontWeight:
-                      FontWeight.bold,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
 
-              const SizedBox(
-                height: 12,
-              ),
+              const SizedBox(height: 12),
 
               SizedBox(
                 height: 285,
-                child:
-                    ListView.separated(
-                  scrollDirection:
-                      Axis.horizontal,
-                  itemCount:
-                      _listings.length,
-                  separatorBuilder:
-                      (_, __) {
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _listings.length,
+                  separatorBuilder: (_, __) {
                     return const SizedBox(
                       width: 10,
                     );
                   },
-                  itemBuilder:
-                      (context, index) {
+                  itemBuilder: (
+                    context,
+                    index,
+                  ) {
                     return SizedBox(
                       width: 210,
-                      child:
-                          _buildListingCard(
-                        _listings[
-                            index],
+                      child: _buildListingCard(
+                        _listings[index],
                       ),
                     );
                   },
                 ),
               ),
 
-              const SizedBox(
-                height: 28,
-              ),
+              const SizedBox(height: 28),
 
-              // أقسام الإعلانات
+              // أقسام الإعلانات.
               ..._categories.map(
                 (category) {
                   final categoryId =
-                      category['id']
-                          as int?;
+                      category['id'] as int?;
 
                   final categoryName =
                       category['name']
                               ?.toString() ??
                           'بدون اسم';
 
-                  if (categoryId ==
-                      null) {
-                    return const SizedBox
-                        .shrink();
+                  if (categoryId == null) {
+                    return const SizedBox.shrink();
                   }
 
                   final categoryListings =
@@ -1169,23 +1055,18 @@ class _HomeScreenState extends State<HomeScreen> {
                     },
                   ).toList();
 
-                  if (categoryListings
-                      .isEmpty) {
-                    return const SizedBox
-                        .shrink();
+                  if (categoryListings.isEmpty) {
+                    return const SizedBox.shrink();
                   }
 
                   return Padding(
                     padding:
-                        const EdgeInsets
-                            .only(
+                        const EdgeInsets.only(
                       bottom: 28,
                     ),
-                    child:
-                        Column(
+                    child: Column(
                       crossAxisAlignment:
-                          CrossAxisAlignment
-                              .stretch,
+                          CrossAxisAlignment.stretch,
                       children: [
                         Row(
                           children: [
@@ -1199,47 +1080,38 @@ class _HomeScreenState extends State<HomeScreen> {
                               width: 8,
                             ),
                             Expanded(
-                              child:
-                                  Text(
+                              child: Text(
                                 categoryName,
                                 style:
                                     const TextStyle(
-                                  fontSize:
-                                      19,
+                                  fontSize: 19,
                                   fontWeight:
                                       FontWeight.bold,
                                 ),
                               ),
                             ),
                             TextButton(
-                              onPressed:
-                                  () {
-                                setState(
-                                  () {
-                                    _selectedCategoryId =
-                                        categoryId;
-                                  },
-                                );
+                              onPressed: () {
+                                setState(() {
+                                  _selectedCategoryId =
+                                      categoryId;
+                                });
 
                                 _loadData();
                               },
-                              child:
-                                  const Text(
+                              child: const Text(
                                 'عرض الكل',
                               ),
                             ),
                           ],
                         ),
 
-                        const SizedBox(
-                          height: 8,
-                        ),
+                        const SizedBox(height: 8),
 
                         SizedBox(
                           height: 285,
-                          child:
-                              ListView
-                                  .separated(
+                          child: ListView
+                              .separated(
                             scrollDirection:
                                 Axis.horizontal,
                             itemCount:
@@ -1251,12 +1123,12 @@ class _HomeScreenState extends State<HomeScreen> {
                                 width: 10,
                               );
                             },
-                            itemBuilder:
-                                (context,
-                                    index) {
+                            itemBuilder: (
+                              context,
+                              index,
+                            ) {
                               return SizedBox(
-                                width:
-                                    210,
+                                width: 210,
                                 child:
                                     _buildListingCard(
                                   categoryListings[
@@ -1279,64 +1151,48 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
+  Widget build(BuildContext context) {
     final user =
         _supabase.auth.currentUser;
 
     final name =
-        user?.userMetadata?[
-            'full_name'] as String?;
+        user?.userMetadata?['full_name']
+            as String?;
 
     return Directionality(
-      textDirection:
-          TextDirection.rtl,
+      textDirection: TextDirection.rtl,
       child: Scaffold(
         drawer: Drawer(
           child: SafeArea(
             child: ListView(
-              padding:
-                  EdgeInsets.zero,
+              padding: EdgeInsets.zero,
               children: [
                 UserAccountsDrawerHeader(
-                  decoration:
-                      BoxDecoration(
-                    color: Theme.of(
-                      context,
-                    )
+                  decoration: BoxDecoration(
+                    color: Theme.of(context)
                         .colorScheme
                         .primary,
                   ),
-                  accountName:
-                      Text(
-                    name == null ||
-                            name.isEmpty
+                  accountName: Text(
+                    name == null || name.isEmpty
                         ? 'مرحباً بك في دلالة شبشة'
                         : name,
                   ),
-                  accountEmail:
-                      user == null
-                          ? null
-                          : Text(
-                              user.email ??
-                                  '',
-                            ),
+                  accountEmail: user == null
+                      ? null
+                      : Text(
+                          user.email ?? '',
+                        ),
                   currentAccountPicture:
                       CircleAvatar(
                     backgroundColor:
-                        Theme.of(
-                      context,
-                    )
+                        Theme.of(context)
                             .colorScheme
                             .onPrimary,
                     child: Icon(
-                      Icons
-                          .storefront_rounded,
+                      Icons.storefront_rounded,
                       size: 32,
-                      color: Theme.of(
-                        context,
-                      )
+                      color: Theme.of(context)
                           .colorScheme
                           .primary,
                     ),
@@ -1344,18 +1200,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
 
                 ListTile(
-                  leading:
-                      const Icon(
-                    Icons
-                        .person_outline,
+                  leading: const Icon(
+                    Icons.person_outline,
                   ),
-                  title:
-                      const Text(
+                  title: const Text(
                     'الملف الشخصي',
                   ),
                   onTap: () {
-                    Navigator.pop(
-                        context);
+                    Navigator.pop(context);
 
                     Navigator.push(
                       context,
@@ -1370,8 +1222,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 const Divider(),
 
                 const Padding(
-                  padding:
-                      EdgeInsets.fromLTRB(
+                  padding: EdgeInsets.fromLTRB(
                     16,
                     12,
                     16,
@@ -1379,11 +1230,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   child: Text(
                     'الأقسام',
-                    style:
-                        TextStyle(
+                    style: TextStyle(
                       fontSize: 16,
-                      fontWeight:
-                          FontWeight.bold,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
@@ -1397,10 +1246,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     child: Text(
                       'لا توجد أقسام حالياً',
-                      style:
-                          TextStyle(
-                        color:
-                            Colors.grey,
+                      style: TextStyle(
+                        color: Colors.grey,
                       ),
                     ),
                   )
@@ -1408,13 +1255,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   ..._categories.map(
                     (category) {
                       final categoryId =
-                          category[
-                                  'id']
-                              as int?;
+                          category['id'] as int?;
 
                       final categoryName =
-                          category[
-                                      'name']
+                          category['name']
                                   ?.toString() ??
                               'بدون اسم';
 
@@ -1431,20 +1275,16 @@ class _HomeScreenState extends State<HomeScreen> {
                             _selectedCategoryId ==
                                 categoryId,
                         onTap: () {
-                          Navigator.pop(
-                              context);
+                          Navigator.pop(context);
 
-                          if (categoryId ==
-                              null) {
+                          if (categoryId == null) {
                             return;
                           }
 
-                          setState(
-                            () {
-                              _selectedCategoryId =
-                                  categoryId;
-                            },
-                          );
+                          setState(() {
+                            _selectedCategoryId =
+                                categoryId;
+                          });
 
                           _loadData();
                         },
@@ -1455,17 +1295,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 const Divider(),
 
                 ListTile(
-                  leading:
-                      const Icon(
+                  leading: const Icon(
                     Icons.favorite_border,
                   ),
-                  title:
-                      const Text(
+                  title: const Text(
                     'المفضلة',
                   ),
                   onTap: () {
-                    Navigator.pop(
-                        context);
+                    Navigator.pop(context);
 
                     Navigator.push(
                       context,
@@ -1479,18 +1316,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
                 if (user != null)
                   ListTile(
-                    leading:
-                        const Icon(
-                      Icons
-                          .inventory_2_outlined,
+                    leading: const Icon(
+                      Icons.inventory_2_outlined,
                     ),
-                    title:
-                        const Text(
+                    title: const Text(
                       'إعلاناتي',
                     ),
                     onTap: () {
-                      Navigator.pop(
-                          context);
+                      Navigator.pop(context);
 
                       Navigator.push(
                         context,
@@ -1504,21 +1337,17 @@ class _HomeScreenState extends State<HomeScreen> {
 
                 if (user == null)
                   ListTile(
-                    leading:
-                        const Icon(
+                    leading: const Icon(
                       Icons.login,
                     ),
-                    title:
-                        const Text(
+                    title: const Text(
                       'تسجيل الدخول',
                     ),
                     onTap: () async {
-                      Navigator.pop(
-                          context);
+                      Navigator.pop(context);
 
                       final result =
-                          await Navigator.push<
-                              bool>(
+                          await Navigator.push<bool>(
                         context,
                         MaterialPageRoute(
                           builder: (_) =>
@@ -1526,11 +1355,9 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       );
 
-                      if (result ==
-                              true &&
+                      if (result == true &&
                           mounted) {
-                        setState(
-                            () {});
+                        setState(() {});
 
                         await _checkAdminStatus();
                       }
@@ -1539,17 +1366,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
                 if (user != null)
                   ListTile(
-                    leading:
-                        const Icon(
+                    leading: const Icon(
                       Icons.logout,
                     ),
-                    title:
-                        const Text(
+                    title: const Text(
                       'تسجيل الخروج',
                     ),
                     onTap: () {
-                      Navigator.pop(
-                          context);
+                      Navigator.pop(context);
                       _signOut();
                     },
                   ),
@@ -1560,74 +1384,55 @@ class _HomeScreenState extends State<HomeScreen> {
 
         appBar: AppBar(
           title: Row(
-            mainAxisSize:
-                MainAxisSize.min,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Container(
                 width: 38,
                 height: 38,
-                decoration:
-                    BoxDecoration(
-                  color: Theme.of(
-                    context,
-                  )
+                decoration: BoxDecoration(
+                  color: Theme.of(context)
                       .colorScheme
                       .primaryContainer,
                   borderRadius:
-                      BorderRadius
-                          .circular(12),
+                      BorderRadius.circular(12),
                 ),
                 child: Icon(
-                  Icons
-                      .storefront_rounded,
+                  Icons.storefront_rounded,
                   size: 25,
-                  color: Theme.of(
-                    context,
-                  )
+                  color: Theme.of(context)
                       .colorScheme
                       .onPrimaryContainer,
                 ),
               ),
-              const SizedBox(
-                width: 10,
-              ),
+              const SizedBox(width: 10),
               const Flexible(
                 child: Text(
                   'دلالة شبشة',
                   overflow:
-                      TextOverflow
-                          .ellipsis,
-                  style:
-                      TextStyle(
+                      TextOverflow.ellipsis,
+                  style: TextStyle(
                     fontSize: 20,
-                    fontWeight:
-                        FontWeight.bold,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
               ),
             ],
           ),
+
           actions: [
             if (_isAdmin)
               IconButton(
-                tooltip:
-                    'لوحة تحكم الأدمن',
-                icon:
-                    const Icon(
-                  Icons
-                      .admin_panel_settings_outlined,
+                tooltip: 'لوحة تحكم الأدمن',
+                icon: const Icon(
+                  Icons.admin_panel_settings_outlined,
                 ),
-                onPressed:
-                    _openAdminPanel,
+                onPressed: _openAdminPanel,
               ),
 
             IconButton(
-              tooltip:
-                  'الملف الشخصي',
-              icon:
-                  const Icon(
-                Icons
-                    .person_outline,
+              tooltip: 'الملف الشخصي',
+              icon: const Icon(
+                Icons.person_outline,
               ),
               onPressed: () {
                 Navigator.push(
@@ -1642,10 +1447,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
             IconButton(
               tooltip: 'المفضلة',
-              icon:
-                  const Icon(
-                Icons
-                    .favorite_border,
+              icon: const Icon(
+                Icons.favorite_border,
               ),
               onPressed: () {
                 Navigator.push(
@@ -1659,14 +1462,10 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
 
             IconButton(
-              tooltip:
-                  'إضافة إعلان',
-              onPressed:
-                  _openAddListing,
-              icon:
-                  const Icon(
-                Icons
-                    .add_circle_outline,
+              tooltip: 'إضافة إعلان',
+              onPressed: _openAddListing,
+              icon: const Icon(
+                Icons.add_circle_outline,
               ),
             ),
 
@@ -1676,20 +1475,16 @@ class _HomeScreenState extends State<HomeScreen> {
                 _loadData();
                 _checkAdminStatus();
               },
-              icon:
-                  const Icon(
+              icon: const Icon(
                 Icons.refresh,
               ),
             ),
 
             if (user != null)
               IconButton(
-                tooltip:
-                    'إعلاناتي',
-                icon:
-                    const Icon(
-                  Icons
-                      .inventory_2_outlined,
+                tooltip: 'إعلاناتي',
+                icon: const Icon(
+                  Icons.inventory_2_outlined,
                 ),
                 onPressed: () {
                   Navigator.push(
@@ -1704,12 +1499,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
             if (user != null)
               IconButton(
-                tooltip:
-                    'تسجيل الخروج',
-                onPressed:
-                    _signOut,
-                icon:
-                    const Icon(
+                tooltip: 'تسجيل الخروج',
+                onPressed: _signOut,
+                icon: const Icon(
                   Icons.logout,
                 ),
               ),
@@ -1718,13 +1510,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
         body: Column(
           crossAxisAlignment:
-              CrossAxisAlignment
-                  .stretch,
+              CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding:
-                  const EdgeInsets
-                      .fromLTRB(
+              padding: const EdgeInsets.fromLTRB(
                 16,
                 18,
                 16,
@@ -1733,54 +1522,38 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Column(
                 children: [
                   Text(
-                    name == null ||
-                            name.isEmpty
+                    name == null || name.isEmpty
                         ? 'مرحباً بك في دلالة شبشة 👋'
                         : 'مرحباً يا $name 👋',
                     textAlign:
                         TextAlign.center,
-                    style:
-                        const TextStyle(
+                    style: const TextStyle(
                       fontSize: 23,
-                      fontWeight:
-                          FontWeight.bold,
+                      fontWeight: FontWeight.bold,
                       height: 1.3,
                     ),
                   ),
-
-                  const SizedBox(
-                    height: 8,
-                  ),
-
+                  const SizedBox(height: 8),
                   const Text(
                     'تسوّق أو أعلن معنا',
                     textAlign:
                         TextAlign.center,
-                    style:
-                        TextStyle(
+                    style: TextStyle(
                       fontSize: 17,
-                      fontWeight:
-                          FontWeight.w500,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
-
-                  const SizedBox(
-                    height: 6,
-                  ),
-
+                  const SizedBox(height: 6),
                   Text(
                     'دلالة شبشة — بيع وشراء بدون وسيط',
                     textAlign:
                         TextAlign.center,
                     style: TextStyle(
                       fontSize: 15,
-                      color: Theme.of(
-                        context,
-                      )
+                      color: Theme.of(context)
                           .colorScheme
                           .primary,
-                      fontWeight:
-                          FontWeight.w600,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ],
@@ -1788,8 +1561,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
 
             Expanded(
-              child:
-                  _buildBody(),
+              child: _buildBody(),
             ),
           ],
         ),
