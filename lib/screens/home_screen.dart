@@ -593,7 +593,7 @@ class _HomeScreenState extends State<HomeScreen> {
     List<Map<String, dynamic>> listings,
   ) {
     return SizedBox(
-      height: 260,
+      height: 230,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: listings.length,
@@ -1210,6 +1210,7 @@ class _HomeScreenState extends State<HomeScreen> {
         // الشريط العلوي: زر القائمة ثم اسم التطبيق، وبعدهما الأزرار.
         appBar: AppBar(
           centerTitle: false,
+          titleSpacing: 0,
           elevation: 0,
           title: Text(
             'دلالة شبشة',
