@@ -368,17 +368,35 @@ class _HomeScreenState extends State<HomeScreen> {
     return '$withCommas ج.س';
   }
 
-  void _openListingDetails(
-    Map<String, dynamic> listing,
-  ) {
+  void _openListingDetails(Map<String, dynamic> listing) {
+    final listingId = listing[id]?.toString();
+
+    if (listingId == null || listingId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('تعذر فتح الإعلان'),
+        ),
+      );
+      return;
+    }
+
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => ListingDetailsScreen(
-          listing: listing,
+          listingId: listingId,
         ),
       ),
     );
   }
+
+  Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (_) => ListingDetailsScreen(
+        listingId: listingId,
+      ),
+    ),
+  );
+}
 
   Widget _buildListingCard(
     Map<String, dynamic> listing,
