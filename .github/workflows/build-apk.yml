@@ -3,7 +3,8 @@ name: Build Android APK
 on:
   push:
     branches:
-      - master
+      - restore-16d57d8
+      - main
   workflow_dispatch:
 
 jobs:
@@ -21,33 +22,77 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Create Flutter Android project
+      - name: Verify source files
         run: |
-          flutter create --platforms=android --project-name dalalat_shabsha .
+          echo "=== CURRENT DIRECTORY ==="
+          pwd
+
+          echo "=== LIB ==="
+          find lib -maxdepth 2 -type f | sort
+
+          echo "=== HOME SCREEN ==="
+          test -f lib/screens/home_screen.dart
+
+          echo "=== MAIN ==="
+          test -f lib/main.dart
+
+          echo "=== GIT COMMIT ==="
+          git log -1 --oneline
+
+      - name: Create Android project separately
+        run: |
+          rm -rf /tmp/dalalat_android
+
+          flutter create \
+            --platforms=android \
+            --project-name dalalat_shabsha \
+            /tmp/dalalat_android
+
+          rm -rf android
+          cp -R /tmp/dalalat_android/android ./android
+
+      - name: Verify source files after Android creation
+        run: |
+          echo "=== LIB AFTER FLUTTER CREATE ==="
+          find lib -maxdepth 2 -type f | sort
+
+          echo "=== CHECK HOME SCREEN ==="
+          test -f lib/screens/home_screen.dart
+
+          echo "=== CHECK MAIN ==="
+          test -f lib/main.dart
 
       - name: Add Android Internet permission
         run: |
-          python - <<'PY2'
+          python3 - <<'PY'
           from pathlib import Path
 
           p = Path("android/app/src/main/AndroidManifest.xml")
           s = p.read_text()
 
-          permission = '    <uses-permission android:name="android.permission.INTERNET" />'
+          permission = (
+              '    <uses-permission '
+              'android:name="android.permission.INTERNET" />'
+          )
 
-          if 'android.permission.INTERNET' not in s:
-              marker = '<application'
-              s = s.replace(marker, permission + '\\n\\n    ' + marker, 1)
+          if "android.permission.INTERNET" not in s:
+              marker = "<application"
+              s = s.replace(
+                  marker,
+                  permission + "\n\n    " + marker,
+                  1
+              )
 
           p.write_text(s)
-          PY2
+          PY
 
       - name: Remove default test
-        run: rm -f test/widget_test.dart
+        run: |
+          rm -f test/widget_test.dart
 
       - name: Set Arabic app name
         run: |
-          python - <<'PY2'
+          python3 - <<'PY'
           from pathlib import Path
 
           p = Path("android/app/src/main/AndroidManifest.xml")
@@ -59,13 +104,15 @@ jobs:
           )
 
           p.write_text(s)
-          PY2
+          PY
 
       - name: Get dependencies
-        run: flutter pub get
+        run: |
+          flutter pub get
 
       - name: Analyze
-        run: flutter analyze
+        run: |
+          flutter analyze
 
       - name: Build APK
         env:
