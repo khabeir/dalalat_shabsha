@@ -1,3 +1,4 @@
+Timer? _promotedRefreshTimer;
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -30,17 +31,25 @@ class _HomeScreenState extends State<HomeScreen> {
   int? _selectedCategoryId;
 
   @override
-  void initState() {
-    super.initState();
-    _loadData();
-    _checkAdminStatus();
-  }
+void initState() {
+  super.initState();
+
+  _loadData();
+  _checkAdminStatus();
+
+  // تحديث حالة الإعلانات التجارية كل دقيقة.
+  _promotedRefreshTimer = Timer.periodic(
+    const Duration(minutes: 1),
+    (_) => _loadPromotedListings(),
+  );
+}
 
   @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
+void dispose() {
+  _promotedRefreshTimer?.cancel();
+  _searchController.dispose();
+  super.dispose();
+}
 
   String _normalizeSearchText(String text) {
     return text
@@ -104,6 +113,150 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() => _isAdmin = false);
     }
   }
+  
+  Future<void> _loadPromotedListings() async {
+  try {
+    final now = DateTime.now().toUtc().toIso8601String();
+
+    final promotedResponse = await _supabase
+        .from('promoted_listings')
+        .select(
+          'id, listing_id, start_at, end_at, is_active, created_by',
+        )
+        .eq('is_active', true)
+        .lte('start_at', now)
+        .gt('end_at', now)
+        .order('start_at', ascending: false);
+
+    final promotedRows =
+        List<Map<String, dynamic>>.from(
+      promotedResponse,
+    );
+
+    if (promotedRows.isEmpty) {
+      if (!mounted) return;
+
+      setState(() {
+        _promotedListings = [];
+      });
+
+      return;
+    }
+
+    final listingIds = promotedRows
+        .map((item) => item['listing_id'])
+        .where((id) => id != null)
+        .toList();
+
+    if (listingIds.isEmpty) {
+      if (!mounted) return;
+
+      setState(() {
+        _promotedListings = [];
+      });
+
+      return;
+    }
+
+    // لا نعرض الإعلان التجاري إلا إذا كان الإعلان نفسه approved.
+    final listingsResponse = await _supabase
+        .from('listings')
+        .select(
+          'id, title, description, price, currency, price_type, '
+          'area, category_id, status, created_at',
+        )
+        .inFilter('id', listingIds)
+        .eq('status', 'approved');
+
+    final approvedListings =
+        List<Map<String, dynamic>>.from(
+      listingsResponse,
+    );
+
+    final listingsById = <dynamic, Map<String, dynamic>>{};
+
+    for (final listing in approvedListings) {
+      listingsById[listing['id']] = listing;
+    }
+
+    final result = <Map<String, dynamic>>[];
+
+    // نحافظ على ترتيب start_at القادم من promoted_listings.
+    for (final promoted in promotedRows) {
+      final listingId = promoted['listing_id'];
+
+      final listing = listingsById[listingId];
+
+      if (listing == null) continue;
+
+      final item = Map<String, dynamic>.from(
+        listing,
+      );
+
+      item['promoted_listing_id'] =
+          promoted['id'];
+
+      item['promotion_start_at'] =
+          promoted['start_at'];
+
+      item['promotion_end_at'] =
+          promoted['end_at'];
+
+      item['promotion_is_active'] =
+          promoted['is_active'];
+
+      item['is_commercial'] = true;
+
+      result.add(item);
+    }
+
+    // جلب أول صورة لكل إعلان تجاري.
+    if (result.isNotEmpty) {
+      final resultIds = result
+          .map((listing) => listing['id'])
+          .where((id) => id != null)
+          .toList();
+
+      if (resultIds.isNotEmpty) {
+        final imagesResponse = await _supabase
+            .from('listing_images')
+            .select(
+              'listing_id, image_path, sort_order',
+            )
+            .inFilter(
+              'listing_id',
+              resultIds,
+            )
+            .order('sort_order');
+
+        final images =
+            List<Map<String, dynamic>>.from(
+          imagesResponse,
+        );
+
+        for (final listing in result) {
+          for (final image in images) {
+            if (image['listing_id'] ==
+                listing['id']) {
+              listing['image_path'] =
+                  image['image_path'];
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    if (!mounted) return;
+
+    setState(() {
+      _promotedListings = result;
+    });
+  } catch (_) {
+    // لا نوقف الصفحة الرئيسية إذا فشل تحميل
+    // الإعلانات التجارية.
+  }
+}
 
   Future<void> _loadData() async {
     if (mounted) {
@@ -171,12 +324,17 @@ class _HomeScreenState extends State<HomeScreen> {
 
       if (!mounted) return;
 
-      setState(() {
-        _categories =
-            List<Map<String, dynamic>>.from(categoriesResponse);
-        _listings = listings;
-        _loading = false;
-      });
+setState(() {
+  _categories =
+      List<Map<String, dynamic>>.from(categoriesResponse);
+
+  _listings = listings;
+
+  _loading = false;
+});
+
+// تحميل الإعلانات التجارية بشكل مستقل.
+await _loadPromotedListings();
     } catch (_) {
       if (!mounted) return;
 
@@ -529,8 +687,9 @@ String _formatPrice(Map<String, dynamic> listing) {
   // تحسين شكل بطاقة الإعلان فقط.
   // لم يتم تغيير طريقة تحميل الصور أو روابط Supabase.
 Widget _buildListingCard(
-  Map<String, dynamic> listing,
-) {
+  Map<String, dynamic> listing, {
+  bool isCommercial = false,
+}) {
   final rawTitle =
       listing['title']?.toString().trim() ?? '';
 
@@ -569,19 +728,57 @@ Widget _buildListingCard(
           children: [
             // صورة الإعلان — لم يتم تغيير منطق الصور
             Stack(
-              children: [
-                _buildListingImage(
-                  listing,
-                  height: 105,
-                ),
+  children: [
+    _buildListingImage(
+      listing,
+      height: 105,
+    ),
 
-                Positioned(
-                  top: 6,
-                  right: 6,
-                  child: _buildAvailableBadge(),
+    Positioned(
+      top: 6,
+      right: 6,
+      child: _buildAvailableBadge(),
+    ),
+
+    if (isCommercial)
+      Positioned(
+        top: 6,
+        left: 6,
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: 7,
+            vertical: 3,
+          ),
+          decoration: BoxDecoration(
+            color: Theme.of(context)
+                .colorScheme
+                .primary,
+            borderRadius:
+                BorderRadius.circular(20),
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.local_offer,
+                color: Colors.white,
+                size: 11,
+              ),
+              SizedBox(width: 3),
+              Text(
+                'إعلان تجاري',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 9,
+                  fontWeight: FontWeight.bold,
                 ),
-              ],
-            ),
+              ),
+            ],
+          ),
+        ),
+      ),
+  ],
+),
 
             Expanded(
               child: Padding(
@@ -1043,21 +1240,46 @@ Widget _buildListingCard(
 
     // لا يوجد حالياً حقل مؤكد يحدد
     // الإعلانات المميزة في قاعدة البيانات.
-    final featuredPreview =
-        _listings.take(5).toList();
+    final promotedIds = _promotedListings
+    .map((listing) => listing['id'])
+    .toSet();
+
+final latestListings = _listings
+    .where(
+      (listing) =>
+          !promotedIds.contains(listing['id']),
+    )
+    .take(10)
+    .toList();
 
     return Column(
       crossAxisAlignment:
           CrossAxisAlignment.stretch,
       children: [
-        _sectionTitle(
-          'إعلانات تجارية',
-          icon: Icons.local_offer_outlined,
-        ),
+        if (_promotedListings.isNotEmpty) ...[
+  _sectionTitle(
+    'إعلانات تجارية',
+    icon: Icons.local_offer_outlined,
+  ),
 
-        _buildHorizontalListings(
-          featuredPreview,
-        ),
+  SizedBox(
+    height: 230,
+    child: ListView.separated(
+      scrollDirection: Axis.horizontal,
+      itemCount: _promotedListings.length,
+      separatorBuilder: (_, __) =>
+          const SizedBox(width: 9),
+      itemBuilder: (context, index) {
+        return _buildListingCard(
+          _promotedListings[index],
+          isCommercial: true,
+        );
+      },
+    ),
+  ),
+
+  const SizedBox(height: 18),
+],
 
         const SizedBox(height: 18),
 
@@ -1067,8 +1289,8 @@ Widget _buildListingCard(
         ),
 
         _buildHorizontalListings(
-          _listings,
-        ),
+  latestListings,
+),
 
         const SizedBox(height: 20),
 
