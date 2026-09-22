@@ -25,7 +25,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   bool _loading = true;
   bool _isAdmin = false;
-
   String? _error;
   String _searchQuery = '';
   int? _selectedCategoryId;
@@ -60,22 +59,19 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Map<String, dynamic>> get _filteredListings {
     final query = _normalizeSearchText(_searchQuery);
 
-    if (query.isEmpty) {
-      return _listings;
-    }
-
     return _listings.where((listing) {
-      final title = _normalizeSearchText(
-        listing['title']?.toString() ?? '',
-      );
+      if (_selectedCategoryId != null &&
+          listing['category_id'] != _selectedCategoryId) {
+        return false;
+      }
 
-      final description = _normalizeSearchText(
-        listing['description']?.toString() ?? '',
-      );
+      if (query.isEmpty) return true;
 
-      final area = _normalizeSearchText(
-        listing['area']?.toString() ?? '',
-      );
+      final title =
+          _normalizeSearchText(listing['title']?.toString() ?? '');
+      final description =
+          _normalizeSearchText(listing['description']?.toString() ?? '');
+      final area = _normalizeSearchText(listing['area']?.toString() ?? '');
 
       return title.contains(query) ||
           description.contains(query) ||
@@ -89,11 +85,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
       if (user == null) {
         if (!mounted) return;
-
-        setState(() {
-          _isAdmin = false;
-        });
-
+        setState(() => _isAdmin = false);
         return;
       }
 
@@ -104,16 +96,10 @@ class _HomeScreenState extends State<HomeScreen> {
           .maybeSingle();
 
       if (!mounted) return;
-
-      setState(() {
-        _isAdmin = profile?['role'] == 'admin';
-      });
+      setState(() => _isAdmin = profile?['role'] == 'admin');
     } catch (_) {
       if (!mounted) return;
-
-      setState(() {
-        _isAdmin = false;
-      });
+      setState(() => _isAdmin = false);
     }
   }
 
@@ -132,8 +118,6 @@ class _HomeScreenState extends State<HomeScreen> {
           .eq('is_active', true)
           .order('sort_order');
 
-      // السوق العام يعرض الإعلانات المتاحة فقط.
-      // sold و archived لا تظهر للعامة.
       var listingsQuery = _supabase
           .from('listings')
           .select(
@@ -143,10 +127,8 @@ class _HomeScreenState extends State<HomeScreen> {
           .eq('status', 'approved');
 
       if (_selectedCategoryId != null) {
-        listingsQuery = listingsQuery.eq(
-          'category_id',
-          _selectedCategoryId!,
-        );
+        listingsQuery =
+            listingsQuery.eq('category_id', _selectedCategoryId!);
       }
 
       final listingsResponse = await listingsQuery.order(
@@ -154,11 +136,9 @@ class _HomeScreenState extends State<HomeScreen> {
         ascending: false,
       );
 
-      final listings = List<Map<String, dynamic>>.from(
-        listingsResponse,
-      );
+      final listings =
+          List<Map<String, dynamic>>.from(listingsResponse);
 
-      // جلب صور الإعلانات.
       if (listings.isNotEmpty) {
         final listingIds = listings
             .map((listing) => listing['id'])
@@ -168,25 +148,16 @@ class _HomeScreenState extends State<HomeScreen> {
         if (listingIds.isNotEmpty) {
           final imagesResponse = await _supabase
               .from('listing_images')
-              .select(
-                'listing_id, image_path, sort_order',
-              )
-              .inFilter(
-                'listing_id',
-                listingIds,
-              )
+              .select('listing_id, image_path, sort_order')
+              .inFilter('listing_id', listingIds)
               .order('sort_order');
 
-          final images = List<Map<String, dynamic>>.from(
-            imagesResponse,
-          );
+          final images =
+              List<Map<String, dynamic>>.from(imagesResponse);
 
-          // ربط أول صورة بكل إعلان.
           for (final listing in listings) {
-            final listingId = listing['id'];
-
             for (final image in images) {
-              if (image['listing_id'] == listingId) {
+              if (image['listing_id'] == listing['id']) {
                 listing['image_path'] = image['image_path'];
                 break;
               }
@@ -198,10 +169,8 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
 
       setState(() {
-        _categories = List<Map<String, dynamic>>.from(
-          categoriesResponse,
-        );
-
+        _categories =
+            List<Map<String, dynamic>>.from(categoriesResponse);
         _listings = listings;
         _loading = false;
       });
@@ -219,130 +188,126 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _signOut() async {
     try {
       await _supabase.auth.signOut();
-
       if (!mounted) return;
 
-      setState(() {
-        _isAdmin = false;
-      });
+      setState(() => _isAdmin = false);
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('تم تسجيل الخروج بنجاح'),
-        ),
+        const SnackBar(content: Text('تم تسجيل الخروج بنجاح')),
       );
+
+      await _loadData();
     } catch (_) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
-            'تعذر تسجيل الخروج، حاول مرة أخرى',
-          ),
+          content: Text('تعذر تسجيل الخروج، حاول مرة أخرى'),
         ),
       );
     }
   }
 
-  Future<void> _openProfile() async {
-    final user = _supabase.auth.currentUser;
+  Future<bool> _ensureSignedIn() async {
+    if (_supabase.auth.currentUser != null) return true;
 
-    // الزائر: افتح تسجيل الدخول بدل فتح ProfileScreen.
-    if (user == null) {
-      final loginResult = await Navigator.push<bool>(
-        context,
-        MaterialPageRoute(
-          builder: (_) => const AuthScreen(),
-        ),
-      );
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => const AuthScreen()),
+    );
 
-      if (!mounted) return;
+    if (!mounted) return false;
 
-      // إذا تم تسجيل الدخول بنجاح، افتح الملف الشخصي مباشرة.
-      if (loginResult == true &&
-          _supabase.auth.currentUser != null) {
-        await _checkAdminStatus();
-
-        if (!mounted) return;
-
-        await Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => const ProfileScreen(),
-          ),
-        );
-
-        if (!mounted) return;
-
-        setState(() {});
-      }
-
-      return;
+    if (result == true && _supabase.auth.currentUser != null) {
+      await _checkAdminStatus();
+      return true;
     }
 
-    // المستخدم المسجل: افتح الملف الشخصي مباشرة.
+    return false;
+  }
+
+  Future<void> _openProfile() async {
+    if (!await _ensureSignedIn()) return;
+    if (!mounted) return;
+
     await Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => const ProfileScreen(),
-      ),
+      MaterialPageRoute(builder: (_) => const ProfileScreen()),
     );
 
     if (!mounted) return;
-
     setState(() {});
     await _checkAdminStatus();
   }
 
   Future<void> _openAddListing() async {
-    final user = _supabase.auth.currentUser;
-
-    if (user == null) {
-      final loginResult = await Navigator.push<bool>(
-        context,
-        MaterialPageRoute(
-          builder: (_) => const AuthScreen(),
-        ),
-      );
-
-      if (!mounted) return;
-
-      if (loginResult != true ||
-          _supabase.auth.currentUser == null) {
-        return;
-      }
-    }
+    if (!await _ensureSignedIn()) return;
+    if (!mounted) return;
 
     await Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => const AddListingScreen(),
-      ),
+      MaterialPageRoute(builder: (_) => const AddListingScreen()),
     );
 
     if (!mounted) return;
-
     await _loadData();
   }
 
-  Future<void> _openAdminPanel() async {
+  Future<void> _openMyListings() async {
+    if (!await _ensureSignedIn()) return;
+    if (!mounted) return;
+
     await Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => const AdminListingsScreen(),
-      ),
+      MaterialPageRoute(builder: (_) => const MyListingsScreen()),
     );
 
     if (!mounted) return;
+    await _loadData();
+  }
 
+  Future<void> _openFavorites() async {
+    if (!await _ensureSignedIn()) return;
+    if (!mounted) return;
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const FavoritesScreen()),
+    );
+
+    if (!mounted) return;
+    setState(() {});
+  }
+
+  Future<void> _openAdminPanel() async {
+    if (!await _ensureSignedIn()) return;
+    if (!mounted) return;
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const AdminListingsScreen()),
+    );
+
+    if (!mounted) return;
     await _checkAdminStatus();
     await _loadData();
   }
 
-  IconData _categoryIcon(String name) {
-    final value = name.trim();
+  void _openListingDetails(Map<String, dynamic> listing) {
+    final listingId = listing['id'];
 
-    switch (value) {
+    if (listingId is! int) return;
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ListingDetailsScreen(listingId: listingId),
+      ),
+    );
+  }
+
+  IconData _categoryIcon(String name) {
+    switch (name.trim()) {
       case 'سيارات ومركبات':
         return Icons.directions_car_outlined;
       case 'عقارات':
@@ -374,9 +339,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  String _formatPrice(
-    Map<String, dynamic> listing,
-  ) {
+  String _formatPrice(Map<String, dynamic> listing) {
     final price = listing['price'];
     final currency = listing['currency'] ?? 'SDG';
     final priceType = listing['price_type'];
@@ -395,137 +358,77 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   String? _imageUrl(dynamic imagePath) {
-    if (imagePath == null) {
-      return null;
-    }
+    if (imagePath == null) return null;
 
     final path = imagePath.toString().trim();
+    if (path.isEmpty) return null;
 
-    if (path.isEmpty) {
-      return null;
-    }
-
-    if (path.startsWith('http://') ||
-        path.startsWith('https://')) {
+    if (path.startsWith('http://') || path.startsWith('https://')) {
       return path;
     }
 
-    return _supabase.storage
-        .from('listing-images')
-        .getPublicUrl(path);
+    return _supabase.storage.from('listing-images').getPublicUrl(path);
   }
 
   Widget _buildListingImage(
-    Map<String, dynamic> listing,
-  ) {
-    final imageUrl = _imageUrl(
-      listing['image_path'],
-    );
+    Map<String, dynamic> listing, {
+    double height = 112,
+  }) {
+    final imageUrl = _imageUrl(listing['image_path']);
 
-    Widget buildNoImage() {
+    Widget noImage() {
       return Container(
-        height: 145,
-        width: double.infinity,
-        decoration: BoxDecoration(
-          color: Colors.grey.shade100,
-          borderRadius: const BorderRadius.vertical(
-            top: Radius.circular(12),
-          ),
-        ),
+        height: height,
+        color: Colors.grey.shade100,
         child: const Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.photo_library_outlined,
-                size: 40,
-                color: Colors.grey,
-              ),
-              SizedBox(height: 7),
-              Text(
-                'لا توجد صور',
-                style: TextStyle(
-                  color: Colors.grey,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
+          child: Icon(
+            Icons.photo_library_outlined,
+            size: 32,
+            color: Colors.grey,
           ),
         ),
       );
     }
 
-    if (imageUrl == null) {
-      return buildNoImage();
-    }
+    if (imageUrl == null) return noImage();
 
-    return ClipRRect(
-      borderRadius: const BorderRadius.vertical(
-        top: Radius.circular(12),
-      ),
-      child: Image.network(
-        imageUrl,
-        height: 145,
-        width: double.infinity,
-        fit: BoxFit.cover,
-        errorBuilder: (
-          context,
-          error,
-          stackTrace,
-        ) {
-          return buildNoImage();
-        },
-        loadingBuilder: (
-          context,
-          child,
-          loadingProgress,
-        ) {
-          if (loadingProgress == null) {
-            return child;
-          }
+    return Image.network(
+      imageUrl,
+      height: height,
+      width: double.infinity,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => noImage(),
+      loadingBuilder: (context, child, progress) {
+        if (progress == null) return child;
 
-          return Container(
-            height: 145,
-            width: double.infinity,
-            color: Colors.grey.shade100,
-            child: const Center(
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-              ),
-            ),
-          );
-        },
-      ),
+        return Container(
+          height: height,
+          color: Colors.grey.shade100,
+          child: const Center(
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        );
+      },
     );
   }
 
   Widget _buildAvailableBadge() {
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 9,
-        vertical: 5,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
       decoration: BoxDecoration(
-        color: Colors.green.withValues(
-          alpha: 0.92,
-        ),
+        color: Colors.green.withValues(alpha: 0.92),
         borderRadius: BorderRadius.circular(20),
       ),
       child: const Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Icons.check_circle,
-            color: Colors.white,
-            size: 15,
-          ),
-          SizedBox(width: 4),
+          Icon(Icons.check_circle, color: Colors.white, size: 12),
+          SizedBox(width: 3),
           Text(
             'متاح',
             style: TextStyle(
               color: Colors.white,
-              fontSize: 11.5,
+              fontSize: 10,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -534,211 +437,413 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildListingCard(
-    Map<String, dynamic> listing,
-  ) {
-    final title = listing['title']
-            ?.toString()
-            .trim()
-            .isNotEmpty ==
-        true
-        ? listing['title'].toString()
-        : 'إعلان بدون عنوان';
-
-    final area = listing['area']
-            ?.toString()
-            .trim() ??
-        '';
-
-    final price = _formatPrice(listing);
+  Widget _buildListingCard(Map<String, dynamic> listing) {
+    final rawTitle = listing['title']?.toString().trim() ?? '';
+    final title = rawTitle.isEmpty ? 'إعلان بدون عنوان' : rawTitle;
+    final area = listing['area']?.toString().trim() ?? '';
 
     return Card(
-      margin: const EdgeInsets.only(
-        bottom: 12,
-      ),
-      elevation: 1.5,
-      shadowColor: Colors.black26,
+      margin: EdgeInsets.zero,
+      elevation: 1,
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(11),
       ),
       child: InkWell(
-        onTap: () {
-          final listingId = listing['id'];
-
-          if (listingId is int) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => ListingDetailsScreen(
-                  listingId: listingId,
-                ),
-              ),
-            );
-          }
-        },
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Stack(
-              children: [
-                _buildListingImage(listing),
-                Positioned(
-                  top: 9,
-                  right: 9,
-                  child: _buildAvailableBadge(),
-                ),
-              ],
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                11,
-                9,
-                11,
-                10,
-              ),
-              child: Column(
-                crossAxisAlignment:
-                    CrossAxisAlignment.start,
+        onTap: () => _openListingDetails(listing),
+        child: SizedBox(
+          width: 158,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Stack(
                 children: [
-                  Text(
-                    title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 15.5,
-                      fontWeight: FontWeight.bold,
-                      height: 1.25,
-                    ),
-                  ),
-                  const SizedBox(height: 7),
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.sell_outlined,
-                        size: 17,
-                      ),
-                      const SizedBox(width: 5),
-                      Expanded(
-                        child: Text(
-                          price,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 14.5,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (area.isNotEmpty) ...[
-                    const SizedBox(height: 5),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.location_on_outlined,
-                          size: 16,
-                        ),
-                        const SizedBox(width: 5),
-                        Expanded(
-                          child: Text(
-                            area,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              color: Colors.grey.shade700,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        final listingId =
-                            listing['id'];
-
-                        if (listingId is int) {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  ListingDetailsScreen(
-                                listingId: listingId,
-                              ),
-                            ),
-                          );
-                        }
-                      },
-                      icon: const Icon(
-                        Icons.arrow_back_ios_new,
-                        size: 13,
-                      ),
-                      label: const Text(
-                        'عرض الإعلان',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        minimumSize:
-                            const Size.fromHeight(36),
-                        padding:
-                            const EdgeInsets.symmetric(
-                          horizontal: 8,
-                        ),
-                        shape:
-                            RoundedRectangleBorder(
-                          borderRadius:
-                              BorderRadius.circular(9),
-                        ),
-                      ),
-                    ),
+                  _buildListingImage(listing, height: 105),
+                  Positioned(
+                    top: 6,
+                    right: 6,
+                    child: _buildAvailableBadge(),
                   ),
                 ],
               ),
-            ),
-          ],
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 7, 8, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        height: 1.2,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      _formatPrice(listing),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                    if (area.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.location_on_outlined,
+                            size: 13,
+                          ),
+                          const SizedBox(width: 3),
+                          Expanded(
+                            child: Text(
+                              area,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey.shade700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    const SizedBox(height: 7),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 31,
+                      child: OutlinedButton(
+                        onPressed: () => _openListingDetails(listing),
+                        style: OutlinedButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                          visualDensity: VisualDensity.compact,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const Text(
+                          'عرض الإعلان',
+                          style: TextStyle(fontSize: 11),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
+  Widget _sectionTitle(
+    String title, {
+    Widget? trailing,
+    IconData? icon,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 9),
+      child: Row(
+        children: [
+          if (icon != null) ...[
+            Icon(
+              icon,
+              size: 19,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            const SizedBox(width: 6),
+          ],
+          Expanded(
+            child: Text(
+              title,
+              style: const TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          if (trailing != null) trailing,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHorizontalListings(
+    List<Map<String, dynamic>> listings,
+  ) {
+    return SizedBox(
+      height: 260,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: listings.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 9),
+        itemBuilder: (context, index) {
+          return _buildListingCard(listings[index]);
+        },
+      ),
+    );
+  }
+
+  Widget _buildCategories() {
+    if (_categories.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 12),
+        child: Center(child: Text('لا توجد أقسام متاحة حالياً')),
+      );
+    }
+
+    return SizedBox(
+      height: 70,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: _categories.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 7),
+        itemBuilder: (context, index) {
+          final category = _categories[index];
+          final categoryId = category['id'] as int?;
+          final categoryName =
+              category['name']?.toString() ?? 'بدون اسم';
+          final selected = _selectedCategoryId == categoryId;
+
+          return InkWell(
+            borderRadius: BorderRadius.circular(10),
+            onTap: () {
+              if (categoryId == null) return;
+
+              setState(() {
+                _selectedCategoryId =
+                    selected ? null : categoryId;
+              });
+
+              _loadData();
+            },
+            child: Container(
+              width: 76,
+              padding: const EdgeInsets.symmetric(
+                horizontal: 5,
+                vertical: 6,
+              ),
+              decoration: BoxDecoration(
+                color: selected
+                    ? Theme.of(context).colorScheme.primaryContainer
+                    : Theme.of(context)
+                        .colorScheme
+                        .surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: selected
+                      ? Theme.of(context).colorScheme.primary
+                      : Colors.transparent,
+                ),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(_categoryIcon(categoryName), size: 22),
+                  const SizedBox(height: 3),
+                  Text(
+                    categoryName,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      height: 1.1,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildSearchField() {
+    return SizedBox(
+      height: 43,
+      child: TextField(
+        controller: _searchController,
+        textInputAction: TextInputAction.search,
+        onChanged: (value) => setState(() => _searchQuery = value),
+        decoration: InputDecoration(
+          hintText: 'ابحث عن إعلان أو منطقة...',
+          hintStyle: const TextStyle(fontSize: 13),
+          prefixIcon: const Icon(Icons.search, size: 21),
+          suffixIcon: _searchQuery.isNotEmpty
+              ? IconButton(
+                  padding: EdgeInsets.zero,
+                  onPressed: () {
+                    _searchController.clear();
+                    setState(() => _searchQuery = '');
+                  },
+                  icon: const Icon(Icons.clear, size: 19),
+                  tooltip: 'مسح البحث',
+                )
+              : null,
+          filled: true,
+          contentPadding: const EdgeInsets.symmetric(vertical: 8),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(11),
+            borderSide: BorderSide.none,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchResults() {
+    final results = _filteredListings;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _sectionTitle(
+          'نتائج البحث',
+          trailing: Text(
+            '${results.length} إعلان',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey.shade600,
+            ),
+          ),
+        ),
+        if (results.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 35),
+            child: Column(
+              children: [
+                Icon(Icons.search_off_outlined, size: 45),
+                SizedBox(height: 9),
+                Text('لم نجد إعلانات تطابق بحثك'),
+              ],
+            ),
+          )
+        else
+          ...results.map(
+            (listing) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _buildListingCard(listing),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildHomeSections() {
+    if (_listings.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 32),
+        child: Column(
+          children: [
+            Icon(Icons.inventory_2_outlined, size: 45),
+            SizedBox(height: 10),
+            Text('لا توجد إعلانات متاحة حالياً'),
+          ],
+        ),
+      );
+    }
+
+    // مؤقتاً: لا يوجد في الاستعلام الحالي حقل يحدد الإعلانات المميزة.
+    // لذلك نعرض مجموعة من أحدث الإعلانات في هذا الموضع.
+    final featuredPreview = _listings.take(5).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _sectionTitle(
+          'إعلانات مميزة أو تجارية',
+          icon: Icons.local_offer_outlined,
+        ),
+        _buildHorizontalListings(featuredPreview),
+        const SizedBox(height: 18),
+        _sectionTitle(
+          'أحدث الإعلانات',
+          icon: Icons.access_time,
+        ),
+        _buildHorizontalListings(_listings),
+        const SizedBox(height: 20),
+        _sectionTitle(
+          'معروضات الأقسام',
+          icon: Icons.grid_view_rounded,
+        ),
+        ..._categories.map((category) {
+          final categoryId = category['id'] as int?;
+          final categoryName =
+              category['name']?.toString() ?? 'بدون اسم';
+
+          if (categoryId == null) return const SizedBox.shrink();
+
+          final categoryListings = _listings
+              .where((listing) => listing['category_id'] == categoryId)
+              .take(8)
+              .toList();
+
+          if (categoryListings.isEmpty) {
+            return const SizedBox.shrink();
+          }
+
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _sectionTitle(
+                  categoryName,
+                  icon: _categoryIcon(categoryName),
+                  trailing: TextButton(
+                    onPressed: () {
+                      setState(() => _selectedCategoryId = categoryId);
+                      _loadData();
+                    },
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 7),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    child: const Text(
+                      'عرض الكل',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                  ),
+                ),
+                _buildHorizontalListings(categoryListings),
+              ],
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
   Widget _buildBody() {
     if (_loading) {
-      return const Center(
-        child: CircularProgressIndicator(),
-      );
+      return const Center(child: CircularProgressIndicator());
     }
 
     if (_error != null) {
       return Center(
         child: Padding(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(22),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
-                Icons.wifi_off,
-                size: 48,
-              ),
-              const SizedBox(height: 12),
-              Text(
-                _error!,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 16),
+              const Icon(Icons.wifi_off, size: 42),
+              const SizedBox(height: 10),
+              Text(_error!, textAlign: TextAlign.center),
+              const SizedBox(height: 14),
               FilledButton(
                 onPressed: _loadData,
-                child: const Text(
-                  'إعادة المحاولة',
-                ),
+                child: const Text('إعادة المحاولة'),
               ),
             ],
           ),
@@ -746,429 +851,64 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
+    final searching =
+        _searchQuery.trim().isNotEmpty || _selectedCategoryId != null;
+
     return RefreshIndicator(
       onRefresh: _loadData,
       child: ListView(
-        physics:
-            const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(
-          16,
-          8,
-          16,
-          24,
-        ),
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(13, 8, 13, 18),
         children: [
-          TextField(
-            controller: _searchController,
-            textInputAction:
-                TextInputAction.search,
-            decoration: InputDecoration(
-              hintText:
-                  'ابحث عن إعلان أو منطقة...',
-              prefixIcon: const Icon(
-                Icons.search,
+          _buildSearchField(),
+          const SizedBox(height: 12),
+          _sectionTitle(
+            'الأقسام',
+            trailing: TextButton(
+              onPressed: () {
+                setState(() {
+                  _selectedCategoryId = null;
+                  _searchQuery = '';
+                  _searchController.clear();
+                });
+                _loadData();
+              },
+              style: TextButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(horizontal: 7),
               ),
-              suffixIcon:
-                  _searchQuery.isNotEmpty
-                      ? IconButton(
-                          onPressed: () {
-                            _searchController.clear();
-
-                            setState(() {
-                              _searchQuery = '';
-                            });
-                          },
-                          icon: const Icon(
-                            Icons.clear,
-                          ),
-                          tooltip: 'مسح البحث',
-                        )
-                      : null,
-              filled: true,
-              border: OutlineInputBorder(
-                borderRadius:
-                    BorderRadius.circular(14),
-                borderSide: BorderSide.none,
+              child: const Text(
+                'عرض الكل',
+                style: TextStyle(fontSize: 12),
               ),
             ),
-            onChanged: (value) {
-              setState(() {
-                _searchQuery = value;
-              });
-            },
           ),
-          const SizedBox(height: 18),
-          Row(
-            children: [
-              const Expanded(
-                child: Text(
-                  'الأقسام',
-                  style: TextStyle(
-                    fontSize: 21,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              TextButton(
-                onPressed: () {
-                  setState(() {
-                    _selectedCategoryId = null;
-                  });
-
-                  _loadData();
-                },
-                child: const Text(
-                  'عرض الكل',
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          if (_categories.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(
-                vertical: 16,
-              ),
-              child: Text(
-                'لا توجد أقسام متاحة حالياً',
-                textAlign: TextAlign.center,
-              ),
-            )
-          else
-            SizedBox(
-              height: 92,
-              child: ListView.separated(
-                scrollDirection:
-                    Axis.horizontal,
-                itemCount: _categories.length,
-                separatorBuilder: (
-                  _,
-                  __,
-                ) {
-                  return const SizedBox(
-                    width: 10,
-                  );
-                },
-                itemBuilder: (
-                  context,
-                  index,
-                ) {
-                  final category =
-                      _categories[index];
-
-                  final categoryId =
-                      category['id'] as int?;
-
-                  final categoryName =
-                      category['name']
-                              ?.toString() ??
-                          'بدون اسم';
-
-                  final selected =
-                      _selectedCategoryId ==
-                          categoryId;
-
-                  return GestureDetector(
-                    onTap: () {
-                      if (categoryId == null) {
-                        return;
-                      }
-
-                      setState(() {
-                        _selectedCategoryId =
-                            categoryId;
-                      });
-
-                      _loadData();
-                    },
-                    child: Container(
-                      width: 92,
-                      padding:
-                          const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: selected
-                            ? Theme.of(context)
-                                .colorScheme
-                                .primaryContainer
-                            : Theme.of(context)
-                                .colorScheme
-                                .surfaceContainerHighest,
-                        borderRadius:
-                            BorderRadius.circular(
-                          16,
-                        ),
-                        border: Border.all(
-                          color: selected
-                              ? Theme.of(context)
-                                  .colorScheme
-                                  .primary
-                              : Colors.transparent,
-                          width: 1.2,
-                        ),
-                      ),
-                      child: Column(
-                        mainAxisAlignment:
-                            MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            _categoryIcon(
-                              categoryName,
-                            ),
-                            size: 30,
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            categoryName,
-                            textAlign:
-                                TextAlign.center,
-                            maxLines: 2,
-                            overflow:
-                                TextOverflow.ellipsis,
-                            style:
-                                const TextStyle(
-                              fontSize: 12,
-                              fontWeight:
-                                  FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          const SizedBox(height: 26),
-          if (_searchQuery.isNotEmpty ||
-              _selectedCategoryId != null) ...[
-            Row(
-              children: [
-                const Expanded(
-                  child: Text(
-                    'النتائج',
-                    style: TextStyle(
-                      fontSize: 21,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                Text(
-                  '${_filteredListings.length} إعلان',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            if (_filteredListings.isEmpty)
-              Padding(
-                padding:
-                    const EdgeInsets.symmetric(
-                  vertical: 32,
-                ),
-                child: Column(
-                  children: [
-                    const Icon(
-                      Icons.search_off_outlined,
-                      size: 56,
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      _searchQuery.isEmpty
-                          ? 'لا توجد إعلانات في هذا القسم'
-                          : 'لم نجد إعلانات تطابق بحثك',
-                      textAlign:
-                          TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 16,
-                      ),
-                    ),
-                  ],
-                ),
-              )
-            else
-              ..._filteredListings.map(
-                _buildListingCard,
-              ),
-          ] else ...[
-            if (_listings.isEmpty)
-              Padding(
-                padding:
-                    const EdgeInsets.symmetric(
-                  vertical: 32,
-                ),
-                child: Column(
-                  children: [
-                    const Icon(
-                      Icons.inventory_2_outlined,
-                      size: 56,
-                    ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      'لا توجد إعلانات متاحة حالياً',
-                      textAlign:
-                          TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 16,
-                      ),
-                    ),
-                  ],
-                ),
-              )
-            else ...[
-              const Text(
-                'أحدث الإعلانات',
-                style: TextStyle(
-                  fontSize: 21,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                height: 285,
-                child: ListView.separated(
-                  scrollDirection:
-                      Axis.horizontal,
-                  itemCount: _listings.length,
-                  separatorBuilder: (
-                    _,
-                    __,
-                  ) {
-                    return const SizedBox(
-                      width: 10,
-                    );
-                  },
-                  itemBuilder: (
-                    context,
-                    index,
-                  ) {
-                    return SizedBox(
-                      width: 210,
-                      child: _buildListingCard(
-                        _listings[index],
-                      ),
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(height: 28),
-              ..._categories.map(
-                (category) {
-                  final categoryId =
-                      category['id'] as int?;
-
-                  final categoryName =
-                      category['name']
-                              ?.toString() ??
-                          'بدون اسم';
-
-                  if (categoryId == null) {
-                    return const SizedBox.shrink();
-                  }
-
-                  final categoryListings =
-                      _listings.where(
-                    (listing) {
-                      return listing[
-                              'category_id'] ==
-                          categoryId;
-                    },
-                  ).toList();
-
-                  if (categoryListings.isEmpty) {
-                    return const SizedBox.shrink();
-                  }
-
-                  return Padding(
-                    padding:
-                        const EdgeInsets.only(
-                      bottom: 28,
-                    ),
-                    child: Column(
-                      crossAxisAlignment:
-                          CrossAxisAlignment
-                              .stretch,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(
-                              _categoryIcon(
-                                categoryName,
-                              ),
-                              size: 22,
-                            ),
-                            const SizedBox(
-                              width: 8,
-                            ),
-                            Expanded(
-                              child: Text(
-                                categoryName,
-                                style:
-                                    const TextStyle(
-                                  fontSize: 19,
-                                  fontWeight:
-                                      FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                            TextButton(
-                              onPressed: () {
-                                setState(() {
-                                  _selectedCategoryId =
-                                      categoryId;
-                                });
-
-                                _loadData();
-                              },
-                              child: const Text(
-                                'عرض الكل',
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        SizedBox(
-                          height: 285,
-                          child: ListView
-                              .separated(
-                            scrollDirection:
-                                Axis.horizontal,
-                            itemCount:
-                                categoryListings
-                                    .length,
-                            separatorBuilder: (
-                              _,
-                              __,
-                            ) {
-                              return const SizedBox(
-                                width: 10,
-                              );
-                            },
-                            itemBuilder: (
-                              context,
-                              index,
-                            ) {
-                              return SizedBox(
-                                width: 210,
-                                child:
-                                    _buildListingCard(
-                                  categoryListings[
-                                      index],
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ],
-          ],
+          _buildCategories(),
+          const SizedBox(height: 15),
+          if (searching) _buildSearchResults() else _buildHomeSections(),
         ],
+      ),
+    );
+  }
+
+  Widget _buildPostListingButton() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 7),
+      child: FilledButton.icon(
+        onPressed: _openAddListing,
+        icon: const Icon(Icons.add, size: 17),
+        label: const Text(
+          'ضع إعلانك',
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+        ),
+        style: FilledButton.styleFrom(
+          minimumSize: const Size(0, 36),
+          padding: const EdgeInsets.symmetric(horizontal: 9),
+          visualDensity: VisualDensity.compact,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(9),
+          ),
+        ),
       ),
     );
   }
@@ -1177,63 +917,82 @@ class _HomeScreenState extends State<HomeScreen> {
     final user = _supabase.auth.currentUser;
 
     return IconButton(
-      tooltip: user == null
-          ? 'تسجيل الدخول'
-          : 'الملف الشخصي',
+      tooltip: user == null ? 'تسجيل الدخول' : 'الملف الشخصي',
+      onPressed: _openProfile,
       icon: CircleAvatar(
-        radius: 17,
-        backgroundColor: Theme.of(context)
-            .colorScheme
-            .primaryContainer,
+        radius: 15,
+        backgroundColor: Theme.of(context).colorScheme.primaryContainer,
         child: Icon(
-          user == null
-              ? Icons.person_outline
-              : Icons.person,
-          size: 21,
-          color: Theme.of(context)
-              .colorScheme
-              .onPrimaryContainer,
+          user == null ? Icons.person_outline : Icons.person,
+          size: 19,
+          color: Theme.of(context).colorScheme.onPrimaryContainer,
         ),
       ),
-      onPressed: _openProfile,
     );
   }
 
-  Widget _buildPostListingButton() {
-    return FilledButton.icon(
-      onPressed: _openAddListing,
-      icon: const Icon(
-        Icons.add_circle_outline,
-        size: 20,
-      ),
-      label: const Text(
-        'ضع إعلانك',
-        style: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.bold,
+  Widget _buildBottomNavigation() {
+    return BottomNavigationBar(
+      currentIndex: 0,
+      type: BottomNavigationBarType.fixed,
+      selectedFontSize: 10,
+      unselectedFontSize: 10,
+      iconSize: 21,
+      showUnselectedLabels: true,
+      onTap: (index) {
+        switch (index) {
+          case 0:
+            setState(() {
+              _selectedCategoryId = null;
+              _searchQuery = '';
+              _searchController.clear();
+            });
+            _loadData();
+            break;
+          case 1:
+            _openMyListings();
+            break;
+          case 2:
+            _openAddListing();
+            break;
+          case 3:
+            _openFavorites();
+            break;
+          case 4:
+            _openProfile();
+            break;
+        }
+      },
+      items: const [
+        BottomNavigationBarItem(
+          icon: Icon(Icons.home_outlined),
+          activeIcon: Icon(Icons.home),
+          label: 'الرئيسية',
         ),
-      ),
-      style: FilledButton.styleFrom(
-        minimumSize: const Size(0, 42),
-        padding:
-            const EdgeInsets.symmetric(
-          horizontal: 14,
+        BottomNavigationBarItem(
+          icon: Icon(Icons.inventory_2_outlined),
+          label: 'إعلاناتي',
         ),
-        shape: RoundedRectangleBorder(
-          borderRadius:
-              BorderRadius.circular(12),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.add_circle_outline),
+          label: 'أضف إعلان',
         ),
-      ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.favorite_border),
+          label: 'المفضلة',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.person_outline),
+          label: 'الملف الشخصي',
+        ),
+      ],
     );
   }
 
   @override
   Widget build(BuildContext context) {
     final user = _supabase.auth.currentUser;
-
-    final name =
-        user?.userMetadata?['full_name']
-            as String?;
+    final name = user?.userMetadata?['full_name'] as String?;
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -1245,198 +1004,105 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 UserAccountsDrawerHeader(
                   decoration: BoxDecoration(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .primary,
+                    color: Theme.of(context).colorScheme.primary,
                   ),
                   accountName: Text(
                     name == null || name.isEmpty
                         ? 'مرحباً بك في دلالة شبشة'
                         : name,
                   ),
-                  accountEmail: user == null
-                      ? null
-                      : Text(
-                          user.email ?? '',
-                        ),
-                  currentAccountPicture:
-                      CircleAvatar(
+                  accountEmail: user == null ? null : Text(user.email ?? ''),
+                  currentAccountPicture: CircleAvatar(
                     backgroundColor:
-                        Theme.of(context)
-                            .colorScheme
-                            .onPrimary,
+                        Theme.of(context).colorScheme.onPrimary,
                     child: Icon(
                       Icons.storefront_rounded,
-                      size: 32,
-                      color: Theme.of(context)
-                          .colorScheme
-                          .primary,
+                      size: 31,
+                      color: Theme.of(context).colorScheme.primary,
                     ),
                   ),
                 ),
-
                 ListTile(
-                  leading: const Icon(
-                    Icons.person_outline,
-                  ),
+                  leading: const Icon(Icons.person_outline),
                   title: Text(
-                    user == null
-                        ? 'تسجيل الدخول'
-                        : 'الملف الشخصي',
+                    user == null ? 'تسجيل الدخول' : 'الملف الشخصي',
                   ),
-                  subtitle: user == null
-                      ? const Text(
-                          'سجّل الدخول للوصول إلى ملفك',
-                        )
-                      : null,
                   onTap: () async {
                     Navigator.pop(context);
                     await _openProfile();
                   },
                 ),
-
-                // لوحة الإدارة للأدمن.
                 if (_isAdmin)
                   ListTile(
-                    leading: const Icon(
-                      Icons.admin_panel_settings_outlined,
-                    ),
-                    title: const Text(
-                      'لوحة تحكم الإدارة',
-                    ),
-                    subtitle: const Text(
-                      'إدارة ومراجعة الإعلانات',
-                    ),
+                    leading: const Icon(Icons.admin_panel_settings_outlined),
+                    title: const Text('لوحة تحكم الإدارة'),
+                    subtitle: const Text('إدارة ومراجعة الإعلانات'),
                     onTap: () async {
                       Navigator.pop(context);
                       await _openAdminPanel();
                     },
                   ),
-
                 const Divider(),
-
                 const Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    16,
-                    12,
-                    16,
-                    8,
-                  ),
+                  padding: EdgeInsets.fromLTRB(16, 10, 16, 6),
                   child: Text(
                     'الأقسام',
                     style: TextStyle(
-                      fontSize: 16,
+                      fontSize: 15,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
-
                 if (_categories.isEmpty)
                   const Padding(
-                    padding:
-                        EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    child: Text(
-                      'لا توجد أقسام حالياً',
-                      style: TextStyle(
-                        color: Colors.grey,
-                      ),
-                    ),
+                    padding: EdgeInsets.all(16),
+                    child: Text('لا توجد أقسام حالياً'),
                   )
                 else
-                  ..._categories.map(
-                    (category) {
-                      final categoryId =
-                          category['id'] as int?;
+                  ..._categories.map((category) {
+                    final categoryId = category['id'] as int?;
+                    final categoryName =
+                        category['name']?.toString() ?? 'بدون اسم';
 
-                      final categoryName =
-                          category['name']
-                                  ?.toString() ??
-                              'بدون اسم';
+                    return ListTile(
+                      dense: true,
+                      leading: Icon(_categoryIcon(categoryName)),
+                      title: Text(categoryName),
+                      selected: _selectedCategoryId == categoryId,
+                      onTap: () {
+                        Navigator.pop(context);
+                        if (categoryId == null) return;
 
-                      return ListTile(
-                        leading: Icon(
-                          _categoryIcon(
-                            categoryName,
-                          ),
-                        ),
-                        title: Text(
-                          categoryName,
-                        ),
-                        selected:
-                            _selectedCategoryId ==
-                                categoryId,
-                        onTap: () {
-                          Navigator.pop(context);
-
-                          if (categoryId == null) {
-                            return;
-                          }
-
-                          setState(() {
-                            _selectedCategoryId =
-                                categoryId;
-                          });
-
-                          _loadData();
-                        },
-                      );
-                    },
-                  ),
-
+                        setState(() {
+                          _selectedCategoryId = categoryId;
+                          _searchQuery = '';
+                          _searchController.clear();
+                        });
+                        _loadData();
+                      },
+                    );
+                  }),
                 const Divider(),
-
                 ListTile(
-                  leading: const Icon(
-                    Icons.favorite_border,
-                  ),
-                  title: const Text(
-                    'المفضلة',
-                  ),
+                  leading: const Icon(Icons.favorite_border),
+                  title: const Text('المفضلة'),
                   onTap: () {
                     Navigator.pop(context);
-
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) =>
-                            const FavoritesScreen(),
-                      ),
-                    );
+                    _openFavorites();
                   },
                 ),
-
+                ListTile(
+                  leading: const Icon(Icons.inventory_2_outlined),
+                  title: const Text('إعلاناتي'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _openMyListings();
+                  },
+                ),
                 if (user != null)
                   ListTile(
-                    leading: const Icon(
-                      Icons.inventory_2_outlined,
-                    ),
-                    title: const Text(
-                      'إعلاناتي',
-                    ),
-                    onTap: () {
-                      Navigator.pop(context);
-
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              const MyListingsScreen(),
-                        ),
-                      );
-                    },
-                  ),
-
-                if (user != null)
-                  ListTile(
-                    leading: const Icon(
-                      Icons.logout,
-                    ),
-                    title: const Text(
-                      'تسجيل الخروج',
-                    ),
+                    leading: const Icon(Icons.logout),
+                    title: const Text('تسجيل الخروج'),
                     onTap: () {
                       Navigator.pop(context);
                       _signOut();
@@ -1446,105 +1112,65 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         ),
-
-        // =====================================================
-        // الشريط العلوي
-        //
-        // في اتجاه RTL:
-        //
-        // ☰ | دلالة شبشة | 🔄 | ضع إعلانك | 👤
-        // =====================================================
         appBar: AppBar(
           centerTitle: true,
           elevation: 0,
-
-          // عنوان التطبيق فقط بدون لوقو.
           title: Text(
             'دلالة شبشة',
             style: TextStyle(
-              fontSize: 22,
+              fontSize: 20,
               fontWeight: FontWeight.w900,
-              letterSpacing: 0.2,
-              color: Theme.of(context)
-                  .colorScheme
-                  .primary,
+              color: Theme.of(context).colorScheme.primary,
             ),
           ),
-
           actions: [
-            // ترتيب العناصر في RTL:
-            // تحديث ← ضع إعلانك ← الملف الشخصي
             IconButton(
               tooltip: 'تحديث',
               onPressed: () {
                 _loadData();
                 _checkAdminStatus();
               },
-              icon: const Icon(
-                Icons.refresh,
-              ),
+              icon: const Icon(Icons.refresh),
             ),
-
             _buildPostListingButton(),
-
             _buildProfileButton(),
           ],
         ),
-
         body: Column(
-          crossAxisAlignment:
-              CrossAxisAlignment.stretch,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding:
-                  const EdgeInsets.fromLTRB(
-                16,
-                18,
-                16,
-                10,
-              ),
+              padding: const EdgeInsets.fromLTRB(13, 4, 13, 8),
               child: Column(
                 children: [
                   Text(
-                    name == null || name.isEmpty
-                        ? 'مرحباً بك في دلالة شبشة 👋'
-                        : 'مرحباً يا $name 👋',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 23,
-                      fontWeight: FontWeight.bold,
-                      height: 1.3,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'تسوّق أو أعلن معنا',
+                    'في مكان واحد - تسوق واعلن بسهولة',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w500,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: Theme.of(context).colorScheme.primary,
                     ),
                   ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'دلالة شبشة — بيع وشراء بدون وسيط',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 15,
-                      color: Theme.of(context)
-                          .colorScheme
-                          .primary,
-                      fontWeight: FontWeight.w600,
+                  if (user != null && name != null && name.trim().isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 3),
+                      child: Text(
+                        'مرحباً يا $name 👋',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade700,
+                        ),
+                      ),
                     ),
-                  ),
                 ],
               ),
             ),
-            Expanded(
-              child: _buildBody(),
-            ),
+            Expanded(child: _buildBody()),
           ],
         ),
+        bottomNavigationBar: _buildBottomNavigation(),
       ),
     );
   }
