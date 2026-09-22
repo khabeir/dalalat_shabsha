@@ -71,7 +71,8 @@ class _HomeScreenState extends State<HomeScreen> {
           _normalizeSearchText(listing['title']?.toString() ?? '');
       final description =
           _normalizeSearchText(listing['description']?.toString() ?? '');
-      final area = _normalizeSearchText(listing['area']?.toString() ?? '');
+      final area =
+          _normalizeSearchText(listing['area']?.toString() ?? '');
 
       return title.contains(query) ||
           description.contains(query) ||
@@ -96,6 +97,7 @@ class _HomeScreenState extends State<HomeScreen> {
           .maybeSingle();
 
       if (!mounted) return;
+
       setState(() => _isAdmin = profile?['role'] == 'admin');
     } catch (_) {
       if (!mounted) return;
@@ -195,7 +197,9 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() => _isAdmin = false);
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تم تسجيل الخروج بنجاح')),
+        const SnackBar(
+          content: Text('تم تسجيل الخروج بنجاح'),
+        ),
       );
 
       await _loadData();
@@ -215,12 +219,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final result = await Navigator.push<bool>(
       context,
-      MaterialPageRoute(builder: (_) => const AuthScreen()),
+      MaterialPageRoute(
+        builder: (_) => const AuthScreen(),
+      ),
     );
 
     if (!mounted) return false;
 
-    if (result == true && _supabase.auth.currentUser != null) {
+    if (result == true &&
+        _supabase.auth.currentUser != null) {
       await _checkAdminStatus();
       return true;
     }
@@ -234,7 +241,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
     await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const ProfileScreen()),
+      MaterialPageRoute(
+        builder: (_) => const ProfileScreen(),
+      ),
     );
 
     if (!mounted) return;
@@ -249,7 +258,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
     await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const AddListingScreen()),
+      MaterialPageRoute(
+        builder: (_) => const AddListingScreen(),
+      ),
     );
 
     if (!mounted) return;
@@ -263,7 +274,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
     await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const MyListingsScreen()),
+      MaterialPageRoute(
+        builder: (_) => const MyListingsScreen(),
+      ),
     );
 
     if (!mounted) return;
@@ -277,7 +290,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
     await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const FavoritesScreen()),
+      MaterialPageRoute(
+        builder: (_) => const FavoritesScreen(),
+      ),
     );
 
     if (!mounted) return;
@@ -291,7 +306,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
     await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const AdminListingsScreen()),
+      MaterialPageRoute(
+        builder: (_) => const AdminListingsScreen(),
+      ),
     );
 
     if (!mounted) return;
@@ -300,7 +317,9 @@ class _HomeScreenState extends State<HomeScreen> {
     await _loadData();
   }
 
-  void _openListingDetails(Map<String, dynamic> listing) {
+  void _openListingDetails(
+    Map<String, dynamic> listing,
+  ) {
     final listingId = listing['id'];
 
     if (listingId is! int) return;
@@ -308,7 +327,9 @@ class _HomeScreenState extends State<HomeScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => ListingDetailsScreen(listingId: listingId),
+        builder: (_) => ListingDetailsScreen(
+          listingId: listingId,
+        ),
       ),
     );
   }
@@ -371,18 +392,23 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (path.isEmpty) return null;
 
-    if (path.startsWith('http://') || path.startsWith('https://')) {
+    if (path.startsWith('http://') ||
+        path.startsWith('https://')) {
       return path;
     }
 
-    return _supabase.storage.from('listing-images').getPublicUrl(path);
+    return _supabase.storage
+        .from('listing-images')
+        .getPublicUrl(path);
   }
 
   Widget _buildListingImage(
     Map<String, dynamic> listing, {
     double height = 105,
   }) {
-    final imageUrl = _imageUrl(listing['image_path']);
+    final imageUrl = _imageUrl(
+      listing['image_path'],
+    );
 
     Widget noImage() {
       return Container(
@@ -407,7 +433,11 @@ class _HomeScreenState extends State<HomeScreen> {
       width: double.infinity,
       fit: BoxFit.cover,
       errorBuilder: (_, __, ___) => noImage(),
-      loadingBuilder: (context, child, progress) {
+      loadingBuilder: (
+        context,
+        child,
+        progress,
+      ) {
         if (progress == null) return child;
 
         return Container(
@@ -415,7 +445,9 @@ class _HomeScreenState extends State<HomeScreen> {
           width: double.infinity,
           color: Colors.grey.shade100,
           child: const Center(
-            child: CircularProgressIndicator(strokeWidth: 2),
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+            ),
           ),
         );
       },
@@ -424,7 +456,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildAvailableBadge() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 7,
+        vertical: 3,
+      ),
       decoration: BoxDecoration(
         color: Colors.green.withValues(alpha: 0.92),
         borderRadius: BorderRadius.circular(20),
@@ -432,7 +467,11 @@ class _HomeScreenState extends State<HomeScreen> {
       child: const Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.check_circle, color: Colors.white, size: 12),
+          Icon(
+            Icons.check_circle,
+            color: Colors.white,
+            size: 12,
+          ),
           SizedBox(width: 3),
           Text(
             'متاح',
@@ -447,28 +486,53 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildListingCard(Map<String, dynamic> listing) {
-    final rawTitle = listing['title']?.toString().trim() ?? '';
-    final title = rawTitle.isEmpty ? 'إعلان بدون عنوان' : rawTitle;
-    final area = listing['area']?.toString().trim() ?? '';
+  // التعديل الأول:
+  // تحسين شكل بطاقة الإعلان فقط.
+  // لم يتم تغيير طريقة تحميل الصور أو روابط Supabase.
+  Widget _buildListingCard(
+    Map<String, dynamic> listing,
+  ) {
+    final rawTitle =
+        listing['title']?.toString().trim() ?? '';
+    final title = rawTitle.isEmpty
+        ? 'إعلان بدون عنوان'
+        : rawTitle;
+
+    final area =
+        listing['area']?.toString().trim() ?? '';
+
+    final priceText = _formatPrice(listing);
+    final isNegotiable =
+        listing['price_type'] == 'negotiable';
 
     return Card(
       margin: EdgeInsets.zero,
-      elevation: 1,
+      elevation: 2,
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(11),
+        borderRadius: BorderRadius.circular(13),
+        side: BorderSide(
+          color: Theme.of(context)
+              .colorScheme
+              .outlineVariant
+              .withValues(alpha: 0.35),
+        ),
       ),
       child: InkWell(
         onTap: () => _openListingDetails(listing),
         child: SizedBox(
           width: 158,
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment:
+                CrossAxisAlignment.stretch,
             children: [
               Stack(
                 children: [
-                  _buildListingImage(listing, height: 105),
+                  _buildListingImage(
+                    listing,
+                    height: 105,
+                  ),
+
                   Positioned(
                     top: 6,
                     right: 6,
@@ -476,78 +540,138 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ],
               ),
-              Padding(
-                // تقليل الهامش السفلي داخل بطاقة الإعلان.
-                padding: const EdgeInsets.fromLTRB(8, 7, 8, 3),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        height: 1.2,
+
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    8,
+                    6,
+                    8,
+                    4,
+                  ),
+                  child: Column(
+                    crossAxisAlignment:
+                        CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          height: 1.18,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 5),
-                    Text(
-                      _formatPrice(listing),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                    if (area.isNotEmpty) ...[
+
                       const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.location_on_outlined,
-                            size: 13,
-                          ),
-                          const SizedBox(width: 3),
-                          Expanded(
-                            child: Text(
-                              area,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.grey.shade700,
-                              ),
+
+                      Text(
+                        priceText,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                          height: 1.15,
+                          color: Theme.of(context)
+                              .colorScheme
+                              .primary,
+                        ),
+                      ),
+
+                      if (isNegotiable)
+                        Padding(
+                          padding:
+                              const EdgeInsets.only(top: 2),
+                          child: Text(
+                            'قابل للتفاوض',
+                            maxLines: 1,
+                            overflow:
+                                TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight:
+                                  FontWeight.w600,
+                              color: Colors.grey.shade600,
                             ),
                           ),
-                        ],
-                      ),
-                    ],
-                    const SizedBox(height: 5),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 28,
-                      child: OutlinedButton(
-                        onPressed: () => _openListingDetails(listing),
-                        style: OutlinedButton.styleFrom(
-                          padding: EdgeInsets.zero,
-                          visualDensity: VisualDensity.compact,
-                          minimumSize: const Size(0, 28),
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
+                        ),
+
+                      if (area.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.location_on_outlined,
+                              size: 13,
+                              color: Colors.grey.shade600,
+                            ),
+                            const SizedBox(width: 3),
+                            Expanded(
+                              child: Text(
+                                area,
+                                maxLines: 1,
+                                overflow:
+                                    TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color:
+                                      Colors.grey.shade700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+
+                      const Spacer(),
+
+                      SizedBox(
+                        width: double.infinity,
+                        height: 28,
+                        child: OutlinedButton(
+                          onPressed: () =>
+                              _openListingDetails(
+                            listing,
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            padding: EdgeInsets.zero,
+                            visualDensity:
+                                VisualDensity.compact,
+                            minimumSize:
+                                const Size(0, 28),
+                            tapTargetSize:
+                                MaterialTapTargetSize
+                                    .shrinkWrap,
+                            side: BorderSide(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .primary
+                                  .withValues(
+                                    alpha: 0.65,
+                                  ),
+                            ),
+                            shape:
+                                RoundedRectangleBorder(
+                              borderRadius:
+                                  BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: Text(
+                            'عرض الإعلان',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .primary,
+                            ),
                           ),
                         ),
-                        child: const Text(
-                          'عرض الإعلان',
-                          style: TextStyle(fontSize: 11),
-                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -563,14 +687,18 @@ class _HomeScreenState extends State<HomeScreen> {
     IconData? icon,
   }) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 9),
+      padding: const EdgeInsets.only(
+        bottom: 9,
+      ),
       child: Row(
         children: [
           if (icon != null) ...[
             Icon(
               icon,
               size: 19,
-              color: Theme.of(context).colorScheme.primary,
+              color: Theme.of(context)
+                  .colorScheme
+                  .primary,
             ),
             const SizedBox(width: 6),
           ],
@@ -597,9 +725,12 @@ class _HomeScreenState extends State<HomeScreen> {
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: listings.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 9),
+        separatorBuilder: (_, __) =>
+            const SizedBox(width: 9),
         itemBuilder: (context, index) {
-          return _buildListingCard(listings[index]);
+          return _buildListingCard(
+            listings[index],
+          );
         },
       ),
     );
@@ -608,8 +739,14 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildCategories() {
     if (_categories.isEmpty) {
       return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 12),
-        child: Center(child: Text('لا توجد أقسام متاحة حالياً')),
+        padding: EdgeInsets.symmetric(
+          vertical: 12,
+        ),
+        child: Center(
+          child: Text(
+            'لا توجد أقسام متاحة حالياً',
+          ),
+        ),
       );
     }
 
@@ -618,21 +755,30 @@ class _HomeScreenState extends State<HomeScreen> {
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: _categories.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 7),
+        separatorBuilder: (_, __) =>
+            const SizedBox(width: 7),
         itemBuilder: (context, index) {
           final category = _categories[index];
-          final categoryId = category['id'] as int?;
+
+          final categoryId =
+              category['id'] as int?;
+
           final categoryName =
-              category['name']?.toString() ?? 'بدون اسم';
-          final selected = _selectedCategoryId == categoryId;
+              category['name']?.toString() ??
+                  'بدون اسم';
+
+          final selected =
+              _selectedCategoryId == categoryId;
 
           return InkWell(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius:
+                BorderRadius.circular(10),
             onTap: () {
               if (categoryId == null) return;
 
               setState(() {
-                _selectedCategoryId = selected ? null : categoryId;
+                _selectedCategoryId =
+                    selected ? null : categoryId;
               });
 
               _loadData();
@@ -645,27 +791,39 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               decoration: BoxDecoration(
                 color: selected
-                    ? Theme.of(context).colorScheme.primaryContainer
+                    ? Theme.of(context)
+                        .colorScheme
+                        .primaryContainer
                     : Theme.of(context)
                         .colorScheme
                         .surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(10),
+                borderRadius:
+                    BorderRadius.circular(10),
                 border: Border.all(
                   color: selected
-                      ? Theme.of(context).colorScheme.primary
+                      ? Theme.of(context)
+                          .colorScheme
+                          .primary
                       : Colors.transparent,
                 ),
               ),
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisAlignment:
+                    MainAxisAlignment.center,
                 children: [
-                  Icon(_categoryIcon(categoryName), size: 22),
+                  Icon(
+                    _categoryIcon(
+                      categoryName,
+                    ),
+                    size: 22,
+                  ),
                   const SizedBox(height: 3),
                   Text(
                     categoryName,
                     textAlign: TextAlign.center,
                     maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                    overflow:
+                        TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w600,
@@ -686,27 +844,48 @@ class _HomeScreenState extends State<HomeScreen> {
       height: 43,
       child: TextField(
         controller: _searchController,
-        textInputAction: TextInputAction.search,
-        onChanged: (value) => setState(() => _searchQuery = value),
+        textInputAction:
+            TextInputAction.search,
+        onChanged: (value) {
+          setState(() {
+            _searchQuery = value;
+          });
+        },
         decoration: InputDecoration(
-          hintText: 'ابحث عن إعلان أو منطقة...',
-          hintStyle: const TextStyle(fontSize: 13),
-          prefixIcon: const Icon(Icons.search, size: 21),
-          suffixIcon: _searchQuery.isNotEmpty
-              ? IconButton(
-                  padding: EdgeInsets.zero,
-                  onPressed: () {
-                    _searchController.clear();
-                    setState(() => _searchQuery = '');
-                  },
-                  icon: const Icon(Icons.clear, size: 19),
-                  tooltip: 'مسح البحث',
-                )
-              : null,
+          hintText:
+              'ابحث عن إعلان أو منطقة...',
+          hintStyle: const TextStyle(
+            fontSize: 13,
+          ),
+          prefixIcon: const Icon(
+            Icons.search,
+            size: 21,
+          ),
+          suffixIcon:
+              _searchQuery.isNotEmpty
+                  ? IconButton(
+                      padding: EdgeInsets.zero,
+                      onPressed: () {
+                        _searchController.clear();
+                        setState(() {
+                          _searchQuery = '';
+                        });
+                      },
+                      icon: const Icon(
+                        Icons.clear,
+                        size: 19,
+                      ),
+                      tooltip: 'مسح البحث',
+                    )
+                  : null,
           filled: true,
-          contentPadding: const EdgeInsets.symmetric(vertical: 8),
+          contentPadding:
+              const EdgeInsets.symmetric(
+            vertical: 8,
+          ),
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(11),
+            borderRadius:
+                BorderRadius.circular(11),
             borderSide: BorderSide.none,
           ),
         ),
@@ -718,7 +897,8 @@ class _HomeScreenState extends State<HomeScreen> {
     final results = _filteredListings;
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      crossAxisAlignment:
+          CrossAxisAlignment.stretch,
       children: [
         _sectionTitle(
           'نتائج البحث',
@@ -730,22 +910,37 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         ),
+
         if (results.isEmpty)
           const Padding(
-            padding: EdgeInsets.symmetric(vertical: 35),
+            padding: EdgeInsets.symmetric(
+              vertical: 35,
+            ),
             child: Column(
               children: [
-                Icon(Icons.search_off_outlined, size: 45),
+                Icon(
+                  Icons.search_off_outlined,
+                  size: 45,
+                ),
                 SizedBox(height: 9),
-                Text('لم نجد إعلانات تطابق بحثك'),
+                Text(
+                  'لم نجد إعلانات تطابق بحثك',
+                ),
               ],
             ),
           )
         else
           ...results.map(
             (listing) => Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: _buildListingCard(listing),
+              padding: const EdgeInsets.only(
+                bottom: 10,
+              ),
+              child: SizedBox(
+                height: 230,
+                child: _buildListingCard(
+                  listing,
+                ),
+              ),
             ),
           ),
       ],
@@ -755,80 +950,128 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildHomeSections() {
     if (_listings.isEmpty) {
       return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 32),
+        padding: EdgeInsets.symmetric(
+          vertical: 32,
+        ),
         child: Column(
           children: [
-            Icon(Icons.inventory_2_outlined, size: 45),
+            Icon(
+              Icons.inventory_2_outlined,
+              size: 45,
+            ),
             SizedBox(height: 10),
-            Text('لا توجد إعلانات متاحة حالياً'),
+            Text(
+              'لا توجد إعلانات متاحة حالياً',
+            ),
           ],
         ),
       );
     }
 
-    // لا يوجد حالياً حقل مؤكد يحدد الإعلانات المميزة في قاعدة البيانات.
-    // لذلك تعرض هذه المساحة مجموعة من أحدث الإعلانات مؤقتاً.
-    final featuredPreview = _listings.take(5).toList();
+    // لا يوجد حالياً حقل مؤكد يحدد
+    // الإعلانات المميزة في قاعدة البيانات.
+    final featuredPreview =
+        _listings.take(5).toList();
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      crossAxisAlignment:
+          CrossAxisAlignment.stretch,
       children: [
         _sectionTitle(
           'إعلانات مميزة أو تجارية',
           icon: Icons.local_offer_outlined,
         ),
-        _buildHorizontalListings(featuredPreview),
+
+        _buildHorizontalListings(
+          featuredPreview,
+        ),
+
         const SizedBox(height: 18),
+
         _sectionTitle(
           'أحدث الإعلانات',
           icon: Icons.access_time,
         ),
-        _buildHorizontalListings(_listings),
+
+        _buildHorizontalListings(
+          _listings,
+        ),
+
         const SizedBox(height: 20),
+
         _sectionTitle(
           'معروضات الأقسام',
           icon: Icons.grid_view_rounded,
         ),
+
         ..._categories.map((category) {
-          final categoryId = category['id'] as int?;
+          final categoryId =
+              category['id'] as int?;
+
           final categoryName =
-              category['name']?.toString() ?? 'بدون اسم';
+              category['name']?.toString() ??
+                  'بدون اسم';
 
-          if (categoryId == null) return const SizedBox.shrink();
+          if (categoryId == null) {
+            return const SizedBox.shrink();
+          }
 
-          final categoryListings = _listings
-              .where((listing) => listing['category_id'] == categoryId)
-              .take(8)
-              .toList();
+          final categoryListings =
+              _listings
+                  .where(
+                    (listing) =>
+                        listing['category_id'] ==
+                        categoryId,
+                  )
+                  .take(8)
+                  .toList();
 
           if (categoryListings.isEmpty) {
             return const SizedBox.shrink();
           }
 
           return Padding(
-            padding: const EdgeInsets.only(bottom: 18),
+            padding: const EdgeInsets.only(
+              bottom: 18,
+            ),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+              crossAxisAlignment:
+                  CrossAxisAlignment.stretch,
               children: [
                 _sectionTitle(
                   categoryName,
-                  icon: _categoryIcon(categoryName),
+                  icon: _categoryIcon(
+                    categoryName,
+                  ),
                   trailing: TextButton(
                     onPressed: () {
-                      setState(() => _selectedCategoryId = categoryId);
+                      setState(() {
+                        _selectedCategoryId =
+                            categoryId;
+                      });
+
                       _loadData();
                     },
                     style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 7),
-                      visualDensity: VisualDensity.compact,
+                      padding:
+                          const EdgeInsets.symmetric(
+                        horizontal: 7,
+                      ),
+                      visualDensity:
+                          VisualDensity.compact,
                     ),
                     child: const Text(
                       'عرض الكل',
-                      style: TextStyle(fontSize: 12),
+                      style: TextStyle(
+                        fontSize: 12,
+                      ),
                     ),
                   ),
                 ),
-                _buildHorizontalListings(categoryListings),
+
+                _buildHorizontalListings(
+                  categoryListings,
+                ),
               ],
             ),
           );
@@ -839,7 +1082,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildBody() {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
     }
 
     if (_error != null) {
@@ -847,15 +1092,24 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Padding(
           padding: const EdgeInsets.all(22),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisSize:
+                MainAxisSize.min,
             children: [
-              const Icon(Icons.wifi_off, size: 42),
+              const Icon(
+                Icons.wifi_off,
+                size: 42,
+              ),
               const SizedBox(height: 10),
-              Text(_error!, textAlign: TextAlign.center),
+              Text(
+                _error!,
+                textAlign: TextAlign.center,
+              ),
               const SizedBox(height: 14),
               FilledButton(
                 onPressed: _loadData,
-                child: const Text('إعادة المحاولة'),
+                child: const Text(
+                  'إعادة المحاولة',
+                ),
               ),
             ],
           ),
@@ -864,16 +1118,25 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     final searching =
-        _searchQuery.trim().isNotEmpty || _selectedCategoryId != null;
+        _searchQuery.trim().isNotEmpty ||
+            _selectedCategoryId != null;
 
     return RefreshIndicator(
       onRefresh: _loadData,
       child: ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(13, 8, 13, 18),
+        physics:
+            const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(
+          13,
+          8,
+          13,
+          18,
+        ),
         children: [
           _buildSearchField(),
+
           const SizedBox(height: 12),
+
           _sectionTitle(
             'الأقسام',
             trailing: TextButton(
@@ -883,21 +1146,34 @@ class _HomeScreenState extends State<HomeScreen> {
                   _searchQuery = '';
                   _searchController.clear();
                 });
+
                 _loadData();
               },
               style: TextButton.styleFrom(
-                visualDensity: VisualDensity.compact,
-                padding: const EdgeInsets.symmetric(horizontal: 7),
+                visualDensity:
+                    VisualDensity.compact,
+                padding:
+                    const EdgeInsets.symmetric(
+                  horizontal: 7,
+                ),
               ),
               child: const Text(
                 'عرض الكل',
-                style: TextStyle(fontSize: 12),
+                style: TextStyle(
+                  fontSize: 12,
+                ),
               ),
             ),
           ),
+
           _buildCategories(),
+
           const SizedBox(height: 15),
-          if (searching) _buildSearchResults() else _buildHomeSections(),
+
+          if (searching)
+            _buildSearchResults()
+          else
+            _buildHomeSections(),
         ],
       ),
     );
@@ -905,15 +1181,21 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildPostListingButton() {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 7),
+      padding:
+          const EdgeInsets.symmetric(vertical: 7),
       child: FilledButton(
         onPressed: _openAddListing,
         style: FilledButton.styleFrom(
           minimumSize: const Size(0, 36),
-          padding: const EdgeInsets.symmetric(horizontal: 9),
-          visualDensity: VisualDensity.compact,
+          padding:
+              const EdgeInsets.symmetric(
+            horizontal: 9,
+          ),
+          visualDensity:
+              VisualDensity.compact,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(9),
+            borderRadius:
+                BorderRadius.circular(9),
           ),
         ),
         child: const Row(
@@ -927,7 +1209,10 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             SizedBox(width: 3),
-            Icon(Icons.add, size: 17),
+            Icon(
+              Icons.add,
+              size: 17,
+            ),
           ],
         ),
       ),
@@ -935,25 +1220,39 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildProfileButton() {
-    final user = _supabase.auth.currentUser;
+    final user =
+        _supabase.auth.currentUser;
 
     return IconButton(
-      tooltip: user == null ? 'تسجيل الدخول' : 'الملف الشخصي',
+      tooltip: user == null
+          ? 'تسجيل الدخول'
+          : 'الملف الشخصي',
       onPressed: _openProfile,
       icon: CircleAvatar(
         radius: 15,
-        backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+        backgroundColor:
+            Theme.of(context)
+                .colorScheme
+                .primaryContainer,
         child: Icon(
-          user == null ? Icons.person_outline : Icons.person,
+          user == null
+              ? Icons.person_outline
+              : Icons.person,
           size: 19,
-          color: Theme.of(context).colorScheme.onPrimaryContainer,
+          color:
+              Theme.of(context)
+                  .colorScheme
+                  .onPrimaryContainer,
         ),
       ),
     );
   }
 
   Widget _buildBottomNavigation() {
-    final primary = Theme.of(context).colorScheme.primary;
+    final primary =
+        Theme.of(context)
+            .colorScheme
+            .primary;
 
     Widget navItem({
       required IconData icon,
@@ -965,25 +1264,35 @@ class _HomeScreenState extends State<HomeScreen> {
         child: InkWell(
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 7),
+            padding:
+                const EdgeInsets.symmetric(
+              vertical: 7,
+            ),
             child: Column(
-              mainAxisSize: MainAxisSize.min,
+              mainAxisSize:
+                  MainAxisSize.min,
               children: [
                 Icon(
                   icon,
                   size: 21,
-                  color: selected ? primary : Colors.grey.shade600,
+                  color: selected
+                      ? primary
+                      : Colors.grey.shade600,
                 ),
                 const SizedBox(height: 3),
                 Text(
                   label,
                   maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  overflow:
+                      TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 10,
-                    fontWeight:
-                        selected ? FontWeight.bold : FontWeight.normal,
-                    color: selected ? primary : Colors.grey.shade700,
+                    fontWeight: selected
+                        ? FontWeight.bold
+                        : FontWeight.normal,
+                    color: selected
+                        ? primary
+                        : Colors.grey.shade700,
                   ),
                 ),
               ],
@@ -997,13 +1306,19 @@ class _HomeScreenState extends State<HomeScreen> {
       top: false,
       child: Container(
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
+          color: Theme.of(context)
+              .colorScheme
+              .surface,
           border: Border(
-            top: BorderSide(color: Colors.grey.shade300, width: 0.6),
+            top: BorderSide(
+              color: Colors.grey.shade300,
+              width: 0.6,
+            ),
           ),
         ),
         child: Row(
-          textDirection: TextDirection.rtl,
+          textDirection:
+              TextDirection.rtl,
           children: [
             navItem(
               icon: Icons.home_outlined,
@@ -1011,15 +1326,19 @@ class _HomeScreenState extends State<HomeScreen> {
               selected: true,
               onTap: () {
                 setState(() {
-                  _selectedCategoryId = null;
+                  _selectedCategoryId =
+                      null;
                   _searchQuery = '';
                   _searchController.clear();
                 });
+
                 _loadData();
               },
             ),
+
             navItem(
-              icon: Icons.inventory_2_outlined,
+              icon:
+                  Icons.inventory_2_outlined,
               label: 'إعلاناتي',
               onTap: _openMyListings,
             ),
@@ -1029,16 +1348,24 @@ class _HomeScreenState extends State<HomeScreen> {
               child: InkWell(
                 onTap: _openAddListing,
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(
+                    vertical: 4,
+                  ),
                   child: Column(
-                    mainAxisSize: MainAxisSize.min,
+                    mainAxisSize:
+                        MainAxisSize.min,
                     children: [
                       Container(
                         width: 43,
                         height: 34,
-                        decoration: BoxDecoration(
+                        decoration:
+                            BoxDecoration(
                           color: primary,
-                          borderRadius: BorderRadius.circular(11),
+                          borderRadius:
+                              BorderRadius.circular(
+                            11,
+                          ),
                         ),
                         child: const Icon(
                           Icons.add,
@@ -1050,10 +1377,12 @@ class _HomeScreenState extends State<HomeScreen> {
                       Text(
                         'أضف إعلان',
                         maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                        overflow:
+                            TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 10,
-                          fontWeight: FontWeight.bold,
+                          fontWeight:
+                              FontWeight.bold,
                           color: primary,
                         ),
                       ),
@@ -1064,12 +1393,15 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
 
             navItem(
-              icon: Icons.favorite_border,
+              icon:
+                  Icons.favorite_border,
               label: 'المفضلة',
               onTap: _openFavorites,
             ),
+
             navItem(
-              icon: Icons.person_outline,
+              icon:
+                  Icons.person_outline,
               label: 'الملف الشخصي',
               onTap: _openProfile,
             ),
@@ -1080,12 +1412,19 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final user = _supabase.auth.currentUser;
-    final name = user?.userMetadata?['full_name'] as String?;
+  Widget build(
+    BuildContext context,
+  ) {
+    final user =
+        _supabase.auth.currentUser;
+
+    final name =
+        user?.userMetadata?['full_name']
+            as String?;
 
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection:
+          TextDirection.rtl,
       child: Scaffold(
         drawer: Drawer(
           child: SafeArea(
@@ -1094,109 +1433,185 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 UserAccountsDrawerHeader(
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primary,
+                    color: Theme.of(context)
+                        .colorScheme
+                        .primary,
                   ),
                   accountName: Text(
-                    name == null || name.isEmpty
+                    name == null ||
+                            name.isEmpty
                         ? 'مرحباً بك في دلالة شبشة'
                         : name,
                   ),
-                  accountEmail: user == null ? null : Text(user.email ?? ''),
-                  currentAccountPicture: CircleAvatar(
+                  accountEmail:
+                      user == null
+                          ? null
+                          : Text(
+                              user.email ?? '',
+                            ),
+                  currentAccountPicture:
+                      CircleAvatar(
                     backgroundColor:
-                        Theme.of(context).colorScheme.onPrimary,
+                        Theme.of(context)
+                            .colorScheme
+                            .onPrimary,
                     child: Icon(
                       Icons.storefront_rounded,
                       size: 31,
-                      color: Theme.of(context).colorScheme.primary,
+                      color:
+                          Theme.of(context)
+                              .colorScheme
+                              .primary,
                     ),
                   ),
                 ),
+
                 ListTile(
-                  leading: const Icon(Icons.person_outline),
+                  leading: const Icon(
+                    Icons.person_outline,
+                  ),
                   title: Text(
-                    user == null ? 'تسجيل الدخول' : 'الملف الشخصي',
+                    user == null
+                        ? 'تسجيل الدخول'
+                        : 'الملف الشخصي',
                   ),
                   onTap: () async {
                     Navigator.pop(context);
                     await _openProfile();
                   },
                 ),
+
                 if (_isAdmin)
                   ListTile(
                     leading: const Icon(
-                      Icons.admin_panel_settings_outlined,
+                      Icons
+                          .admin_panel_settings_outlined,
                     ),
-                    title: const Text('لوحة تحكم الإدارة'),
-                    subtitle: const Text('إدارة ومراجعة الإعلانات'),
+                    title: const Text(
+                      'لوحة تحكم الإدارة',
+                    ),
+                    subtitle: const Text(
+                      'إدارة ومراجعة الإعلانات',
+                    ),
                     onTap: () async {
                       Navigator.pop(context);
                       await _openAdminPanel();
                     },
                   ),
+
                 const Divider(),
+
                 const Padding(
-                  padding: EdgeInsets.fromLTRB(16, 10, 16, 6),
+                  padding:
+                      EdgeInsets.fromLTRB(
+                    16,
+                    10,
+                    16,
+                    6,
+                  ),
                   child: Text(
                     'الأقسام',
                     style: TextStyle(
                       fontSize: 15,
-                      fontWeight: FontWeight.bold,
+                      fontWeight:
+                          FontWeight.bold,
                     ),
                   ),
                 ),
+
                 if (_categories.isEmpty)
                   const Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Text('لا توجد أقسام حالياً'),
+                    padding:
+                        EdgeInsets.all(16),
+                    child: Text(
+                      'لا توجد أقسام حالياً',
+                    ),
                   )
                 else
-                  ..._categories.map((category) {
-                    final categoryId = category['id'] as int?;
-                    final categoryName =
-                        category['name']?.toString() ?? 'بدون اسم';
+                  ..._categories.map(
+                    (category) {
+                      final categoryId =
+                          category['id']
+                              as int?;
 
-                    return ListTile(
-                      dense: true,
-                      leading: Icon(_categoryIcon(categoryName)),
-                      title: Text(categoryName),
-                      selected: _selectedCategoryId == categoryId,
-                      onTap: () {
-                        Navigator.pop(context);
+                      final categoryName =
+                          category['name']
+                                  ?.toString() ??
+                              'بدون اسم';
 
-                        if (categoryId == null) return;
+                      return ListTile(
+                        dense: true,
+                        leading: Icon(
+                          _categoryIcon(
+                            categoryName,
+                          ),
+                        ),
+                        title: Text(
+                          categoryName,
+                        ),
+                        selected:
+                            _selectedCategoryId ==
+                                categoryId,
+                        onTap: () {
+                          Navigator.pop(
+                            context,
+                          );
 
-                        setState(() {
-                          _selectedCategoryId = categoryId;
-                          _searchQuery = '';
-                          _searchController.clear();
-                        });
+                          if (categoryId ==
+                              null) {
+                            return;
+                          }
 
-                        _loadData();
-                      },
-                    );
-                  }),
+                          setState(() {
+                            _selectedCategoryId =
+                                categoryId;
+                            _searchQuery = '';
+                            _searchController
+                                .clear();
+                          });
+
+                          _loadData();
+                        },
+                      );
+                    },
+                  ),
+
                 const Divider(),
+
                 ListTile(
-                  leading: const Icon(Icons.favorite_border),
-                  title: const Text('المفضلة'),
+                  leading: const Icon(
+                    Icons.favorite_border,
+                  ),
+                  title: const Text(
+                    'المفضلة',
+                  ),
                   onTap: () {
                     Navigator.pop(context);
                     _openFavorites();
                   },
                 ),
+
                 ListTile(
-                  leading: const Icon(Icons.inventory_2_outlined),
-                  title: const Text('إعلاناتي'),
+                  leading: const Icon(
+                    Icons.inventory_2_outlined,
+                  ),
+                  title: const Text(
+                    'إعلاناتي',
+                  ),
                   onTap: () {
                     Navigator.pop(context);
                     _openMyListings();
                   },
                 ),
+
                 if (user != null)
                   ListTile(
-                    leading: const Icon(Icons.logout),
-                    title: const Text('تسجيل الخروج'),
+                    leading: const Icon(
+                      Icons.logout,
+                    ),
+                    title: const Text(
+                      'تسجيل الخروج',
+                    ),
                     onTap: () {
                       Navigator.pop(context);
                       _signOut();
@@ -1207,7 +1622,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
 
-        // الشريط العلوي: زر القائمة ثم اسم التطبيق، وبعدهما الأزرار.
         appBar: AppBar(
           centerTitle: false,
           titleSpacing: 0,
@@ -1217,7 +1631,9 @@ class _HomeScreenState extends State<HomeScreen> {
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w900,
-              color: Theme.of(context).colorScheme.primary,
+              color: Theme.of(context)
+                  .colorScheme
+                  .primary,
             ),
           ),
           actions: [
@@ -1227,7 +1643,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 _loadData();
                 _checkAdminStatus();
               },
-              icon: const Icon(Icons.refresh),
+              icon: const Icon(
+                Icons.refresh,
+              ),
             ),
             _buildPostListingButton(),
             _buildProfileButton(),
@@ -1235,44 +1653,66 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
 
         body: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+          crossAxisAlignment:
+              CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(13, 4, 13, 8),
+              padding:
+                  const EdgeInsets.fromLTRB(
+                13,
+                4,
+                13,
+                8,
+              ),
               child: Column(
                 children: [
                   Text(
                     'في مكان واحد - تسوق واعلن بسهولة',
-                    textAlign: TextAlign.center,
+                    textAlign:
+                        TextAlign.center,
                     style: TextStyle(
                       fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: Theme.of(context).colorScheme.primary,
+                      fontWeight:
+                          FontWeight.w800,
+                      color:
+                          Theme.of(context)
+                              .colorScheme
+                              .primary,
                     ),
                   ),
+
                   if (user != null &&
                       name != null &&
                       name.trim().isNotEmpty)
                     Padding(
-                      padding: const EdgeInsets.only(top: 3),
+                      padding:
+                          const EdgeInsets.only(
+                        top: 3,
+                      ),
                       child: Text(
                         'مرحباً يا $name 👋',
-                        textAlign: TextAlign.center,
+                        textAlign:
+                            TextAlign.center,
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.grey.shade700,
+                          color: Colors
+                              .grey
+                              .shade700,
                         ),
                       ),
                     ),
                 ],
               ),
             ),
-            Expanded(child: _buildBody()),
+
+            Expanded(
+              child: _buildBody(),
+            ),
           ],
         ),
 
-        // شريط تنقل سفلي ثابت أثناء تمرير محتوى الصفحة.
-        bottomNavigationBar: _buildBottomNavigation(),
+        bottomNavigationBar:
+            _buildBottomNavigation(),
       ),
     );
   }
