@@ -369,6 +369,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
 String _formatPrice(Map<String, dynamic> listing) {
   final price = listing['price'];
+
   final currency =
       listing['currency']?.toString().trim().isNotEmpty == true
           ? listing['currency'].toString().trim()
@@ -377,11 +378,7 @@ String _formatPrice(Map<String, dynamic> listing) {
   final priceType =
       listing['price_type']?.toString().trim() ?? '';
 
-  if (priceType == 'contact') {
-    return 'السعر عند التواصل';
-  }
-
-  if (price == null) {
+  if (priceType == 'contact' || price == null) {
     return 'السعر عند التواصل';
   }
 
@@ -391,19 +388,38 @@ String _formatPrice(Map<String, dynamic> listing) {
     return '$price $currency';
   }
 
-  // تنسيق الرقم بفواصل كل 3 خانات.
-  final formatted = number
-      .toStringAsFixed(
-        number.truncateToDouble() == number ? 0 : 2,
-      )
-      .replaceFirst(
-        RegExp(r'\.0+$'),
-        '',
-      )
-      .replaceAllMapped(
-        RegExp(r'\B(?=(\d{3})+(?!\d))'),
-        (match) => ',',
-      );
+  // تحويل السعر إلى نص، مع الاحتفاظ بالكسور عند وجودها.
+  String raw = number.toString();
+
+  // حذف .0 من الأرقام الصحيحة مثل 10000.0
+  if (number == number.truncateToDouble()) {
+    raw = number.toInt().toString();
+  }
+
+  final parts = raw.split('.');
+  final integerPart = parts[0];
+  final decimalPart = parts.length > 1 ? parts[1] : '';
+
+  // إضافة فواصل الآلاف من اليمين إلى اليسار.
+  final buffer = StringBuffer();
+
+  for (int i = 0; i < integerPart.length; i++) {
+    buffer.write(integerPart[i]);
+
+    final remaining = integerPart.length - i - 1;
+
+    if (remaining > 0 && remaining % 3 == 0) {
+      buffer.write(',');
+    }
+  }
+
+  String formatted = buffer.toString();
+
+  // إضافة الجزء العشري إذا كان موجوداً وغير صفري.
+  if (decimalPart.isNotEmpty &&
+      int.tryParse(decimalPart) != 0) {
+    formatted = '$formatted.$decimalPart';
+  }
 
   return '$formatted $currency';
 }
