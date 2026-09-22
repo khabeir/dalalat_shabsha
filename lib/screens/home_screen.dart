@@ -331,22 +331,22 @@ await Navigator.push(
 
 if (!mounted) return;
 
-_loadData();
-
+await _loadData();
 }
 
-Future<void> openAdminPanel() async {
-await Navigator.push(
-context,
-MaterialPageRoute(
-builder: () => const AdminListingsScreen(),
-),
-);
+Future<void> _openAdminPanel() async {
+  await Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => const AdminListingsScreen(),
+    ),
+  );
 
-if (!mounted) return;
+  if (!mounted) return;
 
-await _checkAdminStatus();
-await _loadData();
+  await _checkAdminStatus();
+  await _loadData();
+}
 
 }
 
