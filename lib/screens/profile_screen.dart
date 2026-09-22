@@ -23,6 +23,7 @@ bool _isPhoneAccount = false;
 
 String? _error;
 String? _email;
+
 int _listingsCount = 0;
 
 @override
@@ -146,10 +147,8 @@ try {
     {
       'id': user.id,
       'full_name': fullName,
-
       // حساب الهاتف يحتفظ برقمه المرتبط بتسجيل الدخول.
       'phone': phone.isEmpty ? null : phone,
-
       'area': area.isEmpty ? null : area,
     },
     onConflict: 'id',
@@ -180,11 +179,11 @@ try {
 // فتح صفحة إعلاناتي
 // ============================================================
 
-Future<void> openMyListings() async {
+Future<void> _openMyListings() async {
 await Navigator.push(
 context,
 MaterialPageRoute(
-builder: () => const MyListingsScreen(),
+builder: (context) => const MyListingsScreen(),
 ),
 );
 
@@ -248,10 +247,7 @@ size: 48,
 
     const SizedBox(height: 24),
 
-    // ========================================================
     // الاسم الكامل
-    // ========================================================
-
     TextField(
       controller: _nameController,
       textInputAction: TextInputAction.next,
@@ -264,10 +260,7 @@ size: 48,
 
     const SizedBox(height: 16),
 
-    // ========================================================
     // رقم الهاتف
-    // ========================================================
-
     TextField(
       controller: _phoneController,
       readOnly: _isPhoneAccount,
@@ -288,10 +281,7 @@ size: 48,
 
     const SizedBox(height: 16),
 
-    // ========================================================
     // المنطقة
-    // ========================================================
-
     TextField(
       controller: _areaController,
       textInputAction: TextInputAction.done,
@@ -304,10 +294,7 @@ size: 48,
 
     const SizedBox(height: 16),
 
-    // ========================================================
     // البريد الإلكتروني
-    // ========================================================
-
     InputDecorator(
       decoration: const InputDecoration(
         labelText: 'البريد الإلكتروني',
@@ -324,10 +311,7 @@ size: 48,
 
     const SizedBox(height: 24),
 
-    // ========================================================
     // حفظ التغييرات
-    // ========================================================
-
     FilledButton.icon(
       onPressed: _saving ? null : _saveProfile,
       icon: _saving
@@ -346,10 +330,7 @@ size: 48,
 
     const SizedBox(height: 24),
 
-    // ========================================================
     // إعلاناتي
-    // ========================================================
-
     Card(
       child: ListTile(
         leading: const Icon(
