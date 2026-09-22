@@ -367,23 +367,46 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  String _formatPrice(Map<String, dynamic> listing) {
-    final price = listing['price'];
-    final currency = listing['currency'] ?? 'SDG';
-    final priceType = listing['price_type'];
+String _formatPrice(Map<String, dynamic> listing) {
+  final price = listing['price'];
+  final currency =
+      listing['currency']?.toString().trim().isNotEmpty == true
+          ? listing['currency'].toString().trim()
+          : 'SDG';
 
-    if (priceType == 'contact' || price == null) {
-      return 'السعر عند التواصل';
-    }
+  final priceType =
+      listing['price_type']?.toString().trim() ?? '';
 
-    final priceText = price.toString();
-
-    if (priceType == 'negotiable') {
-      return '$priceText $currency قابل للتفاوض';
-    }
-
-    return '$priceText $currency';
+  if (priceType == 'contact') {
+    return 'السعر عند التواصل';
   }
+
+  if (price == null) {
+    return 'السعر عند التواصل';
+  }
+
+  final number = num.tryParse(price.toString());
+
+  if (number == null) {
+    return '$price $currency';
+  }
+
+  // تنسيق الرقم بفواصل كل 3 خانات.
+  final formatted = number
+      .toStringAsFixed(
+        number.truncateToDouble() == number ? 0 : 2,
+      )
+      .replaceFirst(
+        RegExp(r'\.0+$'),
+        '',
+      )
+      .replaceAllMapped(
+        RegExp(r'\B(?=(\d{3})+(?!\d))'),
+        (match) => ',',
+      );
+
+  return '$formatted $currency';
+}
 
   String? _imageUrl(dynamic imagePath) {
     if (imagePath == null) return null;
