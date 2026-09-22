@@ -1,4 +1,5 @@
-Timer? _promotedRefreshTimer;
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -18,17 +19,20 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final _supabase = Supabase.instance.client;
+	  final _supabase = Supabase.instance.client;
   final _searchController = TextEditingController();
 
   List<Map<String, dynamic>> _categories = [];
   List<Map<String, dynamic>> _listings = [];
+  List<Map<String, dynamic>> _promotedListings = [];
 
   bool _loading = true;
   bool _isAdmin = false;
   String? _error;
   String _searchQuery = '';
   int? _selectedCategoryId;
+
+  Timer? _promotedRefreshTimer;
 
   @override
 void initState() {
