@@ -1051,7 +1051,7 @@ Widget _buildListingCard(
           CrossAxisAlignment.stretch,
       children: [
         _sectionTitle(
-          'إعلانات تجارية',
+          'إعلانات مميزة أو تجارية',
           icon: Icons.local_offer_outlined,
         ),
 
