@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - master
+      - main
+      - work-16d57d8
   workflow_dispatch:
 
 jobs:
