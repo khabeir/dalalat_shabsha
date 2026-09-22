@@ -139,6 +139,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final listings =
           List<Map<String, dynamic>>.from(listingsResponse);
 
+      // جلب صور الإعلانات وربط أول صورة بكل إعلان.
       if (listings.isNotEmpty) {
         final listingIds = listings
             .map((listing) => listing['id'])
@@ -188,6 +189,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _signOut() async {
     try {
       await _supabase.auth.signOut();
+
       if (!mounted) return;
 
       setState(() => _isAdmin = false);
@@ -236,6 +238,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
 
     if (!mounted) return;
+
     setState(() {});
     await _checkAdminStatus();
   }
@@ -250,6 +253,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
 
     if (!mounted) return;
+
     await _loadData();
   }
 
@@ -263,6 +267,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
 
     if (!mounted) return;
+
     await _loadData();
   }
 
@@ -276,6 +281,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
 
     if (!mounted) return;
+
     setState(() {});
   }
 
@@ -289,6 +295,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
 
     if (!mounted) return;
+
     await _checkAdminStatus();
     await _loadData();
   }
@@ -361,6 +368,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (imagePath == null) return null;
 
     final path = imagePath.toString().trim();
+
     if (path.isEmpty) return null;
 
     if (path.startsWith('http://') || path.startsWith('https://')) {
@@ -372,13 +380,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildListingImage(
     Map<String, dynamic> listing, {
-    double height = 112,
+    double height = 105,
   }) {
     final imageUrl = _imageUrl(listing['image_path']);
 
     Widget noImage() {
       return Container(
         height: height,
+        width: double.infinity,
         color: Colors.grey.shade100,
         child: const Center(
           child: Icon(
@@ -403,6 +412,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
         return Container(
           height: height,
+          width: double.infinity,
           color: Colors.grey.shade100,
           child: const Center(
             child: CircularProgressIndicator(strokeWidth: 2),
@@ -467,7 +477,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(8, 7, 8, 8),
+                // تقليل الهامش السفلي داخل بطاقة الإعلان.
+                padding: const EdgeInsets.fromLTRB(8, 7, 8, 3),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -515,15 +526,17 @@ class _HomeScreenState extends State<HomeScreen> {
                         ],
                       ),
                     ],
-                    const SizedBox(height: 7),
+                    const SizedBox(height: 5),
                     SizedBox(
                       width: double.infinity,
-                      height: 31,
+                      height: 28,
                       child: OutlinedButton(
                         onPressed: () => _openListingDetails(listing),
                         style: OutlinedButton.styleFrom(
                           padding: EdgeInsets.zero,
                           visualDensity: VisualDensity.compact,
+                          minimumSize: const Size(0, 28),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
                           ),
@@ -619,8 +632,7 @@ class _HomeScreenState extends State<HomeScreen> {
               if (categoryId == null) return;
 
               setState(() {
-                _selectedCategoryId =
-                    selected ? null : categoryId;
+                _selectedCategoryId = selected ? null : categoryId;
               });
 
               _loadData();
@@ -754,8 +766,8 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    // مؤقتاً: لا يوجد في الاستعلام الحالي حقل يحدد الإعلانات المميزة.
-    // لذلك نعرض مجموعة من أحدث الإعلانات في هذا الموضع.
+    // لا يوجد حالياً حقل مؤكد يحدد الإعلانات المميزة في قاعدة البيانات.
+    // لذلك تعرض هذه المساحة مجموعة من أحدث الإعلانات مؤقتاً.
     final featuredPreview = _listings.take(5).toList();
 
     return Column(
@@ -894,13 +906,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildPostListingButton() {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 7),
-      child: FilledButton.icon(
+      child: FilledButton(
         onPressed: _openAddListing,
-        icon: const Icon(Icons.add, size: 17),
-        label: const Text(
-          'ضع إعلانك',
-          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-        ),
         style: FilledButton.styleFrom(
           minimumSize: const Size(0, 36),
           padding: const EdgeInsets.symmetric(horizontal: 9),
@@ -908,6 +915,20 @@ class _HomeScreenState extends State<HomeScreen> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(9),
           ),
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'ضع إعلانك',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            SizedBox(width: 3),
+            Icon(Icons.add, size: 17),
+          ],
         ),
       ),
     );
@@ -932,60 +953,129 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildBottomNavigation() {
-    return BottomNavigationBar(
-      currentIndex: 0,
-      type: BottomNavigationBarType.fixed,
-      selectedFontSize: 10,
-      unselectedFontSize: 10,
-      iconSize: 21,
-      showUnselectedLabels: true,
-      onTap: (index) {
-        switch (index) {
-          case 0:
-            setState(() {
-              _selectedCategoryId = null;
-              _searchQuery = '';
-              _searchController.clear();
-            });
-            _loadData();
-            break;
-          case 1:
-            _openMyListings();
-            break;
-          case 2:
-            _openAddListing();
-            break;
-          case 3:
-            _openFavorites();
-            break;
-          case 4:
-            _openProfile();
-            break;
-        }
-      },
-      items: const [
-        BottomNavigationBarItem(
-          icon: Icon(Icons.home_outlined),
-          activeIcon: Icon(Icons.home),
-          label: 'الرئيسية',
+    final primary = Theme.of(context).colorScheme.primary;
+
+    Widget navItem({
+      required IconData icon,
+      required String label,
+      required VoidCallback onTap,
+      bool selected = false,
+    }) {
+      return Expanded(
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 7),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  icon,
+                  size: 21,
+                  color: selected ? primary : Colors.grey.shade600,
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight:
+                        selected ? FontWeight.bold : FontWeight.normal,
+                    color: selected ? primary : Colors.grey.shade700,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.inventory_2_outlined),
-          label: 'إعلاناتي',
+      );
+    }
+
+    return SafeArea(
+      top: false,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          border: Border(
+            top: BorderSide(color: Colors.grey.shade300, width: 0.6),
+          ),
         ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.add_circle_outline),
-          label: 'أضف إعلان',
+        child: Row(
+          textDirection: TextDirection.rtl,
+          children: [
+            navItem(
+              icon: Icons.home_outlined,
+              label: 'الرئيسية',
+              selected: true,
+              onTap: () {
+                setState(() {
+                  _selectedCategoryId = null;
+                  _searchQuery = '';
+                  _searchController.clear();
+                });
+                _loadData();
+              },
+            ),
+            navItem(
+              icon: Icons.inventory_2_outlined,
+              label: 'إعلاناتي',
+              onTap: _openMyListings,
+            ),
+
+            // زر إضافة إعلان مميز بلون التطبيق.
+            Expanded(
+              child: InkWell(
+                onTap: _openAddListing,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 43,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: primary,
+                          borderRadius: BorderRadius.circular(11),
+                        ),
+                        child: const Icon(
+                          Icons.add,
+                          color: Colors.white,
+                          size: 25,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        'أضف إعلان',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            navItem(
+              icon: Icons.favorite_border,
+              label: 'المفضلة',
+              onTap: _openFavorites,
+            ),
+            navItem(
+              icon: Icons.person_outline,
+              label: 'الملف الشخصي',
+              onTap: _openProfile,
+            ),
+          ],
         ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.favorite_border),
-          label: 'المفضلة',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.person_outline),
-          label: 'الملف الشخصي',
-        ),
-      ],
+      ),
     );
   }
 
@@ -1034,7 +1124,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 if (_isAdmin)
                   ListTile(
-                    leading: const Icon(Icons.admin_panel_settings_outlined),
+                    leading: const Icon(
+                      Icons.admin_panel_settings_outlined,
+                    ),
                     title: const Text('لوحة تحكم الإدارة'),
                     subtitle: const Text('إدارة ومراجعة الإعلانات'),
                     onTap: () async {
@@ -1071,6 +1163,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       selected: _selectedCategoryId == categoryId,
                       onTap: () {
                         Navigator.pop(context);
+
                         if (categoryId == null) return;
 
                         setState(() {
@@ -1078,6 +1171,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           _searchQuery = '';
                           _searchController.clear();
                         });
+
                         _loadData();
                       },
                     );
@@ -1112,8 +1206,10 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         ),
+
+        // الشريط العلوي: زر القائمة ثم اسم التطبيق، وبعدهما الأزرار.
         appBar: AppBar(
-          centerTitle: true,
+          centerTitle: false,
           elevation: 0,
           title: Text(
             'دلالة شبشة',
@@ -1136,6 +1232,7 @@ class _HomeScreenState extends State<HomeScreen> {
             _buildProfileButton(),
           ],
         ),
+
         body: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -1152,7 +1249,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       color: Theme.of(context).colorScheme.primary,
                     ),
                   ),
-                  if (user != null && name != null && name.trim().isNotEmpty)
+                  if (user != null &&
+                      name != null &&
+                      name.trim().isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(top: 3),
                       child: Text(
@@ -1170,6 +1269,8 @@ class _HomeScreenState extends State<HomeScreen> {
             Expanded(child: _buildBody()),
           ],
         ),
+
+        // شريط تنقل سفلي ثابت أثناء تمرير محتوى الصفحة.
         bottomNavigationBar: _buildBottomNavigation(),
       ),
     );
