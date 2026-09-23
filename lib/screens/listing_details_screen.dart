@@ -1,6 +1,10 @@
-import 'package:url_launcher/url_launcher.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart' show NumberFormat;
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import 'auth_screen.dart';
 
 class ListingDetailsScreen extends StatefulWidget {
   final int listingId;
@@ -11,21 +15,33 @@ class ListingDetailsScreen extends StatefulWidget {
   });
 
   @override
-  State<ListingDetailsScreen> createState() =>
-      _ListingDetailsScreenState();
+  State<ListingDetailsScreen> createState() => _ListingDetailsScreenState();
 }
 
 class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
+  static final _numberFormat = NumberFormat('#,##0.##', 'en');
+
+  static const _whatsappGreen = Color(0xFF25D366);
+  static const _defaultCountryCode = '249'; // السودان
+
   final _supabase = Supabase.instance.client;
+  final _pageController = PageController();
 
   Map<String, dynamic>? _listing;
   List<Map<String, dynamic>> _images = [];
+  List<Map<String, dynamic>> _similar = [];
+
+  String? _categoryName;
+  String? _sellerName;
+  int? _sellerAdsCount;
 
   int _currentImageIndex = 0;
 
   bool _loading = true;
   bool _favorite = false;
+  bool _favoriteBusy = false;
   bool _isCommercial = false;
+  bool _descriptionExpanded = false;
 
   String? _error;
 
@@ -35,145 +51,61 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
     _loadListing();
   }
 
-  String _formatDate(dynamic value) {
-    if (value == null) return 'غير محدد';
-
-    final date = DateTime.tryParse(value.toString());
-
-    if (date == null) return 'غير محدد';
-
-    final localDate = date.toLocal();
-
-    final day = localDate.day.toString().padLeft(2, '0');
-    final month = localDate.month.toString().padLeft(2, '0');
-    final year = localDate.year.toString();
-
-    return '$day/$month/$year';
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
   }
 
-  Future<void> _loadListing() async {
-    try {
-      final listing = await _supabase
-          .from('listings')
-          .select('''
-            id,
-            seller_id,
-            title,
-            description,
-            price,
-            currency,
-            price_type,
-            condition,
-            area,
-            contact_phone,
-            created_at
-          ''')
-          .eq('id', widget.listingId)
-          .single();
+  // =========================
+  // أدوات مساعدة
+  // =========================
+  void _showSnack(String message) {
+    if (!mounted) return;
 
-      final images = await _supabase
-          .from('listing_images')
-          .select('id, image_path, sort_order')
-          .eq('listing_id', widget.listingId)
-          .order('sort_order');
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
 
-      // التحقق مما إذا كان الإعلان تجارياً ونشطاً حالياً.
-      final now = DateTime.now().toUtc().toIso8601String();
+  bool get _isOwner {
+    final user = _supabase.auth.currentUser;
 
-      var isCommercial = false;
+    return user != null && user.id == _listing?['seller_id']?.toString();
+  }
 
-      try {
-        final promotion = await _supabase
-            .from('promoted_listings')
-            .select('id')
-            .eq('listing_id', widget.listingId)
-            .eq('is_active', true)
-            .lte('start_at', now)
-            .gt('end_at', now)
-            .limit(1);
+  String _timeAgo(dynamic value) {
+    final date = DateTime.tryParse(value?.toString() ?? '')?.toLocal();
 
-        isCommercial = promotion.isNotEmpty;
-      } catch (_) {
-        // إذا تعذر التحقق، نكمل تحميل الإعلان دون الشارة التجارية.
-      }
+    if (date == null) return '';
 
-      final user = _supabase.auth.currentUser;
+    final diff = DateTime.now().difference(date);
 
-      var favorite = false;
+    if (diff.inMinutes < 1) return 'الآن';
+    if (diff.inMinutes < 60) return 'قبل ${diff.inMinutes} دقيقة';
+    if (diff.inHours < 24) return 'قبل ${diff.inHours} ساعة';
+    if (diff.inDays < 30) return 'قبل ${diff.inDays} يوم';
 
-      if (user != null) {
-        final result = await _supabase
-            .from('favorites')
-            .select('listing_id')
-            .eq('user_id', user.id)
-            .eq('listing_id', widget.listingId);
+    return 'قبل ${diff.inDays ~/ 30} شهر';
+  }
 
-        favorite = result.isNotEmpty;
-      }
+  String _priceLabel(Map<String, dynamic> listing) {
+    final price = listing['price'];
 
-      if (!mounted) return;
+    final currency = listing['currency']?.toString().trim().isNotEmpty == true
+        ? listing['currency'].toString().trim()
+        : 'SDG';
 
-      setState(() {
-        _listing = Map<String, dynamic>.from(listing);
-        _images = List<Map<String, dynamic>>.from(images);
-        _favorite = favorite;
-        _isCommercial = isCommercial;
-        _loading = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-
-      setState(() {
-        _error = 'تعذر تحميل تفاصيل الإعلان.';
-        _loading = false;
-      });
+    if (listing['price_type'] == 'contact' || price == null) {
+      return 'السعر عند التواصل';
     }
+
+    final number = num.tryParse(price.toString());
+
+    if (number == null) return '$price $currency';
+
+    return '${_numberFormat.format(number)} $currency';
   }
-
-  String _formatPrice(dynamic value) {
-  if (value == null) return '';
-
-  final number = num.tryParse(value.toString());
-
-  if (number == null) {
-    return value.toString();
-  }
-
-  final hasDecimal = number % 1 != 0;
-
-  if (hasDecimal) {
-    return number.toStringAsFixed(2).replaceAllMapped(
-      RegExp(r'\B(?=(\d{3})+(?!\d))'),
-      (match) => ',',
-    );
-  }
-
-  return number
-      .toInt()
-      .toString()
-      .replaceAllMapped(
-        RegExp(r'\B(?=(\d{3})+(?!\d))'),
-        (match) => ',',
-      );
-}
-
-String _priceText() {
-  final price = _listing?['price'];
-  final currency = _listing?['currency'] ?? 'SDG';
-  final type = _listing?['price_type'];
-
-  if (type == 'contact' || price == null) {
-    return 'السعر عند التواصل';
-  }
-
-  final formattedPrice = _formatPrice(price);
-
-  if (type == 'negotiable') {
-    return '$formattedPrice $currency - قابل للتفاوض';
-  }
-
-  return '$formattedPrice $currency';
-}
 
   String _conditionText() {
     switch (_listing?['condition']) {
@@ -186,92 +118,992 @@ String _priceText() {
     }
   }
 
+  String _statusMessage(String? status) {
+    switch (status) {
+      case 'pending':
+        return 'هذا الإعلان قيد المراجعة ولا يظهر للآخرين بعد.';
+      case 'rejected':
+        return 'تم رفض هذا الإعلان من الإدارة.';
+      case 'sold':
+        return 'تم بيع هذا المنتج.';
+      case 'archived':
+        return 'هذا الإعلان مؤرشف.';
+      default:
+        return '';
+    }
+  }
+
   String _imageUrl(String path) {
     final cleanPath = path.trim();
 
-    if (cleanPath.isEmpty) {
-      return '';
-    }
+    if (cleanPath.isEmpty) return '';
 
-    if (cleanPath.startsWith('http://') ||
-        cleanPath.startsWith('https://')) {
+    if (cleanPath.startsWith('http://') || cleanPath.startsWith('https://')) {
       return cleanPath;
     }
 
-    return _supabase.storage
-        .from('listing-images')
-        .getPublicUrl(cleanPath);
+    return _supabase.storage.from('listing-images').getPublicUrl(cleanPath);
   }
 
-  Widget _buildImage(String path) {
-    final url = _imageUrl(path);
+  // تحويل الأرقام العربية (٠١٢) إلى غربية (012).
+  String _toWesternDigits(String input) {
+    const arabic = '٠١٢٣٤٥٦٧٨٩';
 
-    if (url.isEmpty) {
-      return _buildImageError('مسار الصورة فارغ');
+    final buffer = StringBuffer();
+
+    for (final char in input.split('')) {
+      final index = arabic.indexOf(char);
+      buffer.write(index == -1 ? char : index.toString());
     }
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        width: double.infinity,
-        height: double.infinity,
-        color: Theme.of(context)
-            .colorScheme
-            .surfaceContainerHighest,
-        child: Image.network(
-          url,
-          fit: BoxFit.cover,
-          width: double.infinity,
-          height: double.infinity,
-          loadingBuilder: (
-            context,
-            child,
-            loadingProgress,
-          ) {
-            if (loadingProgress == null) {
-              return child;
-            }
+    return buffer.toString();
+  }
 
-            return const Center(
-              child: CircularProgressIndicator(),
-            );
-          },
-          errorBuilder: (
-            context,
-            error,
-            stackTrace,
-          ) {
-            return _buildImageError('تعذر تحميل الصورة');
-          },
+  // رقم مناسب لواتساب: بدون + وبرمز الدولة.
+  String? _whatsappNumber(String phone) {
+    var digits = _toWesternDigits(phone).replaceAll(RegExp(r'[^0-9]'), '');
+
+    if (digits.startsWith('00')) {
+      digits = digits.substring(2);
+    } else if (digits.startsWith('0')) {
+      digits = '$_defaultCountryCode${digits.substring(1)}';
+    } else if (digits.length == 9) {
+      digits = '$_defaultCountryCode$digits';
+    }
+
+    return digits.length < 8 ? null : digits;
+  }
+
+  // =========================
+  // تحميل البيانات
+  // =========================
+  Future<void> _loadListing({bool silent = false}) async {
+    if (!silent && _error != null && mounted) {
+      setState(() {
+        _error = null;
+        _loading = true;
+      });
+    }
+
+    try {
+      final results = await Future.wait<Object?>([
+        _supabase
+            .from('listings')
+            .select(
+              'id, seller_id, category_id, title, description, price, '
+              'currency, price_type, condition, area, contact_phone, '
+              'status, created_at',
+            )
+            .eq('id', widget.listingId)
+            .single(),
+        _fetchImages(),
+        _checkCommercial(),
+        _checkFavorite(),
+      ]);
+
+      final listing = Map<String, dynamic>.from(results[0] as Map);
+
+      if (!mounted) return;
+
+      setState(() {
+        _listing = listing;
+        _images = results[1] as List<Map<String, dynamic>>;
+        _isCommercial = results[2] as bool;
+        _favorite = results[3] as bool;
+        _loading = false;
+        _error = null;
+      });
+
+      // معلومات إضافية تظهر عند وصولها دون تعطيل الصفحة.
+      _loadExtras(listing);
+    } catch (e) {
+      debugPrint('loadListing error: $e');
+
+      if (!mounted) return;
+
+      if (_listing != null) {
+        _showSnack('تعذر تحديث الإعلان');
+        return;
+      }
+
+      setState(() {
+        _error = 'تعذر تحميل تفاصيل الإعلان.';
+        _loading = false;
+      });
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchImages() async {
+    final response = await _supabase
+        .from('listing_images')
+        .select('id, image_path, sort_order')
+        .eq('listing_id', widget.listingId)
+        .order('sort_order');
+
+    return List<Map<String, dynamic>>.from(response);
+  }
+
+  // هل الإعلان تجاري ونشط حالياً؟
+  Future<bool> _checkCommercial() async {
+    try {
+      final now = DateTime.now().toUtc().toIso8601String();
+
+      final promotion = await _supabase
+          .from('promoted_listings')
+          .select('id')
+          .eq('listing_id', widget.listingId)
+          .eq('is_active', true)
+          .lte('start_at', now)
+          .gt('end_at', now)
+          .limit(1);
+
+      return promotion.isNotEmpty;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> _checkFavorite() async {
+    try {
+      final user = _supabase.auth.currentUser;
+
+      if (user == null) return false;
+
+      final result = await _supabase
+          .from('favorites')
+          .select('listing_id')
+          .eq('user_id', user.id)
+          .eq('listing_id', widget.listingId);
+
+      return result.isNotEmpty;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _loadExtras(Map<String, dynamic> listing) async {
+    final categoryId = listing['category_id'];
+    final sellerId = listing['seller_id'];
+
+    await Future.wait([
+      _loadCategoryName(categoryId),
+      _loadSeller(sellerId),
+      _loadSimilar(categoryId),
+    ]);
+  }
+
+  Future<void> _loadCategoryName(dynamic categoryId) async {
+    if (categoryId == null) return;
+
+    try {
+      final category = await _supabase
+          .from('categories')
+          .select('name')
+          .eq('id', categoryId)
+          .maybeSingle();
+
+      if (!mounted) return;
+
+      setState(() => _categoryName = category?['name']?.toString());
+    } catch (e) {
+      debugPrint('loadCategoryName error: $e');
+    }
+  }
+
+  Future<void> _loadSeller(dynamic sellerId) async {
+    if (sellerId == null) return;
+
+    try {
+      final profile = await _supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', sellerId)
+          .maybeSingle();
+
+      final name = profile?['full_name']?.toString().trim();
+
+      if (!mounted) return;
+
+      if (name != null && name.isNotEmpty) {
+        setState(() => _sellerName = name);
+      }
+    } catch (e) {
+      debugPrint('loadSellerName error: $e');
+    }
+
+    try {
+      final ads = await _supabase
+          .from('listings')
+          .select('id')
+          .eq('seller_id', sellerId)
+          .eq('status', 'approved');
+
+      if (!mounted) return;
+
+      setState(() => _sellerAdsCount = ads.length);
+    } catch (e) {
+      debugPrint('loadSellerAds error: $e');
+    }
+  }
+
+  Future<void> _loadSimilar(dynamic categoryId) async {
+    if (categoryId == null) return;
+
+    try {
+      final response = await _supabase
+          .from('listings')
+          .select('id, title, price, currency, price_type, area')
+          .eq('status', 'approved')
+          .eq('category_id', categoryId)
+          .neq('id', widget.listingId)
+          .order('created_at', ascending: false)
+          .limit(8);
+
+      final rows = List<Map<String, dynamic>>.from(response);
+
+      if (rows.isEmpty) return;
+
+      final ids = rows.map((row) => row['id']).toList();
+
+      final imagesResponse = await _supabase
+          .from('listing_images')
+          .select('listing_id, image_path, sort_order')
+          .inFilter('listing_id', ids)
+          .order('sort_order');
+
+      final covers = <dynamic, dynamic>{};
+
+      for (final image in List<Map<String, dynamic>>.from(imagesResponse)) {
+        covers.putIfAbsent(image['listing_id'], () => image['image_path']);
+      }
+
+      for (final row in rows) {
+        row['image_path'] = covers[row['id']];
+      }
+
+      if (!mounted) return;
+
+      setState(() => _similar = rows);
+    } catch (e) {
+      debugPrint('loadSimilar error: $e');
+    }
+  }
+
+  // =========================
+  // تسجيل الدخول
+  // =========================
+  Future<bool> _ensureSignedIn() async {
+    if (_supabase.auth.currentUser != null) return true;
+
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => const AuthScreen()),
+    );
+
+    if (!mounted) return false;
+
+    if (result == true && _supabase.auth.currentUser != null) {
+      final favorite = await _checkFavorite();
+
+      if (!mounted) return false;
+
+      setState(() => _favorite = favorite);
+
+      return true;
+    }
+
+    return false;
+  }
+
+  // =========================
+  // المفضلة
+  // =========================
+  Future<void> _toggleFavorite() async {
+    if (_favoriteBusy) return;
+
+    if (!await _ensureSignedIn()) return;
+
+    final user = _supabase.auth.currentUser;
+
+    if (user == null) return;
+
+    final wasFavorite = _favorite;
+
+    // تحديث فوري للواجهة ثم مزامنة مع الخادم.
+    setState(() {
+      _favorite = !wasFavorite;
+      _favoriteBusy = true;
+    });
+
+    try {
+      if (wasFavorite) {
+        await _supabase
+            .from('favorites')
+            .delete()
+            .eq('user_id', user.id)
+            .eq('listing_id', widget.listingId);
+      } else {
+        await _supabase.from('favorites').insert({
+          'user_id': user.id,
+          'listing_id': widget.listingId,
+        });
+      }
+    } catch (e) {
+      debugPrint('toggleFavorite error: $e');
+
+      if (mounted) {
+        setState(() => _favorite = wasFavorite);
+        _showSnack('تعذر تحديث المفضلة');
+      }
+    }
+
+    if (mounted) setState(() => _favoriteBusy = false);
+  }
+
+  // =========================
+  // التواصل والمشاركة
+  // =========================
+  Future<void> _callSeller() async {
+    final phone = _listing?['contact_phone']?.toString().trim();
+
+    if (phone == null || phone.isEmpty) {
+      _showSnack('رقم التواصل غير متوفر');
+      return;
+    }
+
+    final cleaned = _toWesternDigits(phone).replaceAll(RegExp(r'[^0-9+]'), '');
+
+    try {
+      final launched = await launchUrl(Uri(scheme: 'tel', path: cleaned));
+
+      if (!launched) _showSnack('تعذر فتح تطبيق الاتصال');
+    } catch (_) {
+      _showSnack('تعذر فتح تطبيق الاتصال');
+    }
+  }
+
+  Future<void> _openWhatsApp() async {
+    final phone = _listing?['contact_phone']?.toString().trim();
+
+    if (phone == null || phone.isEmpty) {
+      _showSnack('رقم التواصل غير متوفر');
+      return;
+    }
+
+    final number = _whatsappNumber(phone);
+
+    if (number == null) {
+      _showSnack('رقم التواصل غير صالح لواتساب');
+      return;
+    }
+
+    final title = _listing?['title']?.toString().trim() ?? '';
+
+    final message = title.isEmpty
+        ? 'مرحباً، رأيت إعلانك في تطبيق دلالة شبشة.'
+        : 'مرحباً، رأيت إعلانك "$title" في تطبيق دلالة شبشة. هل ما زال متاحاً؟';
+
+    final uri = Uri(
+      scheme: 'https',
+      host: 'wa.me',
+      path: '/$number',
+      queryParameters: {'text': message},
+    );
+
+    try {
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+
+      if (!launched) _showSnack('تعذر فتح واتساب');
+    } catch (_) {
+      _showSnack('تعذر فتح واتساب');
+    }
+  }
+
+  // مشاركة الإعلان عبر واتساب (اختيار جهة الاتصال داخل واتساب).
+  Future<void> _shareListing() async {
+    final listing = _listing;
+
+    if (listing == null) return;
+
+    final title = listing['title']?.toString().trim() ?? '';
+    final area = listing['area']?.toString().trim() ?? '';
+
+    final text = [
+      if (title.isNotEmpty) title,
+      _priceLabel(listing),
+      if (area.isNotEmpty) 'المنطقة: $area',
+      '',
+      'شاهد الإعلان في تطبيق دلالة شبشة',
+    ].join('\n');
+
+    final uri = Uri(
+      scheme: 'https',
+      host: 'wa.me',
+      path: '/',
+      queryParameters: {'text': text},
+    );
+
+    try {
+      final launched = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+
+      if (!launched) _showSnack('تعذر فتح واتساب للمشاركة');
+    } catch (_) {
+      _showSnack('تعذر فتح واتساب للمشاركة');
+    }
+  }
+
+  // =========================
+  // الإبلاغ
+  // =========================
+  Future<void> _reportListing() async {
+    if (!await _ensureSignedIn()) return;
+
+    final user = _supabase.auth.currentUser;
+
+    if (user == null || !mounted) return;
+
+    final reason = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => const _ReportSheet(),
+    );
+
+    if (reason == null || reason.trim().isEmpty) return;
+
+    try {
+      await _supabase.from('reports').insert({
+        'reporter_id': user.id,
+        'listing_id': widget.listingId,
+        'reason': reason.trim(),
+      });
+
+      _showSnack('تم إرسال البلاغ للمراجعة، شكراً لك');
+    } catch (e) {
+      debugPrint('report error: $e');
+      _showSnack('تعذر إرسال البلاغ');
+    }
+  }
+
+  // =========================
+  // الصور
+  // =========================
+  List<String> get _imageUrls {
+    return _images
+        .map((image) => _imageUrl(image['image_path']?.toString() ?? ''))
+        .where((url) => url.isNotEmpty)
+        .toList();
+  }
+
+  void _openFullScreenGallery(int index) {
+    final urls = _imageUrls;
+
+    if (urls.isEmpty) return;
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => _FullScreenGallery(
+          urls: urls,
+          initialIndex: index.clamp(0, urls.length - 1),
         ),
       ),
     );
   }
 
-  Widget _buildImageError(String message) {
+  Widget _imagePlaceholder({
+    IconData icon = Icons.image_outlined,
+    String? message,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Container(
       width: double.infinity,
       height: double.infinity,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        color: Theme.of(context)
-            .colorScheme
-            .surfaceContainerHighest,
-      ),
+      color: colorScheme.surfaceContainerHighest,
       child: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(
-                Icons.broken_image_outlined,
-                size: 60,
-              ),
-              const SizedBox(height: 10),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 56, color: colorScheme.onSurfaceVariant),
+            if (message != null) ...[
+              const SizedBox(height: 8),
               Text(
                 message,
-                textAlign: TextAlign.center,
+                style: TextStyle(color: colorScheme.onSurfaceVariant),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _networkImage(String url, {int memCacheWidth = 900}) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return CachedNetworkImage(
+      imageUrl: url,
+      fit: BoxFit.cover,
+      width: double.infinity,
+      height: double.infinity,
+      memCacheWidth: memCacheWidth,
+      placeholder: (_, __) => Container(
+        color: colorScheme.surfaceContainerHighest,
+        child: const Center(
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      ),
+      errorWidget: (_, __, ___) => _imagePlaceholder(
+        icon: Icons.broken_image_outlined,
+        message: 'تعذر تحميل الصورة',
+      ),
+    );
+  }
+
+  Widget _buildGallery() {
+    final colorScheme = Theme.of(context).colorScheme;
+    final urls = _imageUrls;
+
+    return SizedBox(
+      height: 300,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: urls.isEmpty
+                ? _imagePlaceholder(message: 'لا توجد صور لهذا الإعلان')
+                : PageView.builder(
+                    controller: _pageController,
+                    itemCount: urls.length,
+                    onPageChanged: (index) {
+                      setState(() => _currentImageIndex = index);
+                    },
+                    itemBuilder: (context, index) {
+                      return GestureDetector(
+                        onTap: () => _openFullScreenGallery(index),
+                        child: _networkImage(urls[index]),
+                      );
+                    },
+                  ),
+          ),
+
+          if (_isCommercial)
+            Positioned(
+              top: 12,
+              right: 12,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
+                decoration: BoxDecoration(
+                  color: colorScheme.primary,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.local_offer,
+                      size: 14,
+                      color: colorScheme.onPrimary,
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      'إعلان تجاري',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: colorScheme.onPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+          if (urls.length > 1) ...[
+            Positioned(
+              bottom: 12,
+              left: 0,
+              right: 0,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(urls.length, (index) {
+                  final active = index == _currentImageIndex;
+
+                  return AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    margin: const EdgeInsets.symmetric(horizontal: 3),
+                    width: active ? 18 : 7,
+                    height: 7,
+                    decoration: BoxDecoration(
+                      color: active ? Colors.white : Colors.white54,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  );
+                }),
+              ),
+            ),
+
+            Positioned(
+              bottom: 10,
+              left: 12,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 9,
+                  vertical: 3,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '${_currentImageIndex + 1} / ${urls.length}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // =========================
+  // مكوّنات الصفحة
+  // =========================
+  Widget _buildChip(IconData icon, String text) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: colorScheme.onSurfaceVariant),
+          const SizedBox(width: 5),
+          Text(
+            text,
+            style: const TextStyle(fontSize: 12.5),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCard({required Widget child}) {
+    return Card(
+      margin: EdgeInsets.zero,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: Theme.of(context).colorScheme.outlineVariant,
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: child,
+      ),
+    );
+  }
+
+  Widget _buildStatusBanner(String? status) {
+    final message = _statusMessage(status);
+
+    if (status == 'approved' || status == null || message.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final colorScheme = Theme.of(context).colorScheme;
+    final isRejected = status == 'rejected';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isRejected
+            ? colorScheme.errorContainer
+            : colorScheme.tertiaryContainer,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.info_outline,
+            color: isRejected
+                ? colorScheme.onErrorContainer
+                : colorScheme.onTertiaryContainer,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: isRejected
+                    ? colorScheme.onErrorContainer
+                    : colorScheme.onTertiaryContainer,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPriceBox(Map<String, dynamic> listing) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isContact =
+        listing['price_type'] == 'contact' || listing['price'] == null;
+    final isNegotiable = listing['price_type'] == 'negotiable';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colorScheme.primaryContainer,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.sell_outlined, color: colorScheme.primary, size: 26),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              _priceLabel(listing),
+              style: TextStyle(
+                fontSize: isContact ? 19 : 23,
+                fontWeight: FontWeight.w800,
+                color: colorScheme.onPrimaryContainer,
+              ),
+            ),
+          ),
+          if (isNegotiable)
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: 4,
+              ),
+              decoration: BoxDecoration(
+                color: colorScheme.primary,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                'قابل للتفاوض',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: colorScheme.onPrimary,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDescription(String description) {
+    final isLong = description.length > 220;
+
+    return _buildCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.description_outlined),
+              SizedBox(width: 8),
+              Text(
+                'وصف الإعلان',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          SelectableText(
+            description.isEmpty ? 'لا يوجد وصف لهذا الإعلان.' : description,
+            maxLines: (_descriptionExpanded || !isLong) ? null : 6,
+            style: const TextStyle(fontSize: 15.5, height: 1.8),
+          ),
+          if (isLong)
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: TextButton(
+                onPressed: () {
+                  setState(() => _descriptionExpanded = !_descriptionExpanded);
+                },
+                child: Text(
+                  _descriptionExpanded ? 'عرض أقل' : 'عرض المزيد',
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSellerCard() {
+    if (_sellerName == null && _sellerAdsCount == null) {
+      return const SizedBox.shrink();
+    }
+
+    final colorScheme = Theme.of(context).colorScheme;
+    final name = _sellerName ?? 'البائع';
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: _buildCard(
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 24,
+              backgroundColor: colorScheme.primaryContainer,
+              child: Text(
+                String.fromCharCode(name.runes.first),
+                style: TextStyle(
+                  fontSize: 19,
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.onPrimaryContainer,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  if (_sellerAdsCount != null)
+                    Text(
+                      '$_sellerAdsCount إعلان نشط',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSafetyTips() {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: colorScheme.secondaryContainer.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.shield_outlined, color: colorScheme.secondary),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Text(
+              'نصائح للأمان: عاين المنتج قبل الدفع، وقابل البائع في مكان '
+              'عام، ولا تحوّل أي مبلغ مقدماً لشخص لا تعرفه.',
+              style: TextStyle(fontSize: 13, height: 1.6),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSimilarCard(Map<String, dynamic> listing) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    final id = listing['id'];
+    final path = listing['image_path']?.toString() ?? '';
+    final url = path.isEmpty ? '' : _imageUrl(path);
+    final title = listing['title']?.toString().trim() ?? '';
+
+    return SizedBox(
+      width: 150,
+      child: Card(
+        margin: EdgeInsets.zero,
+        elevation: 0,
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: BorderSide(color: colorScheme.outlineVariant),
+        ),
+        child: InkWell(
+          onTap: id is! int
+              ? null
+              : () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ListingDetailsScreen(listingId: id),
+                    ),
+                  );
+                },
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SizedBox(
+                height: 95,
+                child: url.isEmpty
+                    ? _imagePlaceholder()
+                    : _networkImage(url, memCacheWidth: 350),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title.isEmpty ? 'إعلان بدون عنوان' : title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        height: 1.25,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _priceLabel(listing),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: colorScheme.primary,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -280,259 +1112,107 @@ String _priceText() {
     );
   }
 
-  Future<void> _toggleFavorite() async {
-    final user = _supabase.auth.currentUser;
+  Widget _buildSimilarSection() {
+    if (_similar.isEmpty) return const SizedBox.shrink();
 
-    if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('يجب تسجيل الدخول أولاً'),
-        ),
-      );
-      return;
-    }
-
-    try {
-      if (_favorite) {
-        await _supabase
-            .from('favorites')
-            .delete()
-            .eq('user_id', user.id)
-            .eq('listing_id', widget.listingId);
-
-        if (!mounted) return;
-
-        setState(() => _favorite = false);
-      } else {
-        await _supabase.from('favorites').insert({
-          'user_id': user.id,
-          'listing_id': widget.listingId,
-        });
-
-        if (!mounted) return;
-
-        setState(() => _favorite = true);
-      }
-    } catch (e) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('تعذر تحديث المفضلة'),
-        ),
-      );
-    }
-  }
-
-  Future<void> _callSeller() async {
-    final phone = _listing?['contact_phone']?.toString().trim();
-
-    if (phone == null || phone.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('رقم التواصل غير متوفر'),
-        ),
-      );
-      return;
-    }
-
-    final uri = Uri(
-      scheme: 'tel',
-      path: phone,
+    return Padding(
+      padding: const EdgeInsets.only(top: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text(
+            'إعلانات مشابهة',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 185,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: _similar.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 10),
+              itemBuilder: (_, index) => _buildSimilarCard(_similar[index]),
+            ),
+          ),
+        ],
+      ),
     );
-
-    try {
-      final launched = await launchUrl(uri);
-
-      if (!launched && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('تعذر فتح تطبيق الاتصال'),
-          ),
-        );
-      }
-    } catch (e) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('تعذر فتح تطبيق الاتصال'),
-        ),
-      );
-    }
   }
 
-  Future<void> _openWhatsApp() async {
-    final phone = _listing?['contact_phone']?.toString().trim();
+  // شريط التواصل الثابت أسفل الشاشة.
+  Widget? _buildContactBar() {
+    final listing = _listing;
 
-    if (phone == null || phone.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('رقم التواصل غير متوفر'),
-        ),
-      );
-      return;
-    }
+    if (listing == null) return null;
+    if (_isOwner) return null;
+    if (listing['status'] != 'approved') return null;
 
-    var whatsappPhone = phone.replaceAll(RegExp(r'[^0-9+]'), '');
+    final colorScheme = Theme.of(context).colorScheme;
 
-    if (whatsappPhone.startsWith('0')) {
-      whatsappPhone = '249${whatsappPhone.substring(1)}';
-    }
-
-    whatsappPhone = whatsappPhone.replaceFirst('+', '');
-
-    final uri = Uri.parse('https://wa.me/$whatsappPhone');
-
-    try {
-      final launched = await launchUrl(
-        uri,
-        mode: LaunchMode.externalApplication,
-      );
-
-      if (!launched && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('تعذر فتح WhatsApp'),
+    return SafeArea(
+      top: false,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+        decoration: BoxDecoration(
+          color: colorScheme.surface,
+          border: Border(
+            top: BorderSide(color: colorScheme.outlineVariant, width: 0.6),
           ),
-        );
-      }
-    } catch (e) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('تعذر فتح WhatsApp'),
         ),
-      );
-    }
-  }
-
-  Future<void> _reportListing() async {
-    final user = _supabase.auth.currentUser;
-
-    if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('يجب تسجيل الدخول أولاً'),
-        ),
-      );
-      return;
-    }
-
-    final reasonController = TextEditingController();
-
-    final submit = await showDialog<bool>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('الإبلاغ عن الإعلان'),
-          content: TextField(
-            controller: reasonController,
-            maxLines: 3,
-            decoration: const InputDecoration(
-              hintText: 'اكتب سبب الإبلاغ',
-              border: OutlineInputBorder(),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('إلغاء'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('إرسال'),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (submit != true) {
-      reasonController.dispose();
-      return;
-    }
-
-    final reason = reasonController.text.trim();
-    reasonController.dispose();
-
-    if (reason.isEmpty) return;
-
-    try {
-      await _supabase.from('reports').insert({
-        'reporter_id': user.id,
-        'listing_id': widget.listingId,
-        'reason': reason,
-      });
-
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('تم إرسال البلاغ للمراجعة'),
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('تعذر إرسال البلاغ'),
-        ),
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('تفاصيل الإعلان'),
-          actions: [
-            if (!_loading && _listing != null)
-              IconButton(
-                tooltip: 'المفضلة',
-                onPressed: _toggleFavorite,
-                icon: Icon(
-                  _favorite
-                      ? Icons.favorite
-                      : Icons.favorite_border,
+        child: Row(
+          children: [
+            Expanded(
+              child: SizedBox(
+                height: 50,
+                child: FilledButton.icon(
+                  onPressed: _callSeller,
+                  icon: const Icon(Icons.phone),
+                  label: const Text(
+                    'اتصال',
+                    style: TextStyle(fontSize: 16),
+                  ),
                 ),
               ),
-            if (!_loading && _listing != null)
-              IconButton(
-                tooltip: 'إبلاغ',
-                onPressed: _reportListing,
-                icon: const Icon(Icons.flag_outlined),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: SizedBox(
+                height: 50,
+                child: FilledButton.icon(
+                  onPressed: _openWhatsApp,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: _whatsappGreen,
+                    foregroundColor: Colors.white,
+                  ),
+                  icon: const Icon(Icons.chat),
+                  label: const Text(
+                    'واتساب',
+                    style: TextStyle(fontSize: 16),
+                  ),
+                ),
               ),
+            ),
           ],
         ),
-        body: _buildBody(),
       ),
     );
   }
 
   Widget _buildBody() {
     if (_loading) {
-      return const Center(
-        child: CircularProgressIndicator(),
-      );
+      return const Center(child: CircularProgressIndicator());
     }
 
-    if (_error != null || _listing == null) {
+    final listing = _listing;
+
+    if (_error != null || listing == null) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
-                Icons.error_outline,
-                size: 56,
-              ),
+              const Icon(Icons.error_outline, size: 56),
               const SizedBox(height: 12),
               Text(
                 _error ?? 'الإعلان غير موجود',
@@ -549,337 +1229,358 @@ String _priceText() {
       );
     }
 
-    final title = _listing!['title']?.toString() ?? '';
-    final description =
-        _listing!['description']?.toString() ?? '';
-    final area = _listing!['area']?.toString() ?? '';
-    final createdAt = _formatDate(_listing!['created_at']);
+    final title = listing['title']?.toString().trim() ?? '';
+    final description = listing['description']?.toString().trim() ?? '';
+    final area = listing['area']?.toString().trim() ?? '';
+    final timeAgo = _timeAgo(listing['created_at']);
 
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        // صور الإعلان
-        if (_images.isNotEmpty)
-          Column(
-            children: [
-              SizedBox(
-                height: 270,
-                child: PageView.builder(
-                  itemCount: _images.length,
-                  onPageChanged: (index) {
-                    setState(() {
-                      _currentImageIndex = index;
-                    });
-                  },
-                  itemBuilder: (context, index) {
-                    final path =
-                        _images[index]['image_path']?.toString() ?? '';
+    return RefreshIndicator(
+      onRefresh: () => _loadListing(silent: true),
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: EdgeInsets.zero,
+        children: [
+          _buildGallery(),
 
-                    return _buildImage(path);
-                  },
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildStatusBanner(listing['status']?.toString()),
+
+                if (_isOwner)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context)
+                          .colorScheme
+                          .primaryContainer
+                          .withValues(alpha: 0.6),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.person_pin_outlined),
+                        SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'هذا إعلانك. يمكنك إدارته من صفحة "إعلاناتي".',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                Text(
+                  title.isEmpty ? 'إعلان بدون عنوان' : title,
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    height: 1.4,
+                  ),
                 ),
-              ),
-              if (_images.length > 1) ...[
+
                 const SizedBox(height: 10),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
                   children: [
-                    const Icon(
-                      Icons.photo_library_outlined,
-                      size: 18,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      '${_currentImageIndex + 1} من ${_images.length}',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                    if (area.isNotEmpty)
+                      _buildChip(Icons.location_on_outlined, area),
+                    _buildChip(Icons.inventory_2_outlined, _conditionText()),
+                    if (_categoryName != null)
+                      _buildChip(Icons.category_outlined, _categoryName!),
+                    if (timeAgo.isNotEmpty)
+                      _buildChip(Icons.schedule, timeAgo),
                   ],
                 ),
+
+                const SizedBox(height: 14),
+
+                _buildPriceBox(listing),
+
+                const SizedBox(height: 12),
+
+                _buildDescription(description),
+
+                _buildSellerCard(),
+
+                _buildSafetyTips(),
+
+                _buildSimilarSection(),
+
+                const SizedBox(height: 8),
               ],
-            ],
-          )
-        else
-          Container(
-            height: 220,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(18),
-              color: Theme.of(context)
-                  .colorScheme
-                  .surfaceContainerHighest,
-            ),
-            child: const Center(
-              child: Icon(
-                Icons.image_outlined,
-                size: 80,
-              ),
             ),
           ),
+        ],
+      ),
+    );
+  }
 
-        const SizedBox(height: 12),
+  @override
+  Widget build(BuildContext context) {
+    final ready = !_loading && _listing != null;
 
-        // الشارة التجارية
-        if (_isCommercial)
-          Align(
-            alignment: Alignment.centerRight,
-            child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 6,
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('تفاصيل الإعلان'),
+          actions: [
+            if (ready) ...[
+              IconButton(
+                tooltip: _favorite ? 'إزالة من المفضلة' : 'إضافة للمفضلة',
+                onPressed: _toggleFavorite,
+                icon: Icon(
+                  _favorite ? Icons.favorite : Icons.favorite_border,
+                  color: _favorite ? Colors.red : null,
+                ),
               ),
-              decoration: BoxDecoration(
-                color: Colors.orange.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(20),
+              IconButton(
+                tooltip: 'مشاركة',
+                onPressed: _shareListing,
+                icon: const Icon(Icons.share_outlined),
               ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.campaign_outlined,
-                    size: 18,
-                    color: Colors.deepOrange,
-                  ),
-                  SizedBox(width: 6),
-                  Text(
-                    'إعلان تجاري',
-                    style: TextStyle(
-                      color: Colors.deepOrange,
-                      fontWeight: FontWeight.bold,
+              PopupMenuButton<String>(
+                onSelected: (value) {
+                  if (value == 'report') _reportListing();
+                },
+                itemBuilder: (_) => const [
+                  PopupMenuItem(
+                    value: 'report',
+                    child: Row(
+                      children: [
+                        Icon(Icons.flag_outlined),
+                        SizedBox(width: 8),
+                        Text('الإبلاغ عن الإعلان'),
+                      ],
                     ),
                   ),
                 ],
               ),
-            ),
-          ),
-
-        const SizedBox(height: 10),
-
-        // عنوان الإعلان
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 25,
-            fontWeight: FontWeight.bold,
-            height: 1.4,
-          ),
-        ),
-
-        const SizedBox(height: 12),
-
-        // السعر
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.primaryContainer,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                Icons.sell_outlined,
-                color: Theme.of(context).colorScheme.primary,
-                size: 26,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  _priceText(),
-                  style: TextStyle(
-                    fontSize: 21,
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                ),
-              ),
             ],
-          ),
-        ),
-
-        const SizedBox(height: 12),
-
-        // معلومات الإعلان
-        Card(
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: BorderSide(
-              color: Theme.of(context).colorScheme.outlineVariant,
-            ),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Text(
-                  'معلومات الإعلان',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                _InfoRow(
-                  icon: Icons.calendar_month_outlined,
-                  title: 'تاريخ الإعلان',
-                  value: createdAt,
-                ),
-
-                if (area.isNotEmpty)
-                  _InfoRow(
-                    icon: Icons.location_on_outlined,
-                    title: 'المنطقة',
-                    value: area,
-                  ),
-
-                _InfoRow(
-                  icon: Icons.inventory_2_outlined,
-                  title: 'الحالة',
-                  value: _conditionText(),
-                ),
-              ],
-            ),
-          ),
-        ),
-
-        const SizedBox(height: 12),
-
-        // وصف الإعلان
-        Card(
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: BorderSide(
-              color: Theme.of(context).colorScheme.outlineVariant,
-            ),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Row(
-                  children: [
-                    Icon(Icons.description_outlined),
-                    SizedBox(width: 8),
-                    Text(
-                      'وصف الإعلان',
-                      style: TextStyle(
-                        fontSize: 19,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  description.isEmpty
-                      ? 'لا يوجد وصف لهذا الإعلان.'
-                      : description,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    height: 1.8,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-
-        const SizedBox(height: 12),
-
-        // أزرار التواصل
-        Row(
-          children: [
-            Expanded(
-              child: SizedBox(
-                height: 52,
-                child: FilledButton.icon(
-                  onPressed: _callSeller,
-                  icon: const Icon(Icons.phone),
-                  label: const Text(
-                    'اتصال',
-                    style: TextStyle(fontSize: 17),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: SizedBox(
-                height: 52,
-                child: OutlinedButton.icon(
-                  onPressed: _openWhatsApp,
-                  icon: const Icon(Icons.chat),
-                  label: const Text(
-                    'WhatsApp',
-                    style: TextStyle(fontSize: 16),
-                  ),
-                ),
-              ),
-            ),
           ],
         ),
-
-        const SizedBox(height: 12),
-
-        // المفضلة
-        OutlinedButton.icon(
-          onPressed: _toggleFavorite,
-          icon: Icon(
-            _favorite ? Icons.favorite : Icons.favorite_border,
-          ),
-          label: Text(
-            _favorite ? 'إزالة من المفضلة' : 'إضافة إلى المفضلة',
-          ),
-        ),
-
-        const SizedBox(height: 8),
-
-        // الإبلاغ
-        TextButton.icon(
-          onPressed: _reportListing,
-          icon: const Icon(Icons.flag_outlined),
-          label: const Text('الإبلاغ عن هذا الإعلان'),
-        ),
-
-        const SizedBox(height: 12),
-      ],
+        body: _buildBody(),
+        bottomNavigationBar: _buildContactBar(),
+      ),
     );
   }
 }
 
-class _InfoRow extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String value;
+// =========================
+// عرض الصور بملء الشاشة مع التكبير
+// =========================
+class _FullScreenGallery extends StatefulWidget {
+  final List<String> urls;
+  final int initialIndex;
 
-  const _InfoRow({
-    required this.icon,
-    required this.title,
-    required this.value,
+  const _FullScreenGallery({
+    required this.urls,
+    required this.initialIndex,
   });
 
   @override
+  State<_FullScreenGallery> createState() => _FullScreenGalleryState();
+}
+
+class _FullScreenGalleryState extends State<_FullScreenGallery> {
+  late final PageController _controller =
+      PageController(initialPage: widget.initialIndex);
+
+  late int _index = widget.initialIndex;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        children: [
-          Icon(icon, size: 22),
-          const SizedBox(width: 8),
-          Text(
-            '$title: ',
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-            ),
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        appBar: AppBar(
+          backgroundColor: Colors.black,
+          foregroundColor: Colors.white,
+          title: Text('${_index + 1} من ${widget.urls.length}'),
+        ),
+        body: PageView.builder(
+          controller: _controller,
+          itemCount: widget.urls.length,
+          onPageChanged: (index) => setState(() => _index = index),
+          itemBuilder: (context, index) {
+            return InteractiveViewer(
+              minScale: 1,
+              maxScale: 4,
+              child: Center(
+                child: CachedNetworkImage(
+                  imageUrl: widget.urls[index],
+                  fit: BoxFit.contain,
+                  placeholder: (_, __) => const Center(
+                    child: CircularProgressIndicator(color: Colors.white),
+                  ),
+                  errorWidget: (_, __, ___) => const Icon(
+                    Icons.broken_image_outlined,
+                    color: Colors.white54,
+                    size: 60,
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+// =========================
+// نافذة الإبلاغ
+// =========================
+class _ReportSheet extends StatefulWidget {
+  const _ReportSheet();
+
+  @override
+  State<_ReportSheet> createState() => _ReportSheetState();
+}
+
+class _ReportSheetState extends State<_ReportSheet> {
+  static const _otherReason = 'سبب آخر';
+
+  static const _reasons = [
+    'احتيال أو نصب',
+    'السعر غير حقيقي',
+    'محتوى مخالف أو غير لائق',
+    'الإعلان مكرر',
+    'تم بيع المنتج',
+    _otherReason,
+  ];
+
+  final _noteController = TextEditingController();
+
+  String? _selected;
+  String? _error;
+
+  @override
+  void dispose() {
+    _noteController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final note = _noteController.text.trim();
+
+    if (_selected == null) {
+      setState(() => _error = 'اختر سبب البلاغ');
+      return;
+    }
+
+    if (_selected == _otherReason && note.isEmpty) {
+      setState(() => _error = 'اكتب تفاصيل السبب');
+      return;
+    }
+
+    Navigator.pop(
+      context,
+      note.isEmpty ? _selected : '$_selected: $note',
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'الإبلاغ عن الإعلان',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 10),
+
+              ..._reasons.map((reason) {
+                final selected = _selected == reason;
+
+                return InkWell(
+                  borderRadius: BorderRadius.circular(10),
+                  onTap: () {
+                    setState(() {
+                      _selected = reason;
+                      _error = null;
+                    });
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    child: Row(
+                      children: [
+                        Icon(
+                          selected
+                              ? Icons.radio_button_checked
+                              : Icons.radio_button_unchecked,
+                          color: selected
+                              ? Theme.of(context).colorScheme.primary
+                              : null,
+                        ),
+                        const SizedBox(width: 10),
+                        Text(reason),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+
+              const SizedBox(height: 6),
+
+              TextField(
+                controller: _noteController,
+                maxLines: 3,
+                maxLength: 300,
+                onChanged: (_) {
+                  if (_error != null) setState(() => _error = null);
+                },
+                decoration: const InputDecoration(
+                  hintText: 'تفاصيل إضافية (اختياري)',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+
+              if (_error != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    _error!,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+                ),
+
+              const SizedBox(height: 6),
+
+              FilledButton(
+                onPressed: _submit,
+                child: const Text('إرسال البلاغ'),
+              ),
+            ],
           ),
-          Expanded(
-            child: Text(value),
-          ),
-        ],
+        ),
       ),
     );
   }
