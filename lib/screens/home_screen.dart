@@ -1726,21 +1726,32 @@ final latestListings = _listings
                 ? 'مرحباً بك'
                 : 'مستخدم دلالة شبشة';
 
-    // عند التسجيل بالبريد يظهر البريد.
-    // وإذا لم يوجد بريد نعرض رقم الهاتف من metadata.
+    // رقم الهاتف الحقيقي لحسابات الهاتف.
+    final authPhone =
+        user?.phone?.trim() ?? '';
+
+    // البريد الإلكتروني لحسابات البريد.
     final email =
         user?.email?.trim() ?? '';
 
-    final phone =
+    // رقم الهاتف الذي حفظناه في metadata
+    // عند إنشاء الحساب، كخيار احتياطي.
+    final metadataPhone =
         user?.userMetadata?['phone']
                 ?.toString()
                 .trim() ??
             '';
 
-    final contact = email.isNotEmpty
-        ? email
-        : phone.isNotEmpty
-            ? phone
+    // إذا كان الحساب مرتبطاً برقم هاتف،
+    // نعرض الهاتف أولاً ولا نعرض البريد التلقائي.
+    final phone = authPhone.isNotEmpty
+        ? authPhone
+        : metadataPhone;
+
+    final contact = phone.isNotEmpty
+        ? phone
+        : email.isNotEmpty
+            ? email
             : user == null
                 ? 'تصفح الإعلانات بسهولة'
                 : 'حسابك في دلالة شبشة';
@@ -1781,7 +1792,7 @@ final latestListings = _listings
 
           const SizedBox(width: 12),
 
-          // الاسم + البريد/الهاتف
+          // الاسم + الهاتف أو البريد
           Expanded(
             child: Column(
               crossAxisAlignment:
@@ -1986,7 +1997,7 @@ final latestListings = _listings
         // القائمة الجانبية
         // =========================
         drawer: Drawer(
-          width: 285,
+          width: 240,
           elevation: 3,
           shape: const RoundedRectangleBorder(
             borderRadius: BorderRadius.only(
