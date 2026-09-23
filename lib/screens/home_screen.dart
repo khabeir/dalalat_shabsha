@@ -1,6 +1,23 @@
+// =============================================================
+// الصفحة الرئيسية لتطبيق دلالة شبشة (نسخة محسّنة ومدموجة)
+//
+// الحزم المطلوبة في pubspec.yaml:
+//   intl: ^0.19.0
+//   cached_network_image: ^3.3.1
+//
+// يعتمد الكود على الافتراضات التالية، عدّلها إن اختلفت عندك:
+//   1) جدول المفضلة: أسماؤه في الثوابت _favoritesTable وما بعده.
+//   2) علاقة (foreign key) بين listing_images.listing_id و listings.id.
+//      إن لم توجد يعمل الكود تلقائياً بالطريقة القديمة (طلب منفصل للصور).
+//   3) عمود icon في جدول categories (اختياري): مفاتيح مثل car, home, phone.
+//      إن كان فارغاً تُستخدم الأيقونة حسب اسم القسم كما كان سابقاً.
+// =============================================================
+
 import 'dart:async';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'add_listing_screen.dart';
@@ -18,43 +35,132 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
-	  final _supabase = Supabase.instance.client;
-  final _searchController = TextEditingController();
+class _HomeScreenState extends State<HomeScreen>
+    with WidgetsBindingObserver {
+  // =========================
+  // ثوابت
+  // =========================
+  static const _homePageSize = 60;
+  static const _categoryPageSize = 30;
+  static const _searchPoolSize = 500;
 
+  static const _cardWidth = 158.0;
+  static const _cardHeight = 225.0;
+
+  static const _listingColumns =
+      'id, title, description, price, currency, price_type, '
+      'area, category_id, status, created_at';
+
+  // جدول المفضلة (عدّل الأسماء حسب مشروعك).
+  static const _favoritesTable = 'favorites';
+  static const _favUserColumn = 'user_id';
+  static const _favListingColumn = 'listing_id';
+
+  static final _numberFormat = NumberFormat('#,##0.##', 'en');
+
+  final _supabase = Supabase.instance.client;
+  final _searchController = TextEditingController();
+  final _scrollController = ScrollController();
+
+  // =========================
+  // الحالة
+  // =========================
   List<Map<String, dynamic>> _categories = [];
   List<Map<String, dynamic>> _listings = [];
   List<Map<String, dynamic>> _promotedListings = [];
+  List<Map<String, dynamic>>? _searchPool;
+  Set<int> _favoriteIds = {};
 
-  bool _loading = true;
+  bool _loading = true; // أول تحميل للصفحة فقط
+  bool _listingsLoading = false; // عند تغيير القسم
+  bool _loadingMore = false;
+  bool _searchPoolLoading = false;
+  bool _hasMore = true;
   bool _isAdmin = false;
+
   String? _error;
   String _searchQuery = '';
   int? _selectedCategoryId;
+  int _page = 0;
+  int _listingsRequestId = 0;
 
+  Timer? _debounce;
   Timer? _promotedRefreshTimer;
 
+  bool get _isSearching => _searchQuery.trim().isNotEmpty;
+  bool get _isFiltering => _isSearching || _selectedCategoryId != null;
+
+  // =========================
+  // الدورة الحياتية
+  // =========================
   @override
-void initState() {
-  super.initState();
+  void initState() {
+    super.initState();
 
-  _loadData();
-  _checkAdminStatus();
+    WidgetsBinding.instance.addObserver(this);
+    _scrollController.addListener(_onScroll);
 
-  // تحديث حالة الإعلانات التجارية كل دقيقة.
-  _promotedRefreshTimer = Timer.periodic(
-    const Duration(minutes: 1),
-    (_) => _loadPromotedListings(),
-  );
-}
+    _loadAll(showSpinner: false);
+    _checkAdminStatus();
+
+    // تحديث الإعلانات التجارية كل 5 دقائق (وتتوقف مع dispose).
+    _promotedRefreshTimer = Timer.periodic(
+      const Duration(minutes: 5),
+      (_) => _loadPromotedListings(),
+    );
+  }
 
   @override
-void dispose() {
-  _promotedRefreshTimer?.cancel();
-  _searchController.dispose();
-  super.dispose();
-}
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _promotedRefreshTimer?.cancel();
+    _debounce?.cancel();
+    _searchController.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
 
+  // عند رجوع المستخدم للتطبيق نحدّث الإعلانات التجارية فقط.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _loadPromotedListings();
+    }
+  }
+
+  // التحميل التلقائي للمزيد عند نهاية القائمة (داخل القسم فقط).
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    if (_selectedCategoryId == null || _isSearching) return;
+
+    final position = _scrollController.position;
+
+    if (position.pixels >= position.maxScrollExtent - 400) {
+      _loadListings(reset: false);
+    }
+  }
+
+  void _scrollToTop() {
+    if (!_scrollController.hasClients) return;
+
+    _scrollController.animateTo(
+      0,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOut,
+    );
+  }
+
+  void _showSnack(String message) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  // =========================
+  // البحث
+  // =========================
   String _normalizeSearchText(String text) {
     return text
         .toLowerCase()
@@ -69,10 +175,33 @@ void dispose() {
         .trim();
   }
 
-  List<Map<String, dynamic>> get _filteredListings {
-    final query = _normalizeSearchText(_searchQuery);
+  void _onSearchChanged(String value) {
+    _debounce?.cancel();
 
-    return _listings.where((listing) {
+    _debounce = Timer(const Duration(milliseconds: 300), () {
+      if (!mounted) return;
+
+      setState(() => _searchQuery = value);
+
+      if (value.trim().isNotEmpty) {
+        _ensureSearchPool();
+      }
+    });
+  }
+
+  void _clearSearch() {
+    _debounce?.cancel();
+    _searchController.clear();
+    setState(() => _searchQuery = '');
+  }
+
+  // نتائج البحث/القسم. البحث يعمل على مجموعة أكبر (حتى 500 إعلان)
+  // تُحمّل مرة واحدة عند أول بحث، ثم يُبحث فيها محلياً بالتطبيع العربي.
+  List<Map<String, dynamic>> get _visibleResults {
+    final query = _normalizeSearchText(_searchQuery);
+    final source = query.isEmpty ? _listings : (_searchPool ?? _listings);
+
+    return source.where((listing) {
       if (_selectedCategoryId != null &&
           listing['category_id'] != _selectedCategoryId) {
         return false;
@@ -80,17 +209,317 @@ void dispose() {
 
       if (query.isEmpty) return true;
 
-      final title =
-          _normalizeSearchText(listing['title']?.toString() ?? '');
-      final description =
-          _normalizeSearchText(listing['description']?.toString() ?? '');
-      final area =
-          _normalizeSearchText(listing['area']?.toString() ?? '');
-
-      return title.contains(query) ||
-          description.contains(query) ||
-          area.contains(query);
+      return (listing['_search'] as String? ?? '').contains(query);
     }).toList();
+  }
+
+  Future<void> _ensureSearchPool() async {
+    if (_searchPool != null || _searchPoolLoading) return;
+
+    setState(() => _searchPoolLoading = true);
+
+    try {
+      final rows = await _fetchListings(
+        from: 0,
+        to: _searchPoolSize - 1,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _searchPool = rows;
+        _searchPoolLoading = false;
+      });
+    } catch (e) {
+      debugPrint('searchPool error: $e');
+
+      if (!mounted) return;
+
+      // إن فشل التحميل نبحث في الإعلانات المحمّلة حالياً.
+      setState(() => _searchPoolLoading = false);
+    }
+  }
+
+  // الإعلانات التجارية تنتهي محلياً بدون انتظار المؤقّت.
+  List<Map<String, dynamic>> get _activePromoted {
+    final now = DateTime.now().toUtc();
+
+    return _promotedListings.where((listing) {
+      final end = DateTime.tryParse('${listing['promotion_end_at']}');
+      return end == null || end.toUtc().isAfter(now);
+    }).toList();
+  }
+
+  // =========================
+  // تحميل البيانات
+  // =========================
+  Future<void> _loadAll({bool showSpinner = true}) async {
+    if (showSpinner && mounted) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
+
+    // نجعل مجموعة البحث تُحمّل من جديد عند الحاجة.
+    _searchPool = null;
+
+    try {
+      await Future.wait([
+        _loadCategories(),
+        _loadListings(),
+        _loadPromotedListings(),
+        _loadFavorites(),
+      ]);
+
+      if (mounted) setState(() => _error = null);
+    } catch (e) {
+      debugPrint('loadAll error: $e');
+
+      if (mounted) {
+        if (_listings.isEmpty) {
+          setState(() {
+            _error =
+                'تعذر تحميل البيانات. تحقق من اتصال الإنترنت وحاول مجدداً.';
+          });
+        } else {
+          _showSnack('تعذر تحديث البيانات، تحقق من اتصال الإنترنت');
+        }
+      }
+    }
+
+    if (!mounted) return;
+
+    setState(() => _loading = false);
+
+    if (_isSearching) {
+      unawaited(_ensureSearchPool());
+    }
+  }
+
+  Future<void> _loadCategories() async {
+    final response = await _supabase
+        .from('categories')
+        .select('id, name, icon')
+        .eq('is_active', true)
+        .order('sort_order');
+
+    if (!mounted) return;
+
+    setState(() {
+      _categories = List<Map<String, dynamic>>.from(response);
+    });
+  }
+
+  int _pageSizeFor(int? categoryId) {
+    return categoryId == null ? _homePageSize : _categoryPageSize;
+  }
+
+  Future<void> _loadListings({bool reset = true}) async {
+    if (!reset && (_loadingMore || !_hasMore || _listingsLoading)) return;
+
+    // رقم الطلب يمنع نتيجة قديمة من الكتابة فوق نتيجة أحدث.
+    final requestId = reset ? ++_listingsRequestId : _listingsRequestId;
+    final categoryId = _selectedCategoryId;
+    final pageSize = _pageSizeFor(categoryId);
+    final page = reset ? 0 : _page;
+
+    if (!reset && mounted) {
+      setState(() => _loadingMore = true);
+    }
+
+    try {
+      final rows = await _fetchListings(
+        from: page * pageSize,
+        to: page * pageSize + pageSize - 1,
+        categoryId: categoryId,
+      );
+
+      if (!mounted || requestId != _listingsRequestId) return;
+
+      setState(() {
+        _listings = reset ? rows : [..._listings, ...rows];
+        _page = page + 1;
+        _hasMore = rows.length == pageSize;
+        _loadingMore = false;
+        _listingsLoading = false;
+      });
+    } catch (e) {
+      debugPrint('loadListings error: $e');
+
+      if (!mounted || requestId != _listingsRequestId) return;
+
+      setState(() {
+        _loadingMore = false;
+        _listingsLoading = false;
+      });
+
+      if (reset) rethrow;
+    }
+  }
+
+  // جلب الإعلانات مع أول صورة لكل إعلان في طلب واحد.
+  // إن فشل الطلب المدمج نعود للطريقة القديمة (طلب منفصل للصور).
+  Future<List<Map<String, dynamic>>> _fetchListings({
+    required int from,
+    required int to,
+    int? categoryId,
+  }) async {
+    try {
+      var query = _supabase
+          .from('listings')
+          .select(
+            '$_listingColumns, listing_images(image_path, sort_order)',
+          )
+          .eq('status', 'approved');
+
+      if (categoryId != null) {
+        query = query.eq('category_id', categoryId);
+      }
+
+      final response = await query
+          .order('created_at', ascending: false)
+          .order('sort_order', referencedTable: 'listing_images')
+          .limit(1, referencedTable: 'listing_images')
+          .range(from, to);
+
+      return List<Map<String, dynamic>>.from(response)
+          .map(_prepareListing)
+          .toList();
+    } catch (e) {
+      debugPrint('embedded images query failed, using fallback: $e');
+
+      var query = _supabase
+          .from('listings')
+          .select(_listingColumns)
+          .eq('status', 'approved');
+
+      if (categoryId != null) {
+        query = query.eq('category_id', categoryId);
+      }
+
+      final response = await query
+          .order('created_at', ascending: false)
+          .range(from, to);
+
+      final rows = List<Map<String, dynamic>>.from(response);
+
+      await _attachCoverImages(rows);
+
+      return rows.map(_prepareListing).toList();
+    }
+  }
+
+  // استخراج غلاف الإعلان وتجهيز نص البحث المطبّع مرة واحدة.
+  Map<String, dynamic> _prepareListing(Map<String, dynamic> row) {
+    final images = row['listing_images'];
+
+    if (images is List && images.isNotEmpty && images.first is Map) {
+      row['image_path'] = (images.first as Map)['image_path'];
+    }
+
+    row['_search'] = _normalizeSearchText(
+      '${row['title'] ?? ''} '
+      '${row['description'] ?? ''} '
+      '${row['area'] ?? ''}',
+    );
+
+    return row;
+  }
+
+  // جلب أول صورة لكل إعلان بطلب منفصل (وسيلة احتياطية + الإعلانات التجارية).
+  Future<void> _attachCoverImages(List<Map<String, dynamic>> rows) async {
+    final ids = rows
+        .map((row) => row['id'])
+        .where((id) => id != null)
+        .toList();
+
+    if (ids.isEmpty) return;
+
+    final response = await _supabase
+        .from('listing_images')
+        .select('listing_id, image_path, sort_order')
+        .inFilter('listing_id', ids)
+        .order('sort_order');
+
+    final covers = <dynamic, dynamic>{};
+
+    for (final image in List<Map<String, dynamic>>.from(response)) {
+      covers.putIfAbsent(image['listing_id'], () => image['image_path']);
+    }
+
+    for (final row in rows) {
+      final path = covers[row['id']];
+      if (path != null) row['image_path'] = path;
+    }
+  }
+
+  Future<void> _loadPromotedListings() async {
+    try {
+      final now = DateTime.now().toUtc().toIso8601String();
+
+      final promotedResponse = await _supabase
+          .from('promoted_listings')
+          .select('id, listing_id, start_at, end_at, is_active, created_by')
+          .eq('is_active', true)
+          .lte('start_at', now)
+          .gt('end_at', now)
+          .order('start_at', ascending: false);
+
+      final promotedRows = List<Map<String, dynamic>>.from(promotedResponse);
+
+      final listingIds = promotedRows
+          .map((item) => item['listing_id'])
+          .where((id) => id != null)
+          .toList();
+
+      if (listingIds.isEmpty) {
+        if (mounted) setState(() => _promotedListings = []);
+        return;
+      }
+
+      // لا نعرض الإعلان التجاري إلا إذا كان الإعلان نفسه approved.
+      final listingsResponse = await _supabase
+          .from('listings')
+          .select(_listingColumns)
+          .inFilter('id', listingIds)
+          .eq('status', 'approved');
+
+      final listingsById = <dynamic, Map<String, dynamic>>{};
+
+      for (final listing
+          in List<Map<String, dynamic>>.from(listingsResponse)) {
+        listingsById[listing['id']] = listing;
+      }
+
+      final result = <Map<String, dynamic>>[];
+
+      // نحافظ على ترتيب start_at القادم من promoted_listings.
+      for (final promoted in promotedRows) {
+        final listing = listingsById[promoted['listing_id']];
+
+        if (listing == null) continue;
+
+        final item = Map<String, dynamic>.from(listing);
+
+        item['promoted_listing_id'] = promoted['id'];
+        item['promotion_start_at'] = promoted['start_at'];
+        item['promotion_end_at'] = promoted['end_at'];
+        item['promotion_is_active'] = promoted['is_active'];
+        item['is_commercial'] = true;
+
+        result.add(item);
+      }
+
+      await _attachCoverImages(result);
+
+      if (!mounted) return;
+
+      setState(() => _promotedListings = result);
+    } catch (e) {
+      // لا نوقف الصفحة الرئيسية إذا فشل تحميل الإعلانات التجارية.
+      debugPrint('loadPromoted error: $e');
+    }
   }
 
   Future<void> _checkAdminStatus() async {
@@ -117,262 +546,165 @@ void dispose() {
       setState(() => _isAdmin = false);
     }
   }
-  
-  Future<void> _loadPromotedListings() async {
-  try {
-    final now = DateTime.now().toUtc().toIso8601String();
 
-    final promotedResponse = await _supabase
-        .from('promoted_listings')
-        .select(
-          'id, listing_id, start_at, end_at, is_active, created_by',
-        )
-        .eq('is_active', true)
-        .lte('start_at', now)
-        .gt('end_at', now)
-        .order('start_at', ascending: false);
+  // =========================
+  // الفلاتر والأقسام
+  // =========================
+  Future<void> _selectCategory(
+    int? id, {
+    bool clearSearch = false,
+  }) async {
+    _debounce?.cancel();
 
-    final promotedRows =
-        List<Map<String, dynamic>>.from(
-      promotedResponse,
-    );
-
-    if (promotedRows.isEmpty) {
-      if (!mounted) return;
-
-      setState(() {
-        _promotedListings = [];
-      });
-
-      return;
-    }
-
-    final listingIds = promotedRows
-        .map((item) => item['listing_id'])
-        .where((id) => id != null)
-        .toList();
-
-    if (listingIds.isEmpty) {
-      if (!mounted) return;
-
-      setState(() {
-        _promotedListings = [];
-      });
-
-      return;
-    }
-
-    // لا نعرض الإعلان التجاري إلا إذا كان الإعلان نفسه approved.
-    final listingsResponse = await _supabase
-        .from('listings')
-        .select(
-          'id, title, description, price, currency, price_type, '
-          'area, category_id, status, created_at',
-        )
-        .inFilter('id', listingIds)
-        .eq('status', 'approved');
-
-    final approvedListings =
-        List<Map<String, dynamic>>.from(
-      listingsResponse,
-    );
-
-    final listingsById = <dynamic, Map<String, dynamic>>{};
-
-    for (final listing in approvedListings) {
-      listingsById[listing['id']] = listing;
-    }
-
-    final result = <Map<String, dynamic>>[];
-
-    // نحافظ على ترتيب start_at القادم من promoted_listings.
-    for (final promoted in promotedRows) {
-      final listingId = promoted['listing_id'];
-
-      final listing = listingsById[listingId];
-
-      if (listing == null) continue;
-
-      final item = Map<String, dynamic>.from(
-        listing,
-      );
-
-      item['promoted_listing_id'] =
-          promoted['id'];
-
-      item['promotion_start_at'] =
-          promoted['start_at'];
-
-      item['promotion_end_at'] =
-          promoted['end_at'];
-
-      item['promotion_is_active'] =
-          promoted['is_active'];
-
-      item['is_commercial'] = true;
-
-      result.add(item);
-    }
-
-    // جلب أول صورة لكل إعلان تجاري.
-    if (result.isNotEmpty) {
-      final resultIds = result
-          .map((listing) => listing['id'])
-          .where((id) => id != null)
-          .toList();
-
-      if (resultIds.isNotEmpty) {
-        final imagesResponse = await _supabase
-            .from('listing_images')
-            .select(
-              'listing_id, image_path, sort_order',
-            )
-            .inFilter(
-              'listing_id',
-              resultIds,
-            )
-            .order('sort_order');
-
-        final images =
-            List<Map<String, dynamic>>.from(
-          imagesResponse,
-        );
-
-        for (final listing in result) {
-          for (final image in images) {
-            if (image['listing_id'] ==
-                listing['id']) {
-              listing['image_path'] =
-                  image['image_path'];
-              break;
-            }
-          }
-        }
-      }
-    }
-
-    if (!mounted) return;
+    if (clearSearch) _searchController.clear();
 
     setState(() {
-      _promotedListings = result;
+      _selectedCategoryId = id;
+      _listingsLoading = true;
+      if (clearSearch) _searchQuery = '';
     });
-  } catch (_) {
-    // لا نوقف الصفحة الرئيسية إذا فشل تحميل
-    // الإعلانات التجارية.
-  }
-}
 
-  Future<void> _loadData() async {
-    if (mounted) {
-      setState(() {
-        _loading = true;
-        _error = null;
-      });
-    }
+    _scrollToTop();
 
     try {
-      final categoriesResponse = await _supabase
-          .from('categories')
-          .select('id, name, icon')
-          .eq('is_active', true)
-          .order('sort_order');
-
-      var listingsQuery = _supabase
-          .from('listings')
-          .select(
-            'id, title, description, price, currency, price_type, '
-            'area, category_id, status, created_at',
-          )
-          .eq('status', 'approved');
-
-      if (_selectedCategoryId != null) {
-        listingsQuery =
-            listingsQuery.eq('category_id', _selectedCategoryId!);
-      }
-
-      final listingsResponse = await listingsQuery.order(
-        'created_at',
-        ascending: false,
-      );
-
-      final listings =
-          List<Map<String, dynamic>>.from(listingsResponse);
-
-      // جلب صور الإعلانات وربط أول صورة بكل إعلان.
-      if (listings.isNotEmpty) {
-        final listingIds = listings
-            .map((listing) => listing['id'])
-            .where((id) => id != null)
-            .toList();
-
-        if (listingIds.isNotEmpty) {
-          final imagesResponse = await _supabase
-              .from('listing_images')
-              .select('listing_id, image_path, sort_order')
-              .inFilter('listing_id', listingIds)
-              .order('sort_order');
-
-          final images =
-              List<Map<String, dynamic>>.from(imagesResponse);
-
-          for (final listing in listings) {
-            for (final image in images) {
-              if (image['listing_id'] == listing['id']) {
-                listing['image_path'] = image['image_path'];
-                break;
-              }
-            }
-          }
-        }
-      }
-
-      if (!mounted) return;
-
-setState(() {
-  _categories =
-      List<Map<String, dynamic>>.from(categoriesResponse);
-
-  _listings = listings;
-
-  _loading = false;
-});
-
-// تحميل الإعلانات التجارية بشكل مستقل.
-await _loadPromotedListings();
+      await _loadListings();
     } catch (_) {
-      if (!mounted) return;
-
-      setState(() {
-        _error =
-            'تعذر تحميل البيانات. تحقق من اتصال الإنترنت وحاول مجدداً.';
-        _loading = false;
-      });
+      _showSnack('تعذر تحميل الإعلانات، حاول مرة أخرى');
     }
   }
 
+  Future<void> _clearFilters() async {
+    final hadCategory = _selectedCategoryId != null;
+
+    _debounce?.cancel();
+    _searchController.clear();
+
+    setState(() {
+      _searchQuery = '';
+      _selectedCategoryId = null;
+      if (hadCategory) _listingsLoading = true;
+    });
+
+    _scrollToTop();
+
+    if (!hadCategory) return;
+
+    try {
+      await _loadListings();
+    } catch (_) {
+      _showSnack('تعذر تحميل الإعلانات، حاول مرة أخرى');
+    }
+  }
+
+  String? get _selectedCategoryName {
+    for (final category in _categories) {
+      if (category['id'] == _selectedCategoryId) {
+        return category['name']?.toString();
+      }
+    }
+    return null;
+  }
+
+  // =========================
+  // المفضلة
+  // =========================
+  Future<void> _loadFavorites() async {
+    try {
+      final user = _supabase.auth.currentUser;
+
+      if (user == null) {
+        if (mounted) setState(() => _favoriteIds = {});
+        return;
+      }
+
+      final rows = await _supabase
+          .from(_favoritesTable)
+          .select(_favListingColumn)
+          .eq(_favUserColumn, user.id);
+
+      final ids = <int>{};
+
+      for (final row in rows) {
+        final value = row[_favListingColumn];
+        if (value is num) ids.add(value.toInt());
+      }
+
+      if (!mounted) return;
+
+      setState(() => _favoriteIds = ids);
+    } catch (e) {
+      debugPrint('loadFavorites error: $e');
+    }
+  }
+
+  Future<void> _toggleFavorite(int listingId) async {
+    if (!await _ensureSignedIn()) return;
+
+    final user = _supabase.auth.currentUser;
+
+    if (user == null) return;
+
+    final wasFavorite = _favoriteIds.contains(listingId);
+
+    // تحديث فوري للواجهة ثم مزامنة مع الخادم.
+    setState(() {
+      if (wasFavorite) {
+        _favoriteIds.remove(listingId);
+      } else {
+        _favoriteIds.add(listingId);
+      }
+    });
+
+    try {
+      if (wasFavorite) {
+        await _supabase
+            .from(_favoritesTable)
+            .delete()
+            .eq(_favUserColumn, user.id)
+            .eq(_favListingColumn, listingId);
+      } else {
+        await _supabase.from(_favoritesTable).insert({
+          _favUserColumn: user.id,
+          _favListingColumn: listingId,
+        });
+      }
+    } catch (e) {
+      debugPrint('toggleFavorite error: $e');
+
+      if (!mounted) return;
+
+      // نتراجع عن التحديث الفوري.
+      setState(() {
+        if (wasFavorite) {
+          _favoriteIds.add(listingId);
+        } else {
+          _favoriteIds.remove(listingId);
+        }
+      });
+
+      _showSnack('تعذر تحديث المفضلة، حاول مرة أخرى');
+    }
+  }
+
+  // =========================
+  // التنقل والحساب
+  // =========================
   Future<void> _signOut() async {
     try {
       await _supabase.auth.signOut();
 
       if (!mounted) return;
 
-      setState(() => _isAdmin = false);
+      setState(() {
+        _isAdmin = false;
+        _favoriteIds = {};
+      });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('تم تسجيل الخروج بنجاح'),
-        ),
-      );
+      _showSnack('تم تسجيل الخروج بنجاح');
 
-      await _loadData();
+      await _loadAll(showSpinner: false);
     } catch (_) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('تعذر تسجيل الخروج، حاول مرة أخرى'),
-        ),
-      );
+      _showSnack('تعذر تسجيل الخروج، حاول مرة أخرى');
     }
   }
 
@@ -388,9 +720,9 @@ await _loadPromotedListings();
 
     if (!mounted) return false;
 
-    if (result == true &&
-        _supabase.auth.currentUser != null) {
+    if (result == true && _supabase.auth.currentUser != null) {
       await _checkAdminStatus();
+      await _loadFavorites();
       return true;
     }
 
@@ -427,7 +759,7 @@ await _loadPromotedListings();
 
     if (!mounted) return;
 
-    await _loadData();
+    await _loadAll(showSpinner: false);
   }
 
   Future<void> _openMyListings() async {
@@ -443,7 +775,7 @@ await _loadPromotedListings();
 
     if (!mounted) return;
 
-    await _loadData();
+    await _loadAll(showSpinner: false);
   }
 
   Future<void> _openFavorites() async {
@@ -459,7 +791,7 @@ await _loadPromotedListings();
 
     if (!mounted) return;
 
-    setState(() {});
+    await _loadFavorites();
   }
 
   Future<void> _openAdminPanel() async {
@@ -476,17 +808,15 @@ await _loadPromotedListings();
     if (!mounted) return;
 
     await _checkAdminStatus();
-    await _loadData();
+    await _loadAll(showSpinner: false);
   }
 
-  void _openListingDetails(
-    Map<String, dynamic> listing,
-  ) {
+  Future<void> _openListingDetails(Map<String, dynamic> listing) async {
     final listingId = listing['id'];
 
     if (listingId is! int) return;
 
-    Navigator.push(
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => ListingDetailsScreen(
@@ -494,6 +824,36 @@ await _loadPromotedListings();
         ),
       ),
     );
+
+    if (!mounted) return;
+
+    // قد يكون المستخدم أضاف/أزال المفضلة من صفحة التفاصيل.
+    await _loadFavorites();
+  }
+
+  // =========================
+  // أيقونات الأقسام
+  // =========================
+  static const _iconMap = <String, IconData>{
+    'car': Icons.directions_car_outlined,
+    'home': Icons.home_work_outlined,
+    'phone': Icons.phone_android_outlined,
+    'electric': Icons.electrical_services_outlined,
+    'clothes': Icons.checkroom_outlined,
+    'furniture': Icons.weekend_outlined,
+    'animals': Icons.pets_outlined,
+    'crops': Icons.agriculture_outlined,
+    'food': Icons.restaurant_outlined,
+    'tools': Icons.build_outlined,
+    'services': Icons.handyman_outlined,
+    'jobs': Icons.work_outline,
+    'other': Icons.more_horiz_outlined,
+  };
+
+  // الأولوية لعمود icon في قاعدة البيانات، ثم اسم القسم.
+  IconData _iconForCategory(Map<String, dynamic> category) {
+    return _iconMap[category['icon']?.toString().trim()] ??
+        _categoryIcon(category['name']?.toString() ?? '');
   }
 
   IconData _categoryIcon(String name) {
@@ -529,63 +889,48 @@ await _loadPromotedListings();
     }
   }
 
-String _formatPrice(Map<String, dynamic> listing) {
-  final price = listing['price'];
+  // =========================
+  // تنسيق السعر والوقت
+  // =========================
+  String _formatPrice(Map<String, dynamic> listing) {
+    final price = listing['price'];
 
-  final currency =
-      listing['currency']?.toString().trim().isNotEmpty == true
-          ? listing['currency'].toString().trim()
-          : 'SDG';
+    final currency =
+        (listing['currency']?.toString().trim().isNotEmpty ?? false)
+            ? listing['currency'].toString().trim()
+            : 'SDG';
 
-  final priceType =
-      listing['price_type']?.toString().trim() ?? '';
+    final priceType = listing['price_type']?.toString().trim() ?? '';
 
-  if (priceType == 'contact' || price == null) {
-    return 'السعر عند التواصل';
-  }
-
-  final number = num.tryParse(price.toString());
-
-  if (number == null) {
-    return '$price $currency';
-  }
-
-  // تحويل السعر إلى نص، مع الاحتفاظ بالكسور عند وجودها.
-  String raw = number.toString();
-
-  // حذف .0 من الأرقام الصحيحة مثل 10000.0
-  if (number == number.truncateToDouble()) {
-    raw = number.toInt().toString();
-  }
-
-  final parts = raw.split('.');
-  final integerPart = parts[0];
-  final decimalPart = parts.length > 1 ? parts[1] : '';
-
-  // إضافة فواصل الآلاف من اليمين إلى اليسار.
-  final buffer = StringBuffer();
-
-  for (int i = 0; i < integerPart.length; i++) {
-    buffer.write(integerPart[i]);
-
-    final remaining = integerPart.length - i - 1;
-
-    if (remaining > 0 && remaining % 3 == 0) {
-      buffer.write(',');
+    if (priceType == 'contact' || price == null) {
+      return 'السعر عند التواصل';
     }
+
+    final number = num.tryParse(price.toString());
+
+    if (number == null) return '$price $currency';
+
+    return '${_numberFormat.format(number)} $currency';
   }
 
-  String formatted = buffer.toString();
+  String _timeAgo(dynamic value) {
+    final date = DateTime.tryParse(value?.toString() ?? '')?.toLocal();
 
-  // إضافة الجزء العشري إذا كان موجوداً وغير صفري.
-  if (decimalPart.isNotEmpty &&
-      int.tryParse(decimalPart) != 0) {
-    formatted = '$formatted.$decimalPart';
+    if (date == null) return '';
+
+    final diff = DateTime.now().difference(date);
+
+    if (diff.inMinutes < 1) return 'الآن';
+    if (diff.inMinutes < 60) return 'قبل ${diff.inMinutes} د';
+    if (diff.inHours < 24) return 'قبل ${diff.inHours} س';
+    if (diff.inDays < 30) return 'قبل ${diff.inDays} يوم';
+
+    return 'قبل ${diff.inDays ~/ 30} شهر';
   }
 
-  return '$formatted $currency';
-}
-
+  // =========================
+  // الصور
+  // =========================
   String? _imageUrl(dynamic imagePath) {
     if (imagePath == null) return null;
 
@@ -593,386 +938,250 @@ String _formatPrice(Map<String, dynamic> listing) {
 
     if (path.isEmpty) return null;
 
-    if (path.startsWith('http://') ||
-        path.startsWith('https://')) {
+    if (path.startsWith('http://') || path.startsWith('https://')) {
       return path;
     }
 
-    return _supabase.storage
-        .from('listing-images')
-        .getPublicUrl(path);
+    return _supabase.storage.from('listing-images').getPublicUrl(path);
   }
 
   Widget _buildListingImage(
     Map<String, dynamic> listing, {
-    double height = 105,
+    double height = 110,
   }) {
-    final imageUrl = _imageUrl(
-      listing['image_path'],
-    );
+    final colorScheme = Theme.of(context).colorScheme;
+    final imageUrl = _imageUrl(listing['image_path']);
 
-    Widget noImage() {
+    Widget placeholder([
+      IconData icon = Icons.photo_library_outlined,
+    ]) {
       return Container(
         height: height,
         width: double.infinity,
-        color: Colors.grey.shade100,
-        child: const Center(
+        color: colorScheme.surfaceContainerHighest,
+        child: Center(
           child: Icon(
-            Icons.photo_library_outlined,
-            size: 32,
-            color: Colors.grey,
+            icon,
+            size: 30,
+            color: colorScheme.onSurfaceVariant,
           ),
         ),
       );
     }
 
-    if (imageUrl == null) return noImage();
+    if (imageUrl == null) return placeholder();
 
-    return Image.network(
-      imageUrl,
+    return CachedNetworkImage(
+      imageUrl: imageUrl,
       height: height,
       width: double.infinity,
       fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) => noImage(),
-      loadingBuilder: (
-        context,
-        child,
-        progress,
-      ) {
-        if (progress == null) return child;
-
-        return Container(
-          height: height,
-          width: double.infinity,
-          color: Colors.grey.shade100,
-          child: const Center(
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-            ),
-          ),
-        );
-      },
+      memCacheWidth: 400,
+      placeholder: (_, __) => placeholder(Icons.image_outlined),
+      errorWidget: (_, __, ___) => placeholder(Icons.broken_image_outlined),
     );
   }
 
-  Widget _buildAvailableBadge() {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 7,
-        vertical: 3,
-      ),
-      decoration: BoxDecoration(
-        color: Colors.green.withValues(alpha: 0.92),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: const Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.check_circle,
-            color: Colors.white,
-            size: 12,
-          ),
-          SizedBox(width: 3),
-          Text(
-            'متاح',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  // =========================
+  // بطاقة الإعلان
+  // =========================
+  Widget _buildListingCard(
+    Map<String, dynamic> listing, {
+    bool isCommercial = false,
+    bool fillWidth = false,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
 
-  // التعديل الأول:
-  // تحسين شكل بطاقة الإعلان فقط.
-  // لم يتم تغيير طريقة تحميل الصور أو روابط Supabase.
-Widget _buildListingCard(
-  Map<String, dynamic> listing, {
-  bool isCommercial = false,
-}) {
-  final rawTitle =
-      listing['title']?.toString().trim() ?? '';
+    final id = listing['id'] as int?;
 
-  final title = rawTitle.isEmpty
-      ? 'إعلان بدون عنوان'
-      : rawTitle;
+    final rawTitle = listing['title']?.toString().trim() ?? '';
+    final title = rawTitle.isEmpty ? 'إعلان بدون عنوان' : rawTitle;
 
-  final area =
-      listing['area']?.toString().trim() ?? '';
+    final area = listing['area']?.toString().trim() ?? '';
 
-  final priceText = _formatPrice(listing);
+    final meta = [
+      if (area.isNotEmpty) area,
+      _timeAgo(listing['created_at']),
+    ].where((part) => part.isNotEmpty).join(' · ');
 
-  final isNegotiable =
-      listing['price_type'] == 'negotiable';
+    final isFavorite = id != null && _favoriteIds.contains(id);
+    final isNegotiable = listing['price_type'] == 'negotiable';
 
-  return Card(
-    margin: EdgeInsets.zero,
-    elevation: 2,
-    clipBehavior: Clip.antiAlias,
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(13),
-      side: BorderSide(
-        color: Theme.of(context)
-            .colorScheme
-            .outlineVariant
-            .withValues(alpha: 0.35),
-      ),
-    ),
-    child: InkWell(
-      onTap: () => _openListingDetails(listing),
-      child: SizedBox(
-        width: 158,
-        child: Column(
-          crossAxisAlignment:
-              CrossAxisAlignment.stretch,
-          children: [
-            // صورة الإعلان — لم يتم تغيير منطق الصور
-            Stack(
-  children: [
-    _buildListingImage(
-      listing,
-      height: 105,
-    ),
-
-    Positioned(
-      top: 6,
-      right: 6,
-      child: _buildAvailableBadge(),
-    ),
-
-    if (isCommercial)
-      Positioned(
-        top: 6,
-        left: 6,
-        child: Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: 7,
-            vertical: 3,
-          ),
-          decoration: BoxDecoration(
-            color: Theme.of(context)
-                .colorScheme
-                .primary,
-            borderRadius:
-                BorderRadius.circular(20),
-          ),
-          child: const Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.local_offer,
-                color: Colors.white,
-                size: 11,
-              ),
-              SizedBox(width: 3),
-              Text(
-                'إعلان تجاري',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 9,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
+    return SizedBox(
+      width: fillWidth ? double.infinity : _cardWidth,
+      child: Card(
+        margin: EdgeInsets.zero,
+        elevation: 0,
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: BorderSide(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.5),
           ),
         ),
-      ),
-  ],
-),
+        child: InkWell(
+          onTap: () => _openListingDetails(listing),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Stack(
+                children: [
+                  _buildListingImage(listing, height: 110),
 
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  8,
-                  7,
-                  8,
-                  3,
-                ),
-                child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
-                  children: [
-                    // اسم الإعلان
-                    Text(
-                      title,
-                      maxLines: 2,
-                      overflow:
-                          TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        height: 1.18,
+                  if (isCommercial)
+                    Positioned(
+                      top: 6,
+                      right: 6,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: colorScheme.primary,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.local_offer,
+                              color: colorScheme.onPrimary,
+                              size: 11,
+                            ),
+                            const SizedBox(width: 3),
+                            Text(
+                              'إعلان تجاري',
+                              style: TextStyle(
+                                color: colorScheme.onPrimary,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
 
-                    const SizedBox(height: 3),
-
-                    // السعر
-                    Container(
-                      width: double.infinity,
-                      padding:
-                          const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .primary
-                            .withValues(alpha: 0.08),
-                        borderRadius:
-                            BorderRadius.circular(7),
-                      ),
-                      child: Text(
-                        priceText,
-                        maxLines: 2,
-                        overflow:
-                            TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight:
-                              FontWeight.w800,
-                          height: 1.1,
-                          color: Theme.of(context)
-                              .colorScheme
-                              .primary,
+                  if (id != null)
+                    Positioned(
+                      top: 6,
+                      left: 6,
+                      child: Material(
+                        color: Colors.white.withValues(alpha: 0.92),
+                        shape: const CircleBorder(),
+                        child: InkWell(
+                          customBorder: const CircleBorder(),
+                          onTap: () => _toggleFavorite(id),
+                          child: Padding(
+                            padding: const EdgeInsets.all(6),
+                            child: Icon(
+                              isFavorite
+                                  ? Icons.favorite
+                                  : Icons.favorite_border,
+                              size: 18,
+                              color: isFavorite
+                                  ? Colors.red
+                                  : Colors.grey.shade700,
+                            ),
+                          ),
                         ),
+                      ),
+                    ),
+                ],
+              ),
+
+              Padding(
+                padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w600,
+                        height: 1.25,
+                      ),
+                    ),
+
+                    const SizedBox(height: 4),
+
+                    Text(
+                      _formatPrice(listing),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: colorScheme.primary,
                       ),
                     ),
 
                     if (isNegotiable)
-                      Padding(
-                        padding:
-                            const EdgeInsets.only(
-                          top: 2,
-                        ),
-                        child: Text(
-                          'قابل للتفاوض',
-                          maxLines: 1,
-                          overflow:
-                              TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 9,
-                            fontWeight:
-                                FontWeight.w600,
-                            color:
-                                Colors.grey.shade600,
-                          ),
+                      Text(
+                        'قابل للتفاوض',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: colorScheme.onSurfaceVariant,
                         ),
                       ),
 
-                    // المنطقة
-                    if (area.isNotEmpty) ...[
-                      const SizedBox(height: 3),
+                    if (meta.isNotEmpty) ...[
+                      const SizedBox(height: 4),
                       Row(
                         children: [
                           Icon(
                             Icons.location_on_outlined,
                             size: 13,
-                            color:
-                                Colors.grey.shade600,
+                            color: colorScheme.onSurfaceVariant,
                           ),
                           const SizedBox(width: 3),
                           Expanded(
                             child: Text(
-                              area,
+                              meta,
                               maxLines: 1,
-                              overflow:
-                                  TextOverflow.ellipsis,
+                              overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                fontSize: 11,
-                                color:
-                                    Colors.grey.shade700,
+                                fontSize: 11.5,
+                                color: colorScheme.onSurfaceVariant,
                               ),
                             ),
                           ),
                         ],
                       ),
                     ],
-
-                    const Spacer(),
-
-                    // زر عرض الإعلان
-                    SizedBox(
-                      width: double.infinity,
-                      height: 28,
-                      child: OutlinedButton(
-                        onPressed: () =>
-                            _openListingDetails(
-                          listing,
-                        ),
-                        style:
-                            OutlinedButton.styleFrom(
-                          padding: EdgeInsets.zero,
-                          visualDensity:
-                              VisualDensity.compact,
-                          minimumSize:
-                              const Size(0, 28),
-                          tapTargetSize:
-                              MaterialTapTargetSize
-                                  .shrinkWrap,
-                          side: BorderSide(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .primary
-                                .withValues(
-                                  alpha: 0.65,
-                                ),
-                          ),
-                          shape:
-                              RoundedRectangleBorder(
-                            borderRadius:
-                                BorderRadius.circular(
-                              8,
-                            ),
-                          ),
-                        ),
-                        child: Text(
-                          'عرض الإعلان',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight:
-                                FontWeight.w600,
-                            color: Theme.of(context)
-                                .colorScheme
-                                .primary,
-                          ),
-                        ),
-                      ),
-                    ),
                   ],
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 
+  // =========================
+  // مكوّنات الصفحة
+  // =========================
   Widget _sectionTitle(
     String title, {
     Widget? trailing,
     IconData? icon,
   }) {
     return Padding(
-      padding: const EdgeInsets.only(
-        bottom: 9,
-      ),
+      padding: const EdgeInsets.only(bottom: 9),
       child: Row(
         children: [
           if (icon != null) ...[
             Icon(
               icon,
               size: 19,
-              color: Theme.of(context)
-                  .colorScheme
-                  .primary,
+              color: Theme.of(context).colorScheme.primary,
             ),
             const SizedBox(width: 6),
           ],
@@ -992,20 +1201,88 @@ Widget _buildListingCard(
   }
 
   Widget _buildHorizontalListings(
-    List<Map<String, dynamic>> listings,
-  ) {
+    List<Map<String, dynamic>> listings, {
+    bool commercial = false,
+  }) {
     return SizedBox(
-      height: 230,
+      height: _cardHeight,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: listings.length,
-        separatorBuilder: (_, __) =>
-            const SizedBox(width: 9),
+        separatorBuilder: (_, __) => const SizedBox(width: 9),
         itemBuilder: (context, index) {
           return _buildListingCard(
             listings[index],
+            isCommercial: commercial,
           );
         },
+      ),
+    );
+  }
+
+  // بانر ترحيبي يحلّ محل الجملة الدعائية وزر "ضع إعلانك" في الـ AppBar.
+  Widget _buildPromoBanner() {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: colorScheme.primary,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'عندك شيء للبيع؟',
+                  style: TextStyle(
+                    color: colorScheme.onPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'في مكان واحد - تسوق واعلن بسهولة',
+                  style: TextStyle(
+                    color: colorScheme.onPrimary.withValues(alpha: 0.85),
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                FilledButton(
+                  onPressed: _openAddListing,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: colorScheme.onPrimary,
+                    foregroundColor: colorScheme.primary,
+                    minimumSize: const Size(0, 34),
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    visualDensity: VisualDensity.compact,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: const Text(
+                    'أضف إعلانك الآن',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Icon(
+            Icons.campaign_outlined,
+            size: 52,
+            color: colorScheme.onPrimary.withValues(alpha: 0.9),
+          ),
+        ],
       ),
     );
   }
@@ -1013,82 +1290,55 @@ Widget _buildListingCard(
   Widget _buildCategories() {
     if (_categories.isEmpty) {
       return const Padding(
-        padding: EdgeInsets.symmetric(
-          vertical: 12,
-        ),
+        padding: EdgeInsets.symmetric(vertical: 12),
         child: Center(
-          child: Text(
-            'لا توجد أقسام متاحة حالياً',
-          ),
+          child: Text('لا توجد أقسام متاحة حالياً'),
         ),
       );
     }
 
+    final colorScheme = Theme.of(context).colorScheme;
+
     return SizedBox(
-      height: 70,
+      height: 72,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: _categories.length,
-        separatorBuilder: (_, __) =>
-            const SizedBox(width: 7),
+        separatorBuilder: (_, __) => const SizedBox(width: 7),
         itemBuilder: (context, index) {
           final category = _categories[index];
 
-          final categoryId =
-              category['id'] as int?;
-
-          final categoryName =
-              category['name']?.toString() ??
-                  'بدون اسم';
-
-          final selected =
-              _selectedCategoryId == categoryId;
+          final categoryId = category['id'] as int?;
+          final categoryName = category['name']?.toString() ?? 'بدون اسم';
+          final selected = _selectedCategoryId == categoryId;
 
           return InkWell(
-            borderRadius:
-                BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(10),
             onTap: () {
               if (categoryId == null) return;
 
-              setState(() {
-                _selectedCategoryId =
-                    selected ? null : categoryId;
-              });
-
-              _loadData();
+              _selectCategory(selected ? null : categoryId);
             },
             child: Container(
-              width: 76,
+              width: 80,
               padding: const EdgeInsets.symmetric(
                 horizontal: 5,
                 vertical: 6,
               ),
               decoration: BoxDecoration(
                 color: selected
-                    ? Theme.of(context)
-                        .colorScheme
-                        .primaryContainer
-                    : Theme.of(context)
-                        .colorScheme
-                        .surfaceContainerHighest,
-                borderRadius:
-                    BorderRadius.circular(10),
+                    ? colorScheme.primaryContainer
+                    : colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(10),
                 border: Border.all(
-                  color: selected
-                      ? Theme.of(context)
-                          .colorScheme
-                          .primary
-                      : Colors.transparent,
+                  color: selected ? colorScheme.primary : Colors.transparent,
                 ),
               ),
               child: Column(
-                mainAxisAlignment:
-                    MainAxisAlignment.center,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(
-                    _categoryIcon(
-                      categoryName,
-                    ),
+                    _iconForCategory(category),
                     size: 22,
                   ),
                   const SizedBox(height: 3),
@@ -1096,10 +1346,9 @@ Widget _buildListingCard(
                     categoryName,
                     textAlign: TextAlign.center,
                     maxLines: 2,
-                    overflow:
-                        TextOverflow.ellipsis,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      fontSize: 10,
+                      fontSize: 11,
                       fontWeight: FontWeight.w600,
                       height: 1.1,
                     ),
@@ -1116,35 +1365,24 @@ Widget _buildListingCard(
   Widget _buildSearchField() {
     return SizedBox(
       height: 43,
-      child: TextField(
-        controller: _searchController,
-        textInputAction:
-            TextInputAction.search,
-        onChanged: (value) {
-          setState(() {
-            _searchQuery = value;
-          });
-        },
-        decoration: InputDecoration(
-          hintText:
-              'ابحث عن إعلان أو منطقة...',
-          hintStyle: const TextStyle(
-            fontSize: 13,
-          ),
-          prefixIcon: const Icon(
-            Icons.search,
-            size: 21,
-          ),
-          suffixIcon:
-              _searchQuery.isNotEmpty
+      child: ValueListenableBuilder<TextEditingValue>(
+        valueListenable: _searchController,
+        builder: (context, value, _) {
+          return TextField(
+            controller: _searchController,
+            textInputAction: TextInputAction.search,
+            onChanged: _onSearchChanged,
+            decoration: InputDecoration(
+              hintText: 'ابحث عن إعلان أو منطقة...',
+              hintStyle: const TextStyle(fontSize: 13),
+              prefixIcon: const Icon(
+                Icons.search,
+                size: 21,
+              ),
+              suffixIcon: value.text.isNotEmpty
                   ? IconButton(
                       padding: EdgeInsets.zero,
-                      onPressed: () {
-                        _searchController.clear();
-                        setState(() {
-                          _searchQuery = '';
-                        });
-                      },
+                      onPressed: _clearSearch,
                       icon: const Icon(
                         Icons.clear,
                         size: 19,
@@ -1152,69 +1390,97 @@ Widget _buildListingCard(
                       tooltip: 'مسح البحث',
                     )
                   : null,
-          filled: true,
-          contentPadding:
-              const EdgeInsets.symmetric(
-            vertical: 8,
-          ),
-          border: OutlineInputBorder(
-            borderRadius:
-                BorderRadius.circular(11),
-            borderSide: BorderSide.none,
-          ),
-        ),
+              filled: true,
+              contentPadding: const EdgeInsets.symmetric(vertical: 8),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(11),
+                borderSide: BorderSide.none,
+              ),
+            ),
+          );
+        },
       ),
     );
   }
 
+  // نتائج البحث أو القسم: شبكة من عمودين.
   Widget _buildSearchResults() {
-    final results = _filteredListings;
+    final colorScheme = Theme.of(context).colorScheme;
+    final results = _visibleResults;
+    final promotedIds =
+        _activePromoted.map((listing) => listing['id']).toSet();
+
+    final showSpinner =
+        _listingsLoading || (_isSearching && _searchPoolLoading);
+
+    final title = _isSearching
+        ? 'نتائج البحث'
+        : (_selectedCategoryName ?? 'إعلانات القسم');
 
     return Column(
-      crossAxisAlignment:
-          CrossAxisAlignment.stretch,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _sectionTitle(
-          'نتائج البحث',
+          title,
           trailing: Text(
             '${results.length} إعلان',
             style: TextStyle(
               fontSize: 12,
-              color: Colors.grey.shade600,
+              color: colorScheme.onSurfaceVariant,
             ),
           ),
         ),
 
-        if (results.isEmpty)
+        if (showSpinner && results.isEmpty)
           const Padding(
-            padding: EdgeInsets.symmetric(
-              vertical: 35,
-            ),
+            padding: EdgeInsets.symmetric(vertical: 40),
+            child: Center(child: CircularProgressIndicator()),
+          )
+        else if (results.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 35),
             child: Column(
               children: [
-                Icon(
+                const Icon(
                   Icons.search_off_outlined,
                   size: 45,
                 ),
-                SizedBox(height: 9),
+                const SizedBox(height: 9),
                 Text(
-                  'لم نجد إعلانات تطابق بحثك',
+                  _isSearching
+                      ? 'لم نجد إعلانات تطابق بحثك'
+                      : 'لا توجد إعلانات في هذا القسم حالياً',
                 ),
               ],
             ),
           )
         else
-          ...results.map(
-            (listing) => Padding(
-              padding: const EdgeInsets.only(
-                bottom: 10,
-              ),
-              child: SizedBox(
-                height: 230,
-                child: _buildListingCard(
-                  listing,
-                ),
-              ),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: results.length,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 10,
+              mainAxisExtent: _cardHeight,
+            ),
+            itemBuilder: (context, index) {
+              final listing = results[index];
+
+              return _buildListingCard(
+                listing,
+                fillWidth: true,
+                isCommercial: promotedIds.contains(listing['id']),
+              );
+            },
+          ),
+
+        if (_loadingMore)
+          const Padding(
+            padding: EdgeInsets.all(16),
+            child: Center(
+              child: CircularProgressIndicator(strokeWidth: 2),
             ),
           ),
       ],
@@ -1222,11 +1488,18 @@ Widget _buildListingCard(
   }
 
   Widget _buildHomeSections() {
-    if (_listings.isEmpty) {
+    if (_listingsLoading) {
       return const Padding(
-        padding: EdgeInsets.symmetric(
-          vertical: 32,
-        ),
+        padding: EdgeInsets.symmetric(vertical: 40),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final promoted = _activePromoted;
+
+    if (_listings.isEmpty && promoted.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 32),
         child: Column(
           children: [
             Icon(
@@ -1234,68 +1507,40 @@ Widget _buildListingCard(
               size: 45,
             ),
             SizedBox(height: 10),
-            Text(
-              'لا توجد إعلانات متاحة حالياً',
-            ),
+            Text('لا توجد إعلانات متاحة حالياً'),
           ],
         ),
       );
     }
 
-    // فصل الإعلانات التجارية عن الإعلانات العادية.
-    final promotedIds = _promotedListings
-    .map((listing) => listing['id'])
-    .toSet();
+    // فصل الإعلانات التجارية عن أحدث الإعلانات.
+    final promotedIds = promoted.map((listing) => listing['id']).toSet();
 
-final latestListings = _listings
-    .where(
-      (listing) =>
-          !promotedIds.contains(listing['id']),
-    )
-    .take(10)
-    .toList();
+    final latestListings = _listings
+        .where((listing) => !promotedIds.contains(listing['id']))
+        .take(10)
+        .toList();
 
     return Column(
-      crossAxisAlignment:
-          CrossAxisAlignment.stretch,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (_promotedListings.isNotEmpty) ...[
-  _sectionTitle(
-    'إعلانات تجارية',
-    icon: Icons.local_offer_outlined,
-  ),
+        if (promoted.isNotEmpty) ...[
+          _sectionTitle(
+            'إعلانات تجارية',
+            icon: Icons.local_offer_outlined,
+          ),
+          _buildHorizontalListings(promoted, commercial: true),
+          const SizedBox(height: 20),
+        ],
 
-  SizedBox(
-    height: 230,
-    child: ListView.separated(
-      scrollDirection: Axis.horizontal,
-      itemCount: _promotedListings.length,
-      separatorBuilder: (_, __) =>
-          const SizedBox(width: 9),
-      itemBuilder: (context, index) {
-        return _buildListingCard(
-          _promotedListings[index],
-          isCommercial: true,
-        );
-      },
-    ),
-  ),
-
-  const SizedBox(height: 18),
-],
-
-        const SizedBox(height: 18),
-
-        _sectionTitle(
-          'أحدث الإعلانات',
-          icon: Icons.access_time,
-        ),
-
-        _buildHorizontalListings(
-  latestListings,
-),
-
-        const SizedBox(height: 20),
+        if (latestListings.isNotEmpty) ...[
+          _sectionTitle(
+            'أحدث الإعلانات',
+            icon: Icons.access_time,
+          ),
+          _buildHorizontalListings(latestListings),
+          const SizedBox(height: 20),
+        ],
 
         _sectionTitle(
           'معروضات الأقسام',
@@ -1303,73 +1548,39 @@ final latestListings = _listings
         ),
 
         ..._categories.map((category) {
-          final categoryId =
-              category['id'] as int?;
+          final categoryId = category['id'] as int?;
+          final categoryName = category['name']?.toString() ?? 'بدون اسم';
 
-          final categoryName =
-              category['name']?.toString() ??
-                  'بدون اسم';
+          if (categoryId == null) return const SizedBox.shrink();
 
-          if (categoryId == null) {
-            return const SizedBox.shrink();
-          }
+          final categoryListings = _listings
+              .where((listing) => listing['category_id'] == categoryId)
+              .take(8)
+              .toList();
 
-          final categoryListings =
-              _listings
-                  .where(
-                    (listing) =>
-                        listing['category_id'] ==
-                        categoryId,
-                  )
-                  .take(8)
-                  .toList();
-
-          if (categoryListings.isEmpty) {
-            return const SizedBox.shrink();
-          }
+          if (categoryListings.isEmpty) return const SizedBox.shrink();
 
           return Padding(
-            padding: const EdgeInsets.only(
-              bottom: 18,
-            ),
+            padding: const EdgeInsets.only(bottom: 18),
             child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.stretch,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _sectionTitle(
                   categoryName,
-                  icon: _categoryIcon(
-                    categoryName,
-                  ),
+                  icon: _iconForCategory(category),
                   trailing: TextButton(
-                    onPressed: () {
-                      setState(() {
-                        _selectedCategoryId =
-                            categoryId;
-                      });
-
-                      _loadData();
-                    },
+                    onPressed: () => _selectCategory(categoryId),
                     style: TextButton.styleFrom(
-                      padding:
-                          const EdgeInsets.symmetric(
-                        horizontal: 7,
-                      ),
-                      visualDensity:
-                          VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: 7),
+                      visualDensity: VisualDensity.compact,
                     ),
                     child: const Text(
                       'عرض الكل',
-                      style: TextStyle(
-                        fontSize: 12,
-                      ),
+                      style: TextStyle(fontSize: 12),
                     ),
                   ),
                 ),
-
-                _buildHorizontalListings(
-                  categoryListings,
-                ),
+                _buildHorizontalListings(categoryListings),
               ],
             ),
           );
@@ -1390,8 +1601,7 @@ final latestListings = _listings
         child: Padding(
           padding: const EdgeInsets.all(22),
           child: Column(
-            mainAxisSize:
-                MainAxisSize.min,
+            mainAxisSize: MainAxisSize.min,
             children: [
               const Icon(
                 Icons.wifi_off,
@@ -1404,10 +1614,8 @@ final latestListings = _listings
               ),
               const SizedBox(height: 14),
               FilledButton(
-                onPressed: _loadData,
-                child: const Text(
-                  'إعادة المحاولة',
-                ),
+                onPressed: _loadAll,
+                child: const Text('إعادة المحاولة'),
               ),
             ],
           ),
@@ -1415,51 +1623,48 @@ final latestListings = _listings
       );
     }
 
-    final searching =
-        _searchQuery.trim().isNotEmpty ||
-            _selectedCategoryId != null;
+    final user = _supabase.auth.currentUser;
+    final name = (user?.userMetadata?['full_name'] as String?)?.trim();
 
     return RefreshIndicator(
-      onRefresh: _loadData,
+      onRefresh: () => _loadAll(showSpinner: false),
       child: ListView(
-        physics:
-            const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(
-          13,
-          8,
-          13,
-          18,
-        ),
+        controller: _scrollController,
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(13, 8, 13, 18),
         children: [
           _buildSearchField(),
 
           const SizedBox(height: 12),
 
+          if (!_isFiltering) ...[
+            if (name != null && name.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(
+                  'مرحباً يا $name 👋',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            _buildPromoBanner(),
+            const SizedBox(height: 14),
+          ],
+
           _sectionTitle(
             'الأقسام',
             trailing: TextButton(
-              onPressed: () {
-                setState(() {
-                  _selectedCategoryId = null;
-                  _searchQuery = '';
-                  _searchController.clear();
-                });
-
-                _loadData();
-              },
+              onPressed: _clearFilters,
               style: TextButton.styleFrom(
-                visualDensity:
-                    VisualDensity.compact,
-                padding:
-                    const EdgeInsets.symmetric(
-                  horizontal: 7,
-                ),
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(horizontal: 7),
               ),
               child: const Text(
                 'عرض الكل',
-                style: TextStyle(
-                  fontSize: 12,
-                ),
+                style: TextStyle(fontSize: 12),
               ),
             ),
           ),
@@ -1468,89 +1673,37 @@ final latestListings = _listings
 
           const SizedBox(height: 15),
 
-          if (searching)
-            _buildSearchResults()
-          else
-            _buildHomeSections(),
+          if (_isFiltering) _buildSearchResults() else _buildHomeSections(),
         ],
       ),
     );
   }
 
-  Widget _buildPostListingButton() {
-    return Padding(
-      padding:
-          const EdgeInsets.symmetric(vertical: 7),
-      child: FilledButton(
-        onPressed: _openAddListing,
-        style: FilledButton.styleFrom(
-          minimumSize: const Size(0, 36),
-          padding:
-              const EdgeInsets.symmetric(
-            horizontal: 9,
-          ),
-          visualDensity:
-              VisualDensity.compact,
-          shape: RoundedRectangleBorder(
-            borderRadius:
-                BorderRadius.circular(9),
-          ),
-        ),
-        child: const Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'ضع إعلانك',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            SizedBox(width: 3),
-            Icon(
-              Icons.add,
-              size: 17,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildProfileButton() {
-    final user =
-        _supabase.auth.currentUser;
+    final user = _supabase.auth.currentUser;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return IconButton(
-      tooltip: user == null
-          ? 'تسجيل الدخول'
-          : 'الملف الشخصي',
+      tooltip: user == null ? 'تسجيل الدخول' : 'الملف الشخصي',
       onPressed: _openProfile,
       icon: CircleAvatar(
         radius: 15,
-        backgroundColor:
-            Theme.of(context)
-                .colorScheme
-                .primaryContainer,
+        backgroundColor: colorScheme.primaryContainer,
         child: Icon(
-          user == null
-              ? Icons.person_outline
-              : Icons.person,
+          user == null ? Icons.person_outline : Icons.person,
           size: 19,
-          color:
-              Theme.of(context)
-                  .colorScheme
-                  .onPrimaryContainer,
+          color: colorScheme.onPrimaryContainer,
         ),
       ),
     );
   }
 
+  // =========================
+  // شريط التنقل السفلي
+  // =========================
   Widget _buildBottomNavigation() {
-    final primary =
-        Theme.of(context)
-            .colorScheme
-            .primary;
+    final colorScheme = Theme.of(context).colorScheme;
+    final primary = colorScheme.primary;
 
     Widget navItem({
       required IconData icon,
@@ -1562,35 +1715,25 @@ final latestListings = _listings
         child: InkWell(
           onTap: onTap,
           child: Padding(
-            padding:
-                const EdgeInsets.symmetric(
-              vertical: 7,
-            ),
+            padding: const EdgeInsets.symmetric(vertical: 7),
             child: Column(
-              mainAxisSize:
-                  MainAxisSize.min,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
                   icon,
                   size: 21,
-                  color: selected
-                      ? primary
-                      : Colors.grey.shade600,
+                  color: selected ? primary : colorScheme.onSurfaceVariant,
                 ),
                 const SizedBox(height: 3),
                 Text(
                   label,
                   maxLines: 1,
-                  overflow:
-                      TextOverflow.ellipsis,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: selected
-                        ? FontWeight.bold
-                        : FontWeight.normal,
-                    color: selected
-                        ? primary
-                        : Colors.grey.shade700,
+                    fontSize: 11,
+                    fontWeight:
+                        selected ? FontWeight.bold : FontWeight.normal,
+                    color: selected ? primary : colorScheme.onSurfaceVariant,
                   ),
                 ),
               ],
@@ -1604,39 +1747,27 @@ final latestListings = _listings
       top: false,
       child: Container(
         decoration: BoxDecoration(
-          color: Theme.of(context)
-              .colorScheme
-              .surface,
+          color: colorScheme.surface,
           border: Border(
             top: BorderSide(
-              color: Colors.grey.shade300,
+              color: colorScheme.outlineVariant,
               width: 0.6,
             ),
           ),
         ),
         child: Row(
-          textDirection:
-              TextDirection.rtl,
+          textDirection: TextDirection.rtl,
           children: [
             navItem(
               icon: Icons.home_outlined,
               label: 'الرئيسية',
               selected: true,
-              onTap: () {
-                setState(() {
-                  _selectedCategoryId =
-                      null;
-                  _searchQuery = '';
-                  _searchController.clear();
-                });
-
-                _loadData();
-              },
+              // يصعد لأعلى الصفحة ويمسح الفلاتر بدون إعادة تحميل كل شيء.
+              onTap: _clearFilters,
             ),
 
             navItem(
-              icon:
-                  Icons.inventory_2_outlined,
+              icon: Icons.inventory_2_outlined,
               label: 'إعلاناتي',
               onTap: _openMyListings,
             ),
@@ -1646,28 +1777,20 @@ final latestListings = _listings
               child: InkWell(
                 onTap: _openAddListing,
                 child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(
-                    vertical: 4,
-                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 4),
                   child: Column(
-                    mainAxisSize:
-                        MainAxisSize.min,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Container(
                         width: 43,
                         height: 34,
-                        decoration:
-                            BoxDecoration(
+                        decoration: BoxDecoration(
                           color: primary,
-                          borderRadius:
-                              BorderRadius.circular(
-                            11,
-                          ),
+                          borderRadius: BorderRadius.circular(11),
                         ),
-                        child: const Icon(
+                        child: Icon(
                           Icons.add,
-                          color: Colors.white,
+                          color: colorScheme.onPrimary,
                           size: 25,
                         ),
                       ),
@@ -1675,12 +1798,10 @@ final latestListings = _listings
                       Text(
                         'أضف إعلان',
                         maxLines: 1,
-                        overflow:
-                            TextOverflow.ellipsis,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: 10,
-                          fontWeight:
-                              FontWeight.bold,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
                           color: primary,
                         ),
                       ),
@@ -1691,15 +1812,13 @@ final latestListings = _listings
             ),
 
             navItem(
-              icon:
-                  Icons.favorite_border,
+              icon: Icons.favorite_border,
               label: 'المفضلة',
               onTap: _openFavorites,
             ),
 
             navItem(
-              icon:
-                  Icons.person_outline,
+              icon: Icons.person_outline,
               label: 'الملف الشخصي',
               onTap: _openProfile,
             ),
@@ -1710,43 +1829,29 @@ final latestListings = _listings
   }
 
   // =========================
-  // رأس القائمة
+  // القائمة الجانبية
   // =========================
-  Widget _buildDrawerHeader(
-    User? user,
-    String? name,
-  ) {
-    final primary =
-        Theme.of(context).colorScheme.primary;
+  Widget _buildDrawerHeader(User? user, String? name) {
+    final primary = Theme.of(context).colorScheme.primary;
 
-    final displayName =
-        name != null && name.trim().isNotEmpty
-            ? name.trim()
-            : user == null
-                ? 'مرحباً بك'
-                : 'مستخدم دلالة شبشة';
+    final displayName = name != null && name.trim().isNotEmpty
+        ? name.trim()
+        : user == null
+            ? 'مرحباً بك'
+            : 'مستخدم دلالة شبشة';
 
     // رقم الهاتف الحقيقي لحسابات الهاتف.
-    final authPhone =
-        user?.phone?.trim() ?? '';
+    final authPhone = user?.phone?.trim() ?? '';
 
     // البريد الإلكتروني لحسابات البريد.
-    final email =
-        user?.email?.trim() ?? '';
+    final email = user?.email?.trim() ?? '';
 
-    // رقم الهاتف الذي حفظناه في metadata
-    // عند إنشاء الحساب، كخيار احتياطي.
+    // رقم الهاتف المحفوظ في metadata كخيار احتياطي.
     final metadataPhone =
-        user?.userMetadata?['phone']
-                ?.toString()
-                .trim() ??
-            '';
+        user?.userMetadata?['phone']?.toString().trim() ?? '';
 
-    // إذا كان الحساب مرتبطاً برقم هاتف،
-    // نعرض الهاتف أولاً ولا نعرض البريد التلقائي.
-    final phone = authPhone.isNotEmpty
-        ? authPhone
-        : metadataPhone;
+    // إذا كان الحساب مرتبطاً برقم هاتف نعرضه أولاً.
+    final phone = authPhone.isNotEmpty ? authPhone : metadataPhone;
 
     final contact = phone.isNotEmpty
         ? phone
@@ -1758,12 +1863,7 @@ final latestListings = _listings
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(
-        16,
-        16,
-        16,
-        14,
-      ),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
       decoration: BoxDecoration(
         color: primary,
         borderRadius: const BorderRadius.only(
@@ -1772,19 +1872,15 @@ final latestListings = _listings
       ),
       child: Row(
         children: [
-          // صورة الحساب
           Container(
             width: 52,
             height: 52,
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius:
-                  BorderRadius.circular(15),
+              borderRadius: BorderRadius.circular(15),
             ),
             child: Icon(
-              user == null
-                  ? Icons.person_outline
-                  : Icons.storefront_rounded,
+              user == null ? Icons.person_outline : Icons.storefront_rounded,
               size: 28,
               color: primary,
             ),
@@ -1792,17 +1888,14 @@ final latestListings = _listings
 
           const SizedBox(width: 12),
 
-          // الاسم + الهاتف أو البريد
           Expanded(
             child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   displayName,
                   maxLines: 1,
-                  overflow:
-                      TextOverflow.ellipsis,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 16,
@@ -1815,11 +1908,9 @@ final latestListings = _listings
                 Text(
                   contact,
                   maxLines: 1,
-                  overflow:
-                      TextOverflow.ellipsis,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: Colors.white
-                        .withValues(alpha: 0.82),
+                    color: Colors.white.withValues(alpha: 0.82),
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
                   ),
@@ -1832,23 +1923,11 @@ final latestListings = _listings
     );
   }
 
-  // =========================
-  // عنوان مجموعة
-  // =========================
-  Widget _buildDrawerSectionTitle(
-    String title,
-    IconData icon,
-  ) {
-    final primary =
-        Theme.of(context).colorScheme.primary;
+  Widget _buildDrawerSectionTitle(String title, IconData icon) {
+    final primary = Theme.of(context).colorScheme.primary;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        9,
-        5,
-        9,
-        4,
-      ),
+      padding: const EdgeInsets.fromLTRB(9, 5, 9, 4),
       child: Row(
         children: [
           Icon(
@@ -1870,9 +1949,6 @@ final latestListings = _listings
     );
   }
 
-  // =========================
-  // عنصر القائمة
-  // =========================
   Widget _buildDrawerItem({
     required IconData icon,
     required String title,
@@ -1881,8 +1957,7 @@ final latestListings = _listings
     bool selected = false,
     bool isDestructive = false,
   }) {
-    final colorScheme =
-        Theme.of(context).colorScheme;
+    final colorScheme = Theme.of(context).colorScheme;
 
     final itemColor = isDestructive
         ? Colors.red.shade700
@@ -1891,19 +1966,14 @@ final latestListings = _listings
             : colorScheme.onSurface;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(
-        vertical: 2,
-      ),
+      padding: const EdgeInsets.symmetric(vertical: 2),
       child: Material(
         color: selected
-            ? colorScheme.primaryContainer
-                .withValues(alpha: 0.65)
+            ? colorScheme.primaryContainer.withValues(alpha: 0.65)
             : Colors.transparent,
-        borderRadius:
-            BorderRadius.circular(11),
+        borderRadius: BorderRadius.circular(11),
         child: InkWell(
-          borderRadius:
-              BorderRadius.circular(11),
+          borderRadius: BorderRadius.circular(11),
           onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.symmetric(
@@ -1917,11 +1987,9 @@ final latestListings = _listings
                   height: 34,
                   decoration: BoxDecoration(
                     color: selected
-                        ? colorScheme.primary
-                            .withValues(alpha: 0.12)
+                        ? colorScheme.primary.withValues(alpha: 0.12)
                         : Colors.transparent,
-                    borderRadius:
-                        BorderRadius.circular(9),
+                    borderRadius: BorderRadius.circular(9),
                   ),
                   child: Icon(
                     icon,
@@ -1934,18 +2002,15 @@ final latestListings = _listings
 
                 Expanded(
                   child: Column(
-                    crossAxisAlignment:
-                        CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         title,
                         maxLines: 1,
-                        overflow:
-                            TextOverflow.ellipsis,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 14.5,
-                          fontWeight:
-                              FontWeight.w700,
+                          fontWeight: FontWeight.w700,
                           color: itemColor,
                         ),
                       ),
@@ -1955,13 +2020,10 @@ final latestListings = _listings
                         Text(
                           subtitle,
                           maxLines: 1,
-                          overflow:
-                              TextOverflow.ellipsis,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            fontSize: 10.5,
-                            color: Colors
-                                .grey
-                                .shade600,
+                            fontSize: 11,
+                            color: colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ],
@@ -1983,247 +2045,199 @@ final latestListings = _listings
     );
   }
 
-    @override
+  Widget _buildDrawer(User? user, String? name) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Drawer(
+      width: 220,
+      elevation: 3,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.only(
+          topRight: Radius.circular(18),
+          bottomRight: Radius.circular(18),
+        ),
+      ),
+      child: SafeArea(
+        child: Column(
+          children: [
+            _buildDrawerHeader(user, name),
+
+            const SizedBox(height: 5),
+
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 9,
+                  vertical: 2,
+                ),
+                children: [
+                  _buildDrawerItem(
+                    icon: user == null
+                        ? Icons.login_outlined
+                        : Icons.person_outline,
+                    title: user == null ? 'تسجيل الدخول' : 'الملف الشخصي',
+                    onTap: () async {
+                      Navigator.pop(context);
+                      await _openProfile();
+                    },
+                  ),
+
+                  _buildDrawerItem(
+                    icon: Icons.add_circle_outline,
+                    title: 'إضافة إعلان',
+                    onTap: () async {
+                      Navigator.pop(context);
+                      await _openAddListing();
+                    },
+                  ),
+
+                  const SizedBox(height: 5),
+
+                  if (_isAdmin) ...[
+                    _buildDrawerItem(
+                      icon: Icons.admin_panel_settings_outlined,
+                      title: 'لوحة تحكم الإدارة',
+                      subtitle: 'إدارة ومراجعة الإعلانات',
+                      onTap: () async {
+                        Navigator.pop(context);
+                        await _openAdminPanel();
+                      },
+                    ),
+
+                    const Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 6,
+                      ),
+                      child: Divider(height: 1),
+                    ),
+                  ],
+
+                  _buildDrawerSectionTitle(
+                    'الأقسام',
+                    Icons.grid_view_rounded,
+                  ),
+
+                  if (_categories.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.all(12),
+                      child: Text(
+                        'لا توجد أقسام حالياً',
+                        style: TextStyle(fontSize: 13),
+                      ),
+                    )
+                  else
+                    ..._categories.map((category) {
+                      final categoryId = category['id'] as int?;
+                      final categoryName =
+                          category['name']?.toString() ?? 'بدون اسم';
+
+                      final selected = _selectedCategoryId == categoryId;
+
+                      return _buildDrawerItem(
+                        icon: _iconForCategory(category),
+                        title: categoryName,
+                        selected: selected,
+                        onTap: () {
+                          Navigator.pop(context);
+
+                          if (categoryId == null) return;
+
+                          _selectCategory(categoryId, clearSearch: true);
+                        },
+                      );
+                    }),
+
+                  const Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 6,
+                    ),
+                    child: Divider(height: 1),
+                  ),
+
+                  _buildDrawerSectionTitle(
+                    'حسابي',
+                    Icons.account_circle_outlined,
+                  ),
+
+                  _buildDrawerItem(
+                    icon: Icons.favorite_border,
+                    title: 'المفضلة',
+                    onTap: () {
+                      Navigator.pop(context);
+                      _openFavorites();
+                    },
+                  ),
+
+                  _buildDrawerItem(
+                    icon: Icons.inventory_2_outlined,
+                    title: 'إعلاناتي',
+                    onTap: () {
+                      Navigator.pop(context);
+                      _openMyListings();
+                    },
+                  ),
+
+                  const SizedBox(height: 6),
+
+                  if (user != null)
+                    _buildDrawerItem(
+                      icon: Icons.logout,
+                      title: 'تسجيل الخروج',
+                      isDestructive: true,
+                      onTap: () {
+                        Navigator.pop(context);
+                        _signOut();
+                      },
+                    ),
+                ],
+              ),
+            ),
+
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+              decoration: BoxDecoration(
+                border: Border(
+                  top: BorderSide(
+                    color: colorScheme.outlineVariant,
+                    width: 0.6,
+                  ),
+                ),
+              ),
+              child: Text(
+                'دلالة شبشة',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // =========================
+  // البناء
+  // =========================
+  @override
   Widget build(BuildContext context) {
     final user = _supabase.auth.currentUser;
-
-    final name =
-        user?.userMetadata?['full_name'] as String?;
+    final name = user?.userMetadata?['full_name'] as String?;
 
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        // =========================
-        // القائمة الجانبية
-        // =========================
-        drawer: Drawer(
-          width: 220,
-          elevation: 3,
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.only(
-              topRight: Radius.circular(18),
-              bottomRight: Radius.circular(18),
-            ),
-          ),
-          child: SafeArea(
-            child: Column(
-              children: [
-                // =========================
-                // رأس القائمة / الحساب
-                // =========================
-                _buildDrawerHeader(user, name),
+        drawer: _buildDrawer(user, name),
 
-                const SizedBox(height: 5),
-
-                // =========================
-                // محتوى القائمة
-                // =========================
-                Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 9,
-                      vertical: 2,
-                    ),
-                    children: [
-                      // الملف الشخصي / تسجيل الدخول
-                      _buildDrawerItem(
-                        icon: user == null
-                            ? Icons.login_outlined
-                            : Icons.person_outline,
-                        title: user == null
-                            ? 'تسجيل الدخول'
-                            : 'الملف الشخصي',
-                        onTap: () async {
-                          Navigator.pop(context);
-                          await _openProfile();
-                        },
-                      ),
-
-                      // إضافة إعلان
-                      _buildDrawerItem(
-                        icon: Icons.add_circle_outline,
-                        title: 'إضافة إعلان',
-                        onTap: () async {
-                          Navigator.pop(context);
-                          await _openAddListing();
-                        },
-                      ),
-
-                      const SizedBox(height: 5),
-
-                      // =========================
-                      // الإدارة
-                      // =========================
-                      if (_isAdmin) ...[
-                        _buildDrawerItem(
-                          icon:
-                              Icons.admin_panel_settings_outlined,
-                          title: 'لوحة تحكم الإدارة',
-                          subtitle:
-                              'إدارة ومراجعة الإعلانات',
-                          onTap: () async {
-                            Navigator.pop(context);
-                            await _openAdminPanel();
-                          },
-                        ),
-
-                        const Padding(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 6,
-                          ),
-                          child: Divider(height: 1),
-                        ),
-                      ],
-
-                      // =========================
-                      // الأقسام
-                      // =========================
-                      _buildDrawerSectionTitle(
-                        'الأقسام',
-                        Icons.grid_view_rounded,
-                      ),
-
-                      if (_categories.isEmpty)
-                        const Padding(
-                          padding: EdgeInsets.all(12),
-                          child: Text(
-                            'لا توجد أقسام حالياً',
-                            style: TextStyle(
-                              fontSize: 13,
-                            ),
-                          ),
-                        )
-                      else
-                        ..._categories.map(
-                          (category) {
-                            final categoryId =
-                                category['id'] as int?;
-
-                            final categoryName =
-                                category['name']?.toString() ??
-                                    'بدون اسم';
-
-                            final selected =
-                                _selectedCategoryId ==
-                                    categoryId;
-
-                            return _buildDrawerItem(
-                              icon: _categoryIcon(
-                                categoryName,
-                              ),
-                              title: categoryName,
-                              selected: selected,
-                              onTap: () {
-                                Navigator.pop(context);
-
-                                if (categoryId == null) {
-                                  return;
-                                }
-
-                                setState(() {
-                                  _selectedCategoryId =
-                                      categoryId;
-                                  _searchQuery = '';
-                                  _searchController.clear();
-                                });
-
-                                _loadData();
-                              },
-                            );
-                          },
-                        ),
-
-                      const Padding(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 6,
-                        ),
-                        child: Divider(height: 1),
-                      ),
-
-                      // =========================
-                      // نشاط المستخدم
-                      // =========================
-                      _buildDrawerSectionTitle(
-                        'حسابي',
-                        Icons.account_circle_outlined,
-                      ),
-
-                      _buildDrawerItem(
-                        icon: Icons.favorite_border,
-                        title: 'المفضلة',
-                        onTap: () {
-                          Navigator.pop(context);
-                          _openFavorites();
-                        },
-                      ),
-
-                      _buildDrawerItem(
-                        icon: Icons.inventory_2_outlined,
-                        title: 'إعلاناتي',
-                        onTap: () {
-                          Navigator.pop(context);
-                          _openMyListings();
-                        },
-                      ),
-
-                      const SizedBox(height: 6),
-
-                      // =========================
-                      // تسجيل الخروج
-                      // =========================
-                      if (user != null)
-                        _buildDrawerItem(
-                          icon: Icons.logout,
-                          title: 'تسجيل الخروج',
-                          isDestructive: true,
-                          onTap: () {
-                            Navigator.pop(context);
-                            _signOut();
-                          },
-                        ),
-                    ],
-                  ),
-                ),
-
-                // =========================
-                // أسفل القائمة
-                // =========================
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.fromLTRB(
-                    16,
-                    8,
-                    16,
-                    12,
-                  ),
-                  decoration: BoxDecoration(
-                    border: Border(
-                      top: BorderSide(
-                        color: Colors.grey.shade300,
-                        width: 0.6,
-                      ),
-                    ),
-                  ),
-                  child: Text(
-                    'دلالة شبشة',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey.shade600,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-
-        // =========================
-        // AppBar
-        // =========================
+        // AppBar مبسّط: العنوان والحساب فقط.
+        // زر "ضع إعلانك" أصبح في البانر والشريط السفلي والقائمة،
+        // والتحديث بالسحب للأسفل.
         appBar: AppBar(
           centerTitle: false,
           titleSpacing: 0,
@@ -2233,85 +2247,17 @@ final latestListings = _listings
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w900,
-              color:
-                  Theme.of(context).colorScheme.primary,
+              color: Theme.of(context).colorScheme.primary,
             ),
           ),
           actions: [
-            IconButton(
-              tooltip: 'تحديث',
-              onPressed: () {
-                _loadData();
-                _checkAdminStatus();
-              },
-              icon: const Icon(
-                Icons.refresh,
-              ),
-            ),
-            _buildPostListingButton(),
             _buildProfileButton(),
           ],
         ),
 
-        // =========================
-        // محتوى الصفحة
-        // =========================
-        body: Column(
-          crossAxisAlignment:
-              CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                13,
-                4,
-                13,
-                8,
-              ),
-              child: Column(
-                children: [
-                  Text(
-                    'في مكان واحد - تسوق واعلن بسهولة',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: Theme.of(context)
-                          .colorScheme
-                          .primary,
-                    ),
-                  ),
+        body: _buildBody(),
 
-                  if (user != null &&
-                      name != null &&
-                      name.trim().isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(
-                        top: 3,
-                      ),
-                      child: Text(
-                        'مرحباً يا $name 👋',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade700,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-
-            Expanded(
-              child: _buildBody(),
-            ),
-          ],
-        ),
-
-        // =========================
-        // شريط التنقل السفلي
-        // =========================
-        bottomNavigationBar:
-            _buildBottomNavigation(),
+        bottomNavigationBar: _buildBottomNavigation(),
       ),
     );
   }
