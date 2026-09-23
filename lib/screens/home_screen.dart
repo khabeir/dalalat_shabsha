@@ -1997,7 +1997,7 @@ final latestListings = _listings
         // القائمة الجانبية
         // =========================
         drawer: Drawer(
-          width: 240,
+          width: 220,
           elevation: 3,
           shape: const RoundedRectangleBorder(
             borderRadius: BorderRadius.only(
