@@ -1709,6 +1709,269 @@ final latestListings = _listings
     );
   }
 
+  // =========================
+  // رأس القائمة
+  // =========================
+  Widget _buildDrawerHeader(
+    User? user,
+    String? name,
+  ) {
+    final primary =
+        Theme.of(context).colorScheme.primary;
+
+    final displayName =
+        name != null && name.trim().isNotEmpty
+            ? name.trim()
+            : user == null
+                ? 'مرحباً بك'
+                : 'مستخدم دلالة شبشة';
+
+    // عند التسجيل بالبريد يظهر البريد.
+    // وإذا لم يوجد بريد نعرض رقم الهاتف من metadata.
+    final email =
+        user?.email?.trim() ?? '';
+
+    final phone =
+        user?.userMetadata?['phone']
+                ?.toString()
+                .trim() ??
+            '';
+
+    final contact = email.isNotEmpty
+        ? email
+        : phone.isNotEmpty
+            ? phone
+            : user == null
+                ? 'تصفح الإعلانات بسهولة'
+                : 'حسابك في دلالة شبشة';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(
+        16,
+        16,
+        16,
+        14,
+      ),
+      decoration: BoxDecoration(
+        color: primary,
+        borderRadius: const BorderRadius.only(
+          topRight: Radius.circular(18),
+        ),
+      ),
+      child: Row(
+        children: [
+          // صورة الحساب
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius:
+                  BorderRadius.circular(15),
+            ),
+            child: Icon(
+              user == null
+                  ? Icons.person_outline
+                  : Icons.storefront_rounded,
+              size: 28,
+              color: primary,
+            ),
+          ),
+
+          const SizedBox(width: 12),
+
+          // الاسم + البريد/الهاتف
+          Expanded(
+            child: Column(
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
+              children: [
+                Text(
+                  displayName,
+                  maxLines: 1,
+                  overflow:
+                      TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+
+                const SizedBox(height: 4),
+
+                Text(
+                  contact,
+                  maxLines: 1,
+                  overflow:
+                      TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.white
+                        .withValues(alpha: 0.82),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // =========================
+  // عنوان مجموعة
+  // =========================
+  Widget _buildDrawerSectionTitle(
+    String title,
+    IconData icon,
+  ) {
+    final primary =
+        Theme.of(context).colorScheme.primary;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        9,
+        5,
+        9,
+        4,
+      ),
+      child: Row(
+        children: [
+          Icon(
+            icon,
+            size: 18,
+            color: primary,
+          ),
+          const SizedBox(width: 7),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+              color: primary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // =========================
+  // عنصر القائمة
+  // =========================
+  Widget _buildDrawerItem({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+    String? subtitle,
+    bool selected = false,
+    bool isDestructive = false,
+  }) {
+    final colorScheme =
+        Theme.of(context).colorScheme;
+
+    final itemColor = isDestructive
+        ? Colors.red.shade700
+        : selected
+            ? colorScheme.primary
+            : colorScheme.onSurface;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        vertical: 2,
+      ),
+      child: Material(
+        color: selected
+            ? colorScheme.primaryContainer
+                .withValues(alpha: 0.65)
+            : Colors.transparent,
+        borderRadius:
+            BorderRadius.circular(11),
+        child: InkWell(
+          borderRadius:
+              BorderRadius.circular(11),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 10,
+              vertical: 7,
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? colorScheme.primary
+                            .withValues(alpha: 0.12)
+                        : Colors.transparent,
+                    borderRadius:
+                        BorderRadius.circular(9),
+                  ),
+                  child: Icon(
+                    icon,
+                    size: 21,
+                    color: itemColor,
+                  ),
+                ),
+
+                const SizedBox(width: 9),
+
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment:
+                        CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow:
+                            TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 14.5,
+                          fontWeight:
+                              FontWeight.w700,
+                          color: itemColor,
+                        ),
+                      ),
+
+                      if (subtitle != null) ...[
+                        const SizedBox(height: 1),
+                        Text(
+                          subtitle,
+                          maxLines: 1,
+                          overflow:
+                              TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            color: Colors
+                                .grey
+                                .shade600,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+
+                if (selected)
+                  Icon(
+                    Icons.chevron_left_rounded,
+                    size: 19,
+                    color: colorScheme.primary,
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(
     BuildContext context,
@@ -1725,283 +1988,227 @@ final latestListings = _listings
           TextDirection.rtl,
       child: Scaffold(
         drawer: Drawer(
-          child: SafeArea(
-            child: ListView(
-              padding: EdgeInsets.zero,
-              children: [
-                UserAccountsDrawerHeader(
-                  decoration: BoxDecoration(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .primary,
-                  ),
-                  accountName: Text(
-                    name == null ||
-                            name.isEmpty
-                        ? 'مرحباً بك في دلالة شبشة'
-                        : name,
-                  ),
-                  accountEmail:
-                      user == null
-                          ? null
-                          : Text(
-                              user.email ?? '',
-                            ),
-                  currentAccountPicture:
-                      CircleAvatar(
-                    backgroundColor:
-                        Theme.of(context)
-                            .colorScheme
-                            .onPrimary,
-                    child: Icon(
-                      Icons.storefront_rounded,
-                      size: 31,
-                      color:
-                          Theme.of(context)
-                              .colorScheme
-                              .primary,
-                    ),
-                  ),
-                ),
+  width: 285,
+  elevation: 3,
+  shape: const RoundedRectangleBorder(
+    borderRadius: BorderRadius.only(
+      topRight: Radius.circular(18),
+      bottomRight: Radius.circular(18),
+    ),
+  ),
+  child: SafeArea(
+    child: Column(
+      children: [
+        // =========================
+        // رأس القائمة / الحساب
+        // =========================
+        _buildDrawerHeader(user, name),
 
-                ListTile(
-                  leading: const Icon(
-                    Icons.person_outline,
-                  ),
-                  title: Text(
-                    user == null
-                        ? 'تسجيل الدخول'
-                        : 'الملف الشخصي',
-                  ),
+        const SizedBox(height: 5),
+
+        // =========================
+        // محتوى القائمة
+        // =========================
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 9,
+              vertical: 2,
+            ),
+            children: [
+              // الملف الشخصي / تسجيل الدخول
+              _buildDrawerItem(
+                icon: user == null
+                    ? Icons.login_outlined
+                    : Icons.person_outline,
+                title: user == null
+                    ? 'تسجيل الدخول'
+                    : 'الملف الشخصي',
+                onTap: () async {
+                  Navigator.pop(context);
+                  await _openProfile();
+                },
+              ),
+
+              // إضافة إعلان
+              _buildDrawerItem(
+                icon: Icons.add_circle_outline,
+                title: 'إضافة إعلان',
+                onTap: () async {
+                  Navigator.pop(context);
+                  await _openAddListing();
+                },
+              ),
+
+              const SizedBox(height: 5),
+
+              // =========================
+              // الإدارة
+              // =========================
+              if (_isAdmin) ...[
+                _buildDrawerItem(
+                  icon: Icons.admin_panel_settings_outlined,
+                  title: 'لوحة تحكم الإدارة',
+                  subtitle: 'إدارة ومراجعة الإعلانات',
                   onTap: () async {
                     Navigator.pop(context);
-                    await _openProfile();
+                    await _openAdminPanel();
                   },
                 ),
-
-                if (_isAdmin)
-                  ListTile(
-                    leading: const Icon(
-                      Icons
-                          .admin_panel_settings_outlined,
-                    ),
-                    title: const Text(
-                      'لوحة تحكم الإدارة',
-                    ),
-                    subtitle: const Text(
-                      'إدارة ومراجعة الإعلانات',
-                    ),
-                    onTap: () async {
-                      Navigator.pop(context);
-                      await _openAdminPanel();
-                    },
-                  ),
-
-                const Divider(),
 
                 const Padding(
-                  padding:
-                      EdgeInsets.fromLTRB(
-                    16,
-                    10,
-                    16,
-                    6,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 6,
                   ),
-                  child: Text(
-                    'الأقسام',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight:
-                          FontWeight.bold,
-                    ),
-                  ),
+                  child: Divider(height: 1),
                 ),
-
-                if (_categories.isEmpty)
-                  const Padding(
-                    padding:
-                        EdgeInsets.all(16),
-                    child: Text(
-                      'لا توجد أقسام حالياً',
-                    ),
-                  )
-                else
-                  ..._categories.map(
-                    (category) {
-                      final categoryId =
-                          category['id']
-                              as int?;
-
-                      final categoryName =
-                          category['name']
-                                  ?.toString() ??
-                              'بدون اسم';
-
-                      return ListTile(
-                        dense: true,
-                        leading: Icon(
-                          _categoryIcon(
-                            categoryName,
-                          ),
-                        ),
-                        title: Text(
-                          categoryName,
-                        ),
-                        selected:
-                            _selectedCategoryId ==
-                                categoryId,
-                        onTap: () {
-                          Navigator.pop(
-                            context,
-                          );
-
-                          if (categoryId ==
-                              null) {
-                            return;
-                          }
-
-                          setState(() {
-                            _selectedCategoryId =
-                                categoryId;
-                            _searchQuery = '';
-                            _searchController
-                                .clear();
-                          });
-
-                          _loadData();
-                        },
-                      );
-                    },
-                  ),
-
-                const Divider(),
-
-                ListTile(
-                  leading: const Icon(
-                    Icons.favorite_border,
-                  ),
-                  title: const Text(
-                    'المفضلة',
-                  ),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _openFavorites();
-                  },
-                ),
-
-                ListTile(
-                  leading: const Icon(
-                    Icons.inventory_2_outlined,
-                  ),
-                  title: const Text(
-                    'إعلاناتي',
-                  ),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _openMyListings();
-                  },
-                ),
-
-                if (user != null)
-                  ListTile(
-                    leading: const Icon(
-                      Icons.logout,
-                    ),
-                    title: const Text(
-                      'تسجيل الخروج',
-                    ),
-                    onTap: () {
-                      Navigator.pop(context);
-                      _signOut();
-                    },
-                  ),
               ],
-            ),
-          ),
-        ),
 
-        appBar: AppBar(
-          centerTitle: false,
-          titleSpacing: 0,
-          elevation: 0,
-          title: Text(
-            'دلالة شبشة',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w900,
-              color: Theme.of(context)
-                  .colorScheme
-                  .primary,
-            ),
-          ),
-          actions: [
-            IconButton(
-              tooltip: 'تحديث',
-              onPressed: () {
-                _loadData();
-                _checkAdminStatus();
-              },
-              icon: const Icon(
-                Icons.refresh,
+              // =========================
+              // الأقسام
+              // =========================
+              _buildDrawerSectionTitle(
+                'الأقسام',
+                Icons.grid_view_rounded,
               ),
-            ),
-            _buildPostListingButton(),
-            _buildProfileButton(),
-          ],
-        ),
 
-        body: Column(
-          crossAxisAlignment:
-              CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding:
-                  const EdgeInsets.fromLTRB(
-                13,
-                4,
-                13,
-                8,
-              ),
-              child: Column(
-                children: [
-                  Text(
-                    'في مكان واحد - تسوق واعلن بسهولة',
-                    textAlign:
-                        TextAlign.center,
+              if (_categories.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.all(12),
+                  child: Text(
+                    'لا توجد أقسام حالياً',
                     style: TextStyle(
-                      fontSize: 16,
-                      fontWeight:
-                          FontWeight.w800,
-                      color:
-                          Theme.of(context)
-                              .colorScheme
-                              .primary,
+                      fontSize: 13,
                     ),
                   ),
+                )
+              else
+                ..._categories.map(
+                  (category) {
+                    final categoryId =
+                        category['id'] as int?;
 
-                  if (user != null &&
-                      name != null &&
-                      name.trim().isNotEmpty)
-                    Padding(
-                      padding:
-                          const EdgeInsets.only(
-                        top: 3,
+                    final categoryName =
+                        category['name']?.toString() ??
+                            'بدون اسم';
+
+                    final selected =
+                        _selectedCategoryId ==
+                            categoryId;
+
+                    return _buildDrawerItem(
+                      icon: _categoryIcon(
+                        categoryName,
                       ),
-                      child: Text(
-                        'مرحباً يا $name 👋',
-                        textAlign:
-                            TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors
-                              .grey
-                              .shade700,
-                        ),
-                      ),
-                    ),
-                ],
+                      title: categoryName,
+                      selected: selected,
+                      onTap: () {
+                        Navigator.pop(context);
+
+                        if (categoryId == null) {
+                          return;
+                        }
+
+                        setState(() {
+                          _selectedCategoryId =
+                              categoryId;
+                          _searchQuery = '';
+                          _searchController.clear();
+                        });
+
+                        _loadData();
+                      },
+                    );
+                  },
+                ),
+
+              const Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 6,
+                ),
+                child: Divider(height: 1),
+              ),
+
+              // =========================
+              // نشاط المستخدم
+              // =========================
+              _buildDrawerSectionTitle(
+                'حسابي',
+                Icons.account_circle_outlined,
+              ),
+
+              _buildDrawerItem(
+                icon: Icons.favorite_border,
+                title: 'المفضلة',
+                onTap: () {
+                  Navigator.pop(context);
+                  _openFavorites();
+                },
+              ),
+
+              _buildDrawerItem(
+                icon: Icons.inventory_2_outlined,
+                title: 'إعلاناتي',
+                onTap: () {
+                  Navigator.pop(context);
+                  _openMyListings();
+                },
+              ),
+
+              const SizedBox(height: 6),
+
+              // =========================
+              // تسجيل الخروج
+              // =========================
+              if (user != null)
+                _buildDrawerItem(
+                  icon: Icons.logout,
+                  title: 'تسجيل الخروج',
+                  isDestructive: true,
+                  onTap: () {
+                    Navigator.pop(context);
+                    _signOut();
+                  },
+                ),
+            ],
+          ),
+        ),
+
+        // =========================
+        // أسفل القائمة
+        // =========================
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(
+            16,
+            8,
+            16,
+            12,
+          ),
+          decoration: BoxDecoration(
+            border: Border(
+              top: BorderSide(
+                color: Colors.grey.shade300,
+                width: 0.6,
               ),
             ),
+          ),
+          child: Text(
+            'دلالة شبشة',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey.shade600,
+            ),
+          ),
+        ),
+      ],
+    ),
+  ),
+),
 
             Expanded(
               child: _buildBody(),
