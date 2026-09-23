@@ -130,21 +130,50 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
     }
   }
 
-  String _priceText() {
-    final price = _listing?['price'];
-    final currency = _listing?['currency'] ?? 'SDG';
-    final type = _listing?['price_type'];
+  String _formatPrice(dynamic value) {
+  if (value == null) return '';
 
-    if (type == 'contact' || price == null) {
-      return 'السعر عند التواصل';
-    }
+  final number = num.tryParse(value.toString());
 
-    if (type == 'negotiable') {
-      return '${price.toString()} $currency - قابل للتفاوض';
-    }
-
-    return '${price.toString()} $currency';
+  if (number == null) {
+    return value.toString();
   }
+
+  final hasDecimal = number % 1 != 0;
+
+  if (hasDecimal) {
+    return number.toStringAsFixed(2).replaceAllMapped(
+      RegExp(r'\B(?=(\d{3})+(?!\d))'),
+      (match) => ',',
+    );
+  }
+
+  return number
+      .toInt()
+      .toString()
+      .replaceAllMapped(
+        RegExp(r'\B(?=(\d{3})+(?!\d))'),
+        (match) => ',',
+      );
+}
+
+String _priceText() {
+  final price = _listing?['price'];
+  final currency = _listing?['currency'] ?? 'SDG';
+  final type = _listing?['price_type'];
+
+  if (type == 'contact' || price == null) {
+    return 'السعر عند التواصل';
+  }
+
+  final formattedPrice = _formatPrice(price);
+
+  if (type == 'negotiable') {
+    return '$formattedPrice $currency - قابل للتفاوض';
+  }
+
+  return '$formattedPrice $currency';
+}
 
   String _conditionText() {
     switch (_listing?['condition']) {
@@ -509,7 +538,7 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
                 _error ?? 'الإعلان غير موجود',
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               FilledButton(
                 onPressed: _loadListing,
                 child: const Text('إعادة المحاولة'),
@@ -588,7 +617,7 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
             ),
           ),
 
-        const SizedBox(height: 20),
+        const SizedBox(height: 12),
 
         // الشارة التجارية
         if (_isCommercial)
@@ -667,7 +696,7 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
           ),
         ),
 
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
 
         // معلومات الإعلان
         Card(
@@ -690,7 +719,7 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
 
                 _InfoRow(
                   icon: Icons.calendar_month_outlined,
@@ -715,7 +744,7 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
           ),
         ),
 
-        const SizedBox(height: 20),
+        const SizedBox(height: 12),
 
         // وصف الإعلان
         Card(
@@ -759,7 +788,7 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
           ),
         ),
 
-        const SizedBox(height: 20),
+        const SizedBox(height: 12),
 
         // أزرار التواصل
         Row(
@@ -816,7 +845,7 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
           label: const Text('الإبلاغ عن هذا الإعلان'),
         ),
 
-        const SizedBox(height: 20),
+        const SizedBox(height: 12),
       ],
     );
   }
