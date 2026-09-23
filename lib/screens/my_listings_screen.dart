@@ -716,66 +716,118 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
   }
 
   // أزرار العمليات الصغيرة أسفل الإعلان.
-  Widget _buildCompactActions(
-    Map<String, dynamic> listing,
-  ) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.end,
+Widget _buildCompactActions(
+  Map<String, dynamic> listing,
+) {
+  return Container(
+    padding: const EdgeInsets.symmetric(
+      horizontal: 6,
+      vertical: 4,
+    ),
+    decoration: BoxDecoration(
+      color: Colors.grey.withValues(alpha: 0.05),
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Tooltip(
-          message: 'عرض الإعلان',
-          child: IconButton(
-            visualDensity: VisualDensity.compact,
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(
-              minWidth: 38,
-              minHeight: 38,
-            ),
-            iconSize: 21,
+        // عرض
+        Expanded(
+          child: TextButton.icon(
             onPressed: () => _openListing(listing),
             icon: const Icon(
               Icons.visibility_outlined,
+              size: 19,
+            ),
+            label: const Text(
+              'عرض',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 6,
+                vertical: 7,
+              ),
+              minimumSize: Size.zero,
+              tapTargetSize:
+                  MaterialTapTargetSize.shrinkWrap,
             ),
           ),
         ),
 
-        Tooltip(
-          message: 'تعديل',
-          child: IconButton(
-            visualDensity: VisualDensity.compact,
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(
-              minWidth: 38,
-              minHeight: 38,
-            ),
-            iconSize: 21,
+        Container(
+          width: 1,
+          height: 24,
+          color: Colors.grey.withValues(alpha: 0.2),
+        ),
+
+        // تعديل
+        Expanded(
+          child: TextButton.icon(
             onPressed: () => _editListing(listing),
             icon: const Icon(
               Icons.edit_outlined,
+              size: 18,
+            ),
+            label: const Text(
+              'تعديل',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 6,
+                vertical: 7,
+              ),
+              minimumSize: Size.zero,
+              tapTargetSize:
+                  MaterialTapTargetSize.shrinkWrap,
             ),
           ),
         ),
 
-        Tooltip(
-          message: 'حذف',
-          child: IconButton(
-            visualDensity: VisualDensity.compact,
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(
-              minWidth: 38,
-              minHeight: 38,
-            ),
-            iconSize: 21,
-            color: Colors.red,
+        Container(
+          width: 1,
+          height: 24,
+          color: Colors.grey.withValues(alpha: 0.2),
+        ),
+
+        // حذف
+        Expanded(
+          child: TextButton.icon(
             onPressed: () => _deleteListing(listing),
             icon: const Icon(
               Icons.delete_outline,
+              size: 18,
+            ),
+            label: const Text(
+              'حذف',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.red,
+              padding: const EdgeInsets.symmetric(
+                horizontal: 6,
+                vertical: 7,
+              ),
+              minimumSize: Size.zero,
+              tapTargetSize:
+                  MaterialTapTargetSize.shrinkWrap,
             ),
           ),
         ),
       ],
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildListingCard(
     Map<String, dynamic> listing,
