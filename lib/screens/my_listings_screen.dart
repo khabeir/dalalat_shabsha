@@ -63,34 +63,27 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
               .order('sort_order', ascending: true);
 
           final images =
-              List<Map<String, dynamic>>.from(
-            imagesResponse,
-          );
+              List<Map<String, dynamic>>.from(imagesResponse);
 
-          // نأخذ أول صورة فقط لكل إعلان.
+          // أخذ أول صورة فقط لكل إعلان.
           for (final image in images) {
             final listingId = image['listing_id'];
-            final imagePath =
-                image['image_path']?.toString();
+            final imagePath = image['image_path']?.toString();
 
             if (listingId is int &&
                 imagePath != null &&
                 imagePath.isNotEmpty &&
-                !_listingImageUrls.containsKey(
-                  listingId,
-                )) {
+                !_listingImageUrls.containsKey(listingId)) {
               final publicUrl = _supabase.storage
                   .from('listing-images')
                   .getPublicUrl(imagePath);
 
-              _listingImageUrls[listingId] =
-                  publicUrl;
+              _listingImageUrls[listingId] = publicUrl;
             }
           }
         } catch (_) {
-          // في حالة حدوث مشكلة في الصور،
-          // نترك الإعلانات تظهر بصورة طبيعية
-          // مع صورة افتراضية.
+          // إذا حدثت مشكلة في الصور،
+          // تستمر الإعلانات في الظهور بالصورة الافتراضية.
         }
       }
     }
@@ -498,8 +491,7 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
       ),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.10),
-        borderRadius:
-            BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: color.withValues(alpha: 0.25),
         ),
@@ -556,6 +548,8 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
                       OutlinedButton.styleFrom(
                     foregroundColor:
                         Colors.blue,
+                    minimumSize:
+                        const Size(0, 42),
                   ),
                 ),
               ),
@@ -576,6 +570,8 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
                       OutlinedButton.styleFrom(
                     foregroundColor:
                         Colors.grey,
+                    minimumSize:
+                        const Size(0, 42),
                   ),
                 ),
               ),
@@ -605,6 +601,11 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
               label: const Text(
                 'إعادة إلى متاح',
               ),
+              style:
+                  OutlinedButton.styleFrom(
+                minimumSize:
+                    const Size(0, 42),
+              ),
             ),
           ),
           const SizedBox(height: 10),
@@ -631,8 +632,7 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
           child: Text(
             text,
             maxLines: 1,
-            overflow:
-                TextOverflow.ellipsis,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontSize: 13,
               color: Colors.grey.shade700,
@@ -655,12 +655,15 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
     }
 
     return Container(
-      width: 118,
-      height: 118,
+      width: 120,
+      height: 120,
       decoration: BoxDecoration(
         color: Colors.grey.shade100,
-        borderRadius:
-            BorderRadius.circular(15),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: Colors.grey.shade300,
+          width: 1,
+        ),
       ),
       clipBehavior: Clip.antiAlias,
       child: imageUrl == null
@@ -683,8 +686,7 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
                 }
 
                 return Center(
-                  child:
-                      CircularProgressIndicator(
+                  child: CircularProgressIndicator(
                     strokeWidth: 2,
                     value: loadingProgress
                                 .expectedTotalBytes !=
@@ -713,6 +715,68 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
     );
   }
 
+  // أزرار العمليات الصغيرة أسفل الإعلان.
+  Widget _buildCompactActions(
+    Map<String, dynamic> listing,
+  ) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        Tooltip(
+          message: 'عرض الإعلان',
+          child: IconButton(
+            visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(
+              minWidth: 38,
+              minHeight: 38,
+            ),
+            iconSize: 21,
+            onPressed: () => _openListing(listing),
+            icon: const Icon(
+              Icons.visibility_outlined,
+            ),
+          ),
+        ),
+
+        Tooltip(
+          message: 'تعديل',
+          child: IconButton(
+            visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(
+              minWidth: 38,
+              minHeight: 38,
+            ),
+            iconSize: 21,
+            onPressed: () => _editListing(listing),
+            icon: const Icon(
+              Icons.edit_outlined,
+            ),
+          ),
+        ),
+
+        Tooltip(
+          message: 'حذف',
+          child: IconButton(
+            visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(
+              minWidth: 38,
+              minHeight: 38,
+            ),
+            iconSize: 21,
+            color: Colors.red,
+            onPressed: () => _deleteListing(listing),
+            icon: const Icon(
+              Icons.delete_outline,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildListingCard(
     Map<String, dynamic> listing,
   ) {
@@ -727,216 +791,189 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
         listing['area']?.toString() ?? '';
 
     final description =
-        listing['description']?.toString() ??
-            '';
+        listing['description']?.toString() ?? '';
 
     final createdAt =
-        _formatDate(
-      listing['created_at'],
-    );
+        _formatDate(listing['created_at']);
 
     final priceText =
         _priceText(listing);
 
-    return Card(
+    return Container(
       margin: const EdgeInsets.symmetric(
         horizontal: 12,
-        vertical: 6,
+        vertical: 7,
       ),
-      elevation: 1.5,
+      decoration: BoxDecoration(
+        color: Theme.of(context)
+            .colorScheme
+            .surface,
+        borderRadius: BorderRadius.circular(20),
+
+        // إطار واضح للإعلان.
+        border: Border.all(
+          color: Theme.of(context)
+              .colorScheme
+              .outline
+              .withValues(alpha: 0.28),
+          width: 1.2,
+        ),
+
+        // ظل خفيف لإظهار حدود البطاقة.
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(
+              alpha: 0.07,
+            ),
+            blurRadius: 10,
+            spreadRadius: 0,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
       clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
-        borderRadius:
-            BorderRadius.circular(18),
-      ),
-      child: InkWell(
-        onTap: () => _openListing(listing),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment:
-                CrossAxisAlignment.stretch,
-            children: [
-              // الصورة + العنوان + الحالة
-              Row(
-                crossAxisAlignment:
-                    CrossAxisAlignment.start,
-                children: [
-                  _buildImage(listing),
-
-                  const SizedBox(width: 12),
-
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment:
-                          CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          crossAxisAlignment:
-                              CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: Text(
-                                title,
-                                maxLines: 3,
-                                overflow:
-                                    TextOverflow.ellipsis,
-                                style:
-                                    const TextStyle(
-                                  fontSize: 17,
-                                  fontWeight:
-                                      FontWeight.bold,
-                                  height: 1.25,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-
-                        const SizedBox(height: 10),
-
-                        _buildStatusBadge(status),
-
-                        const SizedBox(height: 10),
-
-                        Text(
-                          priceText,
-                          maxLines: 2,
-                          overflow:
-                              TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight:
-                                FontWeight.bold,
-                            color: Theme.of(
-                              context,
-                            )
-                                .colorScheme
-                                .primary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 13),
-
-              // معلومات الإعلان
-              if (area.isNotEmpty ||
-                  createdAt.isNotEmpty)
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _openListing(listing),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment:
+                  CrossAxisAlignment.stretch,
+              children: [
+                // الصورة + معلومات الإعلان.
                 Row(
+                  crossAxisAlignment:
+                      CrossAxisAlignment.start,
                   children: [
-                    if (area.isNotEmpty)
-                      Expanded(
-                        child: _buildInfoRow(
-                          icon: Icons
-                              .location_on_outlined,
-                          text: area,
-                        ),
+                    _buildImage(listing),
+
+                    const SizedBox(width: 12),
+
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment:
+                            CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            maxLines: 3,
+                            overflow:
+                                TextOverflow.ellipsis,
+                            style:
+                                const TextStyle(
+                              fontSize: 17,
+                              fontWeight:
+                                  FontWeight.bold,
+                              height: 1.25,
+                            ),
+                          ),
+
+                          const SizedBox(height: 9),
+
+                          _buildStatusBadge(status),
+
+                          const SizedBox(height: 9),
+
+                          Text(
+                            priceText,
+                            maxLines: 2,
+                            overflow:
+                                TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight:
+                                  FontWeight.bold,
+                              color: Theme.of(
+                                context,
+                              )
+                                  .colorScheme
+                                  .primary,
+                            ),
+                          ),
+                        ],
                       ),
-                    if (area.isNotEmpty &&
-                        createdAt.isNotEmpty)
-                      const SizedBox(width: 12),
-                    if (createdAt.isNotEmpty)
-                      Expanded(
-                        child: _buildInfoRow(
-                          icon: Icons
-                              .calendar_today_outlined,
-                          text: createdAt,
-                        ),
-                      ),
+                    ),
                   ],
                 ),
 
-              if (description.isNotEmpty) ...[
+                const SizedBox(height: 13),
+
+                // خط فاصل واضح.
+                Divider(
+                  height: 1,
+                  thickness: 0.8,
+                  color: Theme.of(context)
+                      .colorScheme
+                      .outline
+                      .withValues(alpha: 0.15),
+                ),
+
                 const SizedBox(height: 11),
-                Container(
-                  padding:
-                      const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Colors.grey
-                        .withValues(alpha: 0.06),
-                    borderRadius:
-                        BorderRadius.circular(11),
+
+                // معلومات الإعلان.
+                if (area.isNotEmpty ||
+                    createdAt.isNotEmpty)
+                  Row(
+                    children: [
+                      if (area.isNotEmpty)
+                        Expanded(
+                          child: _buildInfoRow(
+                            icon: Icons
+                                .location_on_outlined,
+                            text: area,
+                          ),
+                        ),
+                      if (area.isNotEmpty &&
+                          createdAt.isNotEmpty)
+                        const SizedBox(width: 12),
+                      if (createdAt.isNotEmpty)
+                        Expanded(
+                          child: _buildInfoRow(
+                            icon: Icons
+                                .calendar_today_outlined,
+                            text: createdAt,
+                          ),
+                        ),
+                    ],
                   ),
-                  child: Text(
-                    description,
-                    maxLines: 2,
-                    overflow:
-                        TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 13,
-                      height: 1.4,
-                      color:
-                          Colors.grey.shade700,
+
+                if (description.isNotEmpty) ...[
+                  const SizedBox(height: 11),
+                  Container(
+                    padding:
+                        const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.grey
+                          .withValues(alpha: 0.06),
+                      borderRadius:
+                          BorderRadius.circular(11),
                     ),
-                  ),
-                ),
-              ],
-
-              const SizedBox(height: 13),
-
-              // عرض الإعلان
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () =>
-                      _openListing(listing),
-                  icon: const Icon(
-                    Icons.visibility_outlined,
-                    size: 18,
-                  ),
-                  label: const Text(
-                    'عرض الإعلان',
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 8),
-
-              // تغيير الحالة
-              _buildStatusActions(listing),
-
-              // تعديل وحذف
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () =>
-                          _editListing(listing),
-                      icon: const Icon(
-                        Icons.edit_outlined,
-                        size: 18,
-                      ),
-                      label: const Text(
-                        'تعديل',
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () =>
-                          _deleteListing(listing),
-                      icon: const Icon(
-                        Icons.delete_outline,
-                        size: 18,
-                      ),
-                      label: const Text(
-                        'حذف',
-                      ),
-                      style:
-                          OutlinedButton.styleFrom(
-                        foregroundColor:
-                            Colors.red,
+                    child: Text(
+                      description,
+                      maxLines: 2,
+                      overflow:
+                          TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13,
+                        height: 1.4,
+                        color:
+                            Colors.grey.shade700,
                       ),
                     ),
                   ),
                 ],
-              ),
-            ],
+
+                const SizedBox(height: 12),
+
+                // عرض الإعلان + تعديل + حذف
+                _buildCompactActions(listing),
+
+                // تغيير الحالة.
+                _buildStatusActions(listing),
+              ],
+            ),
           ),
         ),
       ),
