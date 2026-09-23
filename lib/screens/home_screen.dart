@@ -693,6 +693,7 @@ String _formatPrice(Map<String, dynamic> listing) {
 Widget _buildListingCard(
   Map<String, dynamic> listing, {
   bool isCommercial = false,
+  double width = 158,
 }) {
   final rawTitle =
       listing['title']?.toString().trim() ?? '';
@@ -709,12 +710,49 @@ Widget _buildListingCard(
   final isNegotiable =
       listing['price_type'] == 'negotiable';
 
+  final categoryId =
+      listing['category_id'] as int?;
+
+  String categoryName = '';
+
+  if (categoryId != null) {
+    for (final category in _categories) {
+      if (category['id'] == categoryId) {
+        categoryName =
+            category['name']?.toString().trim() ?? '';
+        break;
+      }
+    }
+  }
+
+  final createdAt =
+      listing['created_at']?.toString();
+
+  String dateText = '';
+
+  if (createdAt != null &&
+      createdAt.trim().isNotEmpty) {
+    final date = DateTime.tryParse(createdAt);
+
+    if (date != null) {
+      final localDate = date.toLocal();
+
+      final day =
+          localDate.day.toString().padLeft(2, '0');
+
+      final month =
+          localDate.month.toString().padLeft(2, '0');
+
+      dateText = '$day/$month/${localDate.year}';
+    }
+  }
+
   return Card(
     margin: EdgeInsets.zero,
     elevation: 2,
     clipBehavior: Clip.antiAlias,
     shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(13),
+      borderRadius: BorderRadius.circular(14),
       side: BorderSide(
         color: Theme.of(context)
             .colorScheme
@@ -725,64 +763,312 @@ Widget _buildListingCard(
     child: InkWell(
       onTap: () => _openListingDetails(listing),
       child: SizedBox(
-        width: 158,
+        width: width,
         child: Column(
           crossAxisAlignment:
               CrossAxisAlignment.stretch,
           children: [
-            // صورة الإعلان — لم يتم تغيير منطق الصور
+            // =========================
+            // صورة الإعلان
+            // =========================
             Stack(
-  children: [
-    _buildListingImage(
-      listing,
-      height: 105,
-    ),
+              children: [
+                _buildListingImage(
+                  listing,
+                  height: 112,
+                ),
 
-    Positioned(
-      top: 6,
-      right: 6,
-      child: _buildAvailableBadge(),
-    ),
+                // متاح
+                Positioned(
+                  top: 7,
+                  right: 7,
+                  child: _buildAvailableBadge(),
+                ),
 
-    if (isCommercial)
-      Positioned(
-        top: 6,
-        left: 6,
-        child: Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: 7,
-            vertical: 3,
-          ),
-          decoration: BoxDecoration(
-            color: Theme.of(context)
-                .colorScheme
-                .primary,
-            borderRadius:
-                BorderRadius.circular(20),
-          ),
-          child: const Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.local_offer,
-                color: Colors.white,
-                size: 11,
-              ),
-              SizedBox(width: 3),
-              Text(
-                'إعلان تجاري',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 9,
-                  fontWeight: FontWeight.bold,
+                // إعلان تجاري
+                if (isCommercial)
+                  Positioned(
+                    top: 7,
+                    left: 7,
+                    child: Container(
+                      padding:
+                          const EdgeInsets.symmetric(
+                        horizontal: 7,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .primary,
+                        borderRadius:
+                            BorderRadius.circular(20),
+                      ),
+                      child: const Row(
+                        mainAxisSize:
+                            MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.local_offer,
+                            color: Colors.white,
+                            size: 11,
+                          ),
+                          SizedBox(width: 3),
+                          Text(
+                            'إعلان تجاري',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight:
+                                  FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+
+            // =========================
+            // معلومات الإعلان
+            // =========================
+            Expanded(
+              child: Padding(
+                padding:
+                    const EdgeInsets.fromLTRB(
+                  9,
+                  7,
+                  9,
+                  6,
+                ),
+                child: Column(
+                  crossAxisAlignment:
+                      CrossAxisAlignment.start,
+                  children: [
+                    // العنوان
+                    Text(
+                      title,
+                      maxLines: 2,
+                      overflow:
+                          TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 13.5,
+                        fontWeight:
+                            FontWeight.w800,
+                        height: 1.18,
+                      ),
+                    ),
+
+                    const SizedBox(height: 5),
+
+                    // السعر
+                    Container(
+                      width: double.infinity,
+                      padding:
+                          const EdgeInsets.symmetric(
+                        horizontal: 7,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .primary
+                            .withValues(alpha: 0.08),
+                        borderRadius:
+                            BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        priceText,
+                        maxLines: 2,
+                        overflow:
+                            TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight:
+                              FontWeight.w900,
+                          height: 1.1,
+                          color: Theme.of(context)
+                              .colorScheme
+                              .primary,
+                        ),
+                      ),
+                    ),
+
+                    // قابل للتفاوض
+                    if (isNegotiable)
+                      Padding(
+                        padding:
+                            const EdgeInsets.only(
+                          top: 2,
+                        ),
+                        child: Text(
+                          'قابل للتفاوض',
+                          maxLines: 1,
+                          overflow:
+                              TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 9.5,
+                            fontWeight:
+                                FontWeight.w600,
+                            color:
+                                Colors.grey.shade600,
+                          ),
+                        ),
+                      ),
+
+                    const SizedBox(height: 3),
+
+                    // المنطقة
+                    if (area.isNotEmpty)
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.location_on_outlined,
+                            size: 13,
+                            color:
+                                Colors.grey.shade600,
+                          ),
+                          const SizedBox(width: 3),
+                          Expanded(
+                            child: Text(
+                              area,
+                              maxLines: 1,
+                              overflow:
+                                  TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                color:
+                                    Colors.grey.shade700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+
+                    // القسم
+                    if (categoryName.isNotEmpty)
+                      Padding(
+                        padding:
+                            const EdgeInsets.only(
+                          top: 2,
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              _categoryIcon(
+                                categoryName,
+                              ),
+                              size: 12,
+                              color:
+                                  Colors.grey.shade600,
+                            ),
+                            const SizedBox(width: 3),
+                            Expanded(
+                              child: Text(
+                                categoryName,
+                                maxLines: 1,
+                                overflow:
+                                    TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color:
+                                      Colors.grey.shade600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                    // التاريخ
+                    if (dateText.isNotEmpty)
+                      Padding(
+                        padding:
+                            const EdgeInsets.only(
+                          top: 2,
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons
+                                  .calendar_today_outlined,
+                              size: 11,
+                              color:
+                                  Colors.grey.shade500,
+                            ),
+                            const SizedBox(width: 3),
+                            Text(
+                              dateText,
+                              style: TextStyle(
+                                fontSize: 9.5,
+                                color:
+                                    Colors.grey.shade500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                    const Spacer(),
+
+                    // زر عرض الإعلان
+                    SizedBox(
+                      width: double.infinity,
+                      height: 29,
+                      child: OutlinedButton(
+                        onPressed: () =>
+                            _openListingDetails(
+                          listing,
+                        ),
+                        style:
+                            OutlinedButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                          visualDensity:
+                              VisualDensity.compact,
+                          minimumSize:
+                              const Size(0, 29),
+                          tapTargetSize:
+                              MaterialTapTargetSize
+                                  .shrinkWrap,
+                          side: BorderSide(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .primary
+                                .withValues(
+                                  alpha: 0.65,
+                                ),
+                          ),
+                          shape:
+                              RoundedRectangleBorder(
+                            borderRadius:
+                                BorderRadius.circular(
+                              8,
+                            ),
+                          ),
+                        ),
+                        child: Text(
+                          'عرض الإعلان',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight:
+                                FontWeight.w700,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .primary,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
-  ],
-),
+    ),
+  );
+}
 
             Expanded(
               child: Padding(
@@ -1210,11 +1496,12 @@ Widget _buildListingCard(
                 bottom: 10,
               ),
               child: SizedBox(
-                height: 230,
-                child: _buildListingCard(
-                  listing,
-                ),
-              ),
+  height: 255,
+  child: _buildListingCard(
+    listing,
+    width: double.infinity,
+  ),
+),
             ),
           ),
       ],
