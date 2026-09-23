@@ -51,7 +51,9 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
     await newFuture;
   }
 
-  Future<void> _editListing(Map<String, dynamic> listing) async {
+  Future<void> _editListing(
+    Map<String, dynamic> listing,
+  ) async {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
@@ -68,7 +70,6 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
     }
   }
 
-  // تغيير حالة الإعلان.
   Future<void> _changeListingStatus(
     Map<String, dynamic> listing,
     String newStatus,
@@ -120,7 +121,9 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('تعذر تحديث حالة الإعلان: ${e.message}'),
+          content: Text(
+            'تعذر تحديث حالة الإعلان: ${e.message}',
+          ),
         ),
       );
     } catch (e) {
@@ -134,7 +137,6 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
     }
   }
 
-  // تأكيد تغيير الحالة قبل التنفيذ.
   Future<void> _confirmChangeStatus(
     Map<String, dynamic> listing,
     String newStatus,
@@ -155,7 +157,8 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
       case 'archived':
         actionTitle = 'أرشفة';
         message =
-            'هل تريد أرشفة هذا الإعلان؟\n\n$title\n\n'
+            'هل تريد أرشفة هذا الإعلان؟\n\n'
+            '$title\n\n'
             'يمكنك إعادته إلى "متاح" لاحقًا.';
         break;
 
@@ -336,49 +339,70 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
   }
 
   String _formatPrice(dynamic value) {
-  if (value == null) return '';
+    if (value == null) return '';
 
-  final number = num.tryParse(value.toString());
+    final number = num.tryParse(value.toString());
 
-  if (number == null) {
-    return value.toString();
-  }
+    if (number == null) {
+      return value.toString();
+    }
 
-  if (number % 1 != 0) {
-    return number.toStringAsFixed(2).replaceAllMapped(
+    if (number % 1 != 0) {
+      return number.toStringAsFixed(2).replaceAllMapped(
+        RegExp(r'\B(?=(\d{3})+(?!\d))'),
+        (match) => ',',
+      );
+    }
+
+    return number.toInt().toString().replaceAllMapped(
       RegExp(r'\B(?=(\d{3})+(?!\d))'),
       (match) => ',',
     );
   }
 
-  return number
-      .toInt()
-      .toString()
-      .replaceAllMapped(
-        RegExp(r'\B(?=(\d{3})+(?!\d))'),
-        (match) => ',',
-      );
-}
+  String _priceText(Map<String, dynamic> listing) {
+    final priceType = listing['price_type']?.toString();
+    final price = listing['price'];
+    final currency = listing['currency']?.toString() ?? 'SDG';
 
-String _priceText(Map<String, dynamic> listing) {
-  final priceType = listing['price_type']?.toString();
-  final price = listing['price'];
-  final currency = listing['currency']?.toString() ?? 'SDG';
+    if (priceType == 'contact' || price == null) {
+      return 'السعر عند التواصل';
+    }
 
-  if (priceType == 'contact' || price == null) {
-    return 'السعر عند التواصل';
+    final formattedPrice = _formatPrice(price);
+
+    if (priceType == 'negotiable') {
+      return '$formattedPrice $currency قابل للتفاوض';
+    }
+
+    return '$formattedPrice $currency';
   }
 
-  final formattedPrice = _formatPrice(price);
+  String _formatDate(dynamic value) {
+    if (value == null) {
+      return '';
+    }
 
-  if (priceType == 'negotiable') {
-    return '$formattedPrice $currency قابل للتفاوض';
+    final date = DateTime.tryParse(
+      value.toString(),
+    );
+
+    if (date == null) {
+      return '';
+    }
+
+    final localDate = date.toLocal();
+
+    final day = localDate.day.toString().padLeft(2, '0');
+    final month = localDate.month.toString().padLeft(2, '0');
+    final year = localDate.year.toString();
+
+    return '$day/$month/$year';
   }
 
-  return '$formattedPrice $currency';
-}
-
-  void _openListing(Map<String, dynamic> listing) {
+  void _openListing(
+    Map<String, dynamic> listing,
+  ) {
     final listingId = listing['id'];
 
     if (listingId is! int) {
@@ -395,17 +419,53 @@ String _priceText(Map<String, dynamic> listing) {
     );
   }
 
+  Widget _buildStatusBadge(String? status) {
+    final color = _statusColor(status);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 10,
+        vertical: 6,
+      ),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: color.withValues(alpha: 0.25),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 7,
+            height: 7,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            _statusText(status),
+            style: TextStyle(
+              color: color,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildStatusActions(
     Map<String, dynamic> listing,
   ) {
-    final status =
-        listing['status']?.toString();
+    final status = listing['status']?.toString();
 
-    // الإعلان المتاح.
     if (status == 'approved') {
       return Column(
-        crossAxisAlignment:
-            CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
@@ -418,7 +478,7 @@ String _priceText(Map<String, dynamic> listing) {
                   ),
                   icon: const Icon(
                     Icons.sell_outlined,
-                    size: 19,
+                    size: 18,
                   ),
                   label: const Text('تم البيع'),
                   style: OutlinedButton.styleFrom(
@@ -426,7 +486,7 @@ String _priceText(Map<String, dynamic> listing) {
                   ),
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: () =>
@@ -436,7 +496,7 @@ String _priceText(Map<String, dynamic> listing) {
                   ),
                   icon: const Icon(
                     Icons.archive_outlined,
-                    size: 19,
+                    size: 18,
                   ),
                   label: const Text('أرشفة'),
                   style: OutlinedButton.styleFrom(
@@ -451,24 +511,23 @@ String _priceText(Map<String, dynamic> listing) {
       );
     }
 
-    // الإعلان المباع أو المؤرشف.
-    if (status == 'sold' ||
-        status == 'archived') {
+    if (status == 'sold' || status == 'archived') {
       return Column(
-        crossAxisAlignment:
-            CrossAxisAlignment.stretch,
         children: [
-          OutlinedButton.icon(
-            onPressed: () =>
-                _confirmChangeStatus(
-              listing,
-              'approved',
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () =>
+                  _confirmChangeStatus(
+                listing,
+                'approved',
+              ),
+              icon: const Icon(
+                Icons.replay_outlined,
+                size: 18,
+              ),
+              label: const Text('إعادة إلى متاح'),
             ),
-            icon: const Icon(
-              Icons.replay_outlined,
-              size: 19,
-            ),
-            label: const Text('إعادة إلى متاح'),
           ),
           const SizedBox(height: 10),
         ],
@@ -478,11 +537,37 @@ String _priceText(Map<String, dynamic> listing) {
     return const SizedBox.shrink();
   }
 
+  Widget _buildInfoRow({
+    required IconData icon,
+    required String text,
+  }) {
+    return Row(
+      children: [
+        Icon(
+          icon,
+          size: 17,
+          color: Colors.grey.shade600,
+        ),
+        const SizedBox(width: 5),
+        Expanded(
+          child: Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 13,
+              color: Colors.grey.shade700,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildListingCard(
     Map<String, dynamic> listing,
   ) {
-    final status =
-        listing['status']?.toString();
+    final status = listing['status']?.toString();
 
     final title =
         listing['title']?.toString() ??
@@ -494,108 +579,171 @@ String _priceText(Map<String, dynamic> listing) {
     final description =
         listing['description']?.toString() ?? '';
 
+    final createdAt =
+        _formatDate(listing['created_at']);
+
+    final priceText = _priceText(listing);
+
     return Card(
       margin: const EdgeInsets.symmetric(
         horizontal: 12,
         vertical: 6,
       ),
+      elevation: 1.5,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+      ),
       child: InkWell(
-        borderRadius:
-            BorderRadius.circular(12),
         onTap: () => _openListing(listing),
         child: Padding(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(15),
           child: Column(
             crossAxisAlignment:
-                CrossAxisAlignment.start,
+                CrossAxisAlignment.stretch,
             children: [
+              // العنوان والحالة
               Row(
+                crossAxisAlignment:
+                    CrossAxisAlignment.start,
                 children: [
                   Expanded(
                     child: Text(
                       title,
+                      maxLines: 2,
+                      overflow:
+                          TextOverflow.ellipsis,
                       style: const TextStyle(
-                        fontSize: 17,
+                        fontSize: 18,
                         fontWeight:
                             FontWeight.bold,
+                        height: 1.25,
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 5,
-                    ),
-                    decoration:
-                        BoxDecoration(
-                      color: _statusColor(
-                        status,
-                      ).withValues(
-                        alpha: 0.12,
-                      ),
-                      borderRadius:
-                          BorderRadius.circular(
-                        20,
-                      ),
-                    ),
-                    child: Text(
-                      _statusText(status),
-                      style: TextStyle(
-                        color: _statusColor(
-                          status,
-                        ),
-                        fontSize: 12,
-                        fontWeight:
-                            FontWeight.bold,
-                      ),
-                    ),
-                  ),
+                  const SizedBox(width: 10),
+                  _buildStatusBadge(status),
                 ],
               ),
 
-              const SizedBox(height: 10),
+              const SizedBox(height: 13),
 
-              Text(
-                _priceText(listing),
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight:
-                      FontWeight.w600,
+              // السعر
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 11,
+                ),
+                decoration: BoxDecoration(
+                  color: Theme.of(context)
+                      .colorScheme
+                      .primary
+                      .withValues(alpha: 0.06),
+                  borderRadius:
+                      BorderRadius.circular(13),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.payments_outlined,
+                      size: 21,
+                      color: Theme.of(context)
+                          .colorScheme
+                          .primary,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        priceText,
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight:
+                              FontWeight.bold,
+                          color: Theme.of(context)
+                              .colorScheme
+                              .primary,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
 
-              if (area.isNotEmpty) ...[
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.location_on_outlined,
-                      size: 18,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(area),
-                  ],
-                ),
-              ],
-
-              if (description.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Text(
-                  description,
-                  maxLines: 2,
-                  overflow:
-                      TextOverflow.ellipsis,
-                ),
-              ],
-
               const SizedBox(height: 12),
 
-              // أزرار تغيير حالة الإعلان.
+              // معلومات الإعلان
+              if (area.isNotEmpty ||
+                  createdAt.isNotEmpty)
+                Row(
+                  children: [
+                    if (area.isNotEmpty)
+                      Expanded(
+                        child: _buildInfoRow(
+                          icon: Icons
+                              .location_on_outlined,
+                          text: area,
+                        ),
+                      ),
+                    if (area.isNotEmpty &&
+                        createdAt.isNotEmpty)
+                      const SizedBox(width: 12),
+                    if (createdAt.isNotEmpty)
+                      _buildInfoRow(
+                        icon: Icons
+                            .calendar_today_outlined,
+                        text: createdAt,
+                      ),
+                  ],
+                ),
+
+              if (description.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding:
+                      const EdgeInsets.all(11),
+                  decoration: BoxDecoration(
+                    color: Colors.grey
+                        .withValues(alpha: 0.06),
+                    borderRadius:
+                        BorderRadius.circular(11),
+                  ),
+                  child: Text(
+                    description,
+                    maxLines: 2,
+                    overflow:
+                        TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      height: 1.4,
+                      color:
+                          Colors.grey.shade700,
+                    ),
+                  ),
+                ),
+              ],
+
+              const SizedBox(height: 14),
+
+              // فتح التفاصيل
+              OutlinedButton.icon(
+                onPressed: () =>
+                    _openListing(listing),
+                icon: const Icon(
+                  Icons.visibility_outlined,
+                  size: 18,
+                ),
+                label: const Text(
+                  'عرض الإعلان',
+                ),
+              ),
+
+              const SizedBox(height: 8),
+
+              // تغيير الحالة
               _buildStatusActions(listing),
 
-              // التعديل والحذف.
+              // تعديل وحذف
               Row(
                 children: [
                   Expanded(
@@ -604,19 +752,19 @@ String _priceText(Map<String, dynamic> listing) {
                           _editListing(listing),
                       icon: const Icon(
                         Icons.edit_outlined,
-                        size: 19,
+                        size: 18,
                       ),
                       label: const Text('تعديل'),
                     ),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: OutlinedButton.icon(
                       onPressed: () =>
                           _deleteListing(listing),
                       icon: const Icon(
                         Icons.delete_outline,
-                        size: 19,
+                        size: 18,
                       ),
                       label: const Text('حذف'),
                       style:
@@ -628,20 +776,105 @@ String _priceText(Map<String, dynamic> listing) {
                   ),
                 ],
               ),
-
-              const SizedBox(height: 4),
-
-              const Align(
-                alignment:
-                    Alignment.centerLeft,
-                child: Icon(
-                  Icons.chevron_left,
-                ),
-              ),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return RefreshIndicator(
+      onRefresh: _refreshListings,
+      child: ListView(
+        physics:
+            const AlwaysScrollableScrollPhysics(),
+        children: [
+          const SizedBox(height: 130),
+          Icon(
+            Icons.inventory_2_outlined,
+            size: 65,
+            color: Colors.grey.shade400,
+          ),
+          const SizedBox(height: 16),
+          const Center(
+            child: Text(
+              'لم تضف أي إعلانات حتى الآن.',
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Center(
+            child: Text(
+              'ابدأ بإضافة أول إعلان لك.',
+              style: TextStyle(
+                color: Colors.grey.shade600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorState(
+    Object? error,
+  ) {
+    return ListView(
+      physics:
+          const AlwaysScrollableScrollPhysics(),
+      children: [
+        const SizedBox(height: 110),
+        Icon(
+          Icons.error_outline,
+          size: 52,
+          color: Colors.red.shade300,
+        ),
+        const SizedBox(height: 14),
+        const Center(
+          child: Text(
+            'تعذر تحميل إعلاناتك.',
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: 24,
+          ),
+          child: Text(
+            error.toString(),
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.grey.shade600,
+              fontSize: 13,
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+        Center(
+          child: TextButton.icon(
+            onPressed: () {
+              setState(() {
+                _listingsFuture =
+                    _loadMyListings();
+              });
+            },
+            icon: const Icon(
+              Icons.refresh,
+            ),
+            label: const Text(
+              'إعادة المحاولة',
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -681,47 +914,8 @@ String _priceText(Map<String, dynamic> listing) {
             }
 
             if (snapshot.hasError) {
-              return ListView(
-                physics:
-                    const AlwaysScrollableScrollPhysics(),
-                children: [
-                  const SizedBox(height: 120),
-                  const Icon(
-                    Icons.error_outline,
-                    size: 48,
-                  ),
-                  const SizedBox(height: 12),
-                  const Center(
-                    child: Text(
-                      'تعذر تحميل إعلاناتك.',
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Center(
-                    child: Padding(
-                      padding:
-                          const EdgeInsets.all(16),
-                      child: Text(
-                        snapshot.error.toString(),
-                        textAlign:
-                            TextAlign.center,
-                      ),
-                    ),
-                  ),
-                  Center(
-                    child: TextButton(
-                      onPressed: () {
-                        setState(() {
-                          _listingsFuture =
-                              _loadMyListings();
-                        });
-                      },
-                      child: const Text(
-                        'إعادة المحاولة',
-                      ),
-                    ),
-                  ),
-                ],
+              return _buildErrorState(
+                snapshot.error,
               );
             }
 
@@ -729,35 +923,7 @@ String _priceText(Map<String, dynamic> listing) {
                 snapshot.data ?? [];
 
             if (listings.isEmpty) {
-              return RefreshIndicator(
-                onRefresh: _refreshListings,
-                child: ListView(
-                  physics:
-                      const AlwaysScrollableScrollPhysics(),
-                  children: const [
-                    SizedBox(height: 150),
-                    Icon(
-                      Icons.inventory_2_outlined,
-                      size: 60,
-                    ),
-                    SizedBox(height: 16),
-                    Center(
-                      child: Text(
-                        'لم تضف أي إعلانات حتى الآن.',
-                        style: TextStyle(
-                          fontSize: 16,
-                        ),
-                      ),
-                    ),
-                    SizedBox(height: 8),
-                    Center(
-                      child: Text(
-                        'اسحب الشاشة إلى الأسفل للتحديث.',
-                      ),
-                    ),
-                  ],
-                ),
-              );
+              return _buildEmptyState();
             }
 
             return RefreshIndicator(
@@ -766,8 +932,9 @@ String _priceText(Map<String, dynamic> listing) {
                 physics:
                     const AlwaysScrollableScrollPhysics(),
                 padding:
-                    const EdgeInsets.symmetric(
-                  vertical: 8,
+                    const EdgeInsets.only(
+                  top: 8,
+                  bottom: 20,
                 ),
                 itemCount: listings.length,
                 itemBuilder:
