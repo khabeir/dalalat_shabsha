@@ -16,6 +16,9 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
 
   late Future<List<Map<String, dynamic>>> _listingsFuture;
 
+  // رابط الصورة الأولى لكل إعلان.
+  final Map<int, String> _listingImageUrls = {};
+
   @override
   void initState() {
     super.initState();
@@ -38,7 +41,61 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
         .eq('seller_id', user.id)
         .order('created_at', ascending: false);
 
-    return List<Map<String, dynamic>>.from(response);
+    final listings = List<Map<String, dynamic>>.from(response);
+
+    // تنظيف روابط الصور القديمة.
+    _listingImageUrls.clear();
+
+    if (listings.isNotEmpty) {
+      final listingIds = listings
+          .map((listing) => listing['id'])
+          .whereType<int>()
+          .toList();
+
+      if (listingIds.isNotEmpty) {
+        try {
+          final imagesResponse = await _supabase
+              .from('listing_images')
+              .select(
+                'listing_id, image_path, sort_order',
+              )
+              .inFilter('listing_id', listingIds)
+              .order('sort_order', ascending: true);
+
+          final images =
+              List<Map<String, dynamic>>.from(
+            imagesResponse,
+          );
+
+          // نأخذ أول صورة فقط لكل إعلان.
+          for (final image in images) {
+            final listingId = image['listing_id'];
+            final imagePath =
+                image['image_path']?.toString();
+
+            if (listingId is int &&
+                imagePath != null &&
+                imagePath.isNotEmpty &&
+                !_listingImageUrls.containsKey(
+                  listingId,
+                )) {
+              final publicUrl = _supabase.storage
+                  .from('listing-images')
+                  .getPublicUrl(imagePath);
+
+              _listingImageUrls[listingId] =
+                  publicUrl;
+            }
+          }
+        } catch (_) {
+          // في حالة حدوث مشكلة في الصور،
+          // نترك الإعلانات تظهر بصورة طبيعية
+          // مع صورة افتراضية.
+        }
+      }
+    }
+
+    return listings;
   }
 
   Future<void> _refreshListings() async {
@@ -360,16 +417,23 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
     );
   }
 
-  String _priceText(Map<String, dynamic> listing) {
-    final priceType = listing['price_type']?.toString();
+  String _priceText(
+    Map<String, dynamic> listing,
+  ) {
+    final priceType =
+        listing['price_type']?.toString();
+
     final price = listing['price'];
-    final currency = listing['currency']?.toString() ?? 'SDG';
+
+    final currency =
+        listing['currency']?.toString() ?? 'SDG';
 
     if (priceType == 'contact' || price == null) {
       return 'السعر عند التواصل';
     }
 
-    final formattedPrice = _formatPrice(price);
+    final formattedPrice =
+        _formatPrice(price);
 
     if (priceType == 'negotiable') {
       return '$formattedPrice $currency قابل للتفاوض';
@@ -393,9 +457,14 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
 
     final localDate = date.toLocal();
 
-    final day = localDate.day.toString().padLeft(2, '0');
-    final month = localDate.month.toString().padLeft(2, '0');
-    final year = localDate.year.toString();
+    final day =
+        localDate.day.toString().padLeft(2, '0');
+
+    final month =
+        localDate.month.toString().padLeft(2, '0');
+
+    final year =
+        localDate.year.toString();
 
     return '$day/$month/$year';
   }
@@ -429,7 +498,8 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
       ),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius:
+            BorderRadius.circular(20),
         border: Border.all(
           color: color.withValues(alpha: 0.25),
         ),
@@ -462,7 +532,8 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
   Widget _buildStatusActions(
     Map<String, dynamic> listing,
   ) {
-    final status = listing['status']?.toString();
+    final status =
+        listing['status']?.toString();
 
     if (status == 'approved') {
       return Column(
@@ -481,8 +552,10 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
                     size: 18,
                   ),
                   label: const Text('تم البيع'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.blue,
+                  style:
+                      OutlinedButton.styleFrom(
+                    foregroundColor:
+                        Colors.blue,
                   ),
                 ),
               ),
@@ -499,8 +572,10 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
                     size: 18,
                   ),
                   label: const Text('أرشفة'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.grey,
+                  style:
+                      OutlinedButton.styleFrom(
+                    foregroundColor:
+                        Colors.grey,
                   ),
                 ),
               ),
@@ -511,7 +586,8 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
       );
     }
 
-    if (status == 'sold' || status == 'archived') {
+    if (status == 'sold' ||
+        status == 'archived') {
       return Column(
         children: [
           SizedBox(
@@ -526,7 +602,9 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
                 Icons.replay_outlined,
                 size: 18,
               ),
-              label: const Text('إعادة إلى متاح'),
+              label: const Text(
+                'إعادة إلى متاح',
+              ),
             ),
           ),
           const SizedBox(height: 10),
@@ -553,7 +631,8 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
           child: Text(
             text,
             maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+            overflow:
+                TextOverflow.ellipsis,
             style: TextStyle(
               fontSize: 13,
               color: Colors.grey.shade700,
@@ -564,10 +643,81 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
     );
   }
 
+  Widget _buildImage(
+    Map<String, dynamic> listing,
+  ) {
+    final listingId = listing['id'];
+
+    String? imageUrl;
+
+    if (listingId is int) {
+      imageUrl = _listingImageUrls[listingId];
+    }
+
+    return Container(
+      width: 118,
+      height: 118,
+      decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+        borderRadius:
+            BorderRadius.circular(15),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: imageUrl == null
+          ? Icon(
+              Icons.image_outlined,
+              size: 42,
+              color: Colors.grey.shade400,
+            )
+          : Image.network(
+              imageUrl,
+              fit: BoxFit.cover,
+              loadingBuilder:
+                  (
+                    context,
+                    child,
+                    loadingProgress,
+                  ) {
+                if (loadingProgress == null) {
+                  return child;
+                }
+
+                return Center(
+                  child:
+                      CircularProgressIndicator(
+                    strokeWidth: 2,
+                    value: loadingProgress
+                                .expectedTotalBytes !=
+                            null
+                        ? loadingProgress
+                                .cumulativeBytesLoaded /
+                            loadingProgress
+                                .expectedTotalBytes!
+                        : null,
+                  ),
+                );
+              },
+              errorBuilder:
+                  (
+                    context,
+                    error,
+                    stackTrace,
+                  ) {
+                return Icon(
+                  Icons.broken_image_outlined,
+                  size: 42,
+                  color: Colors.grey.shade400,
+                );
+              },
+            ),
+    );
+  }
+
   Widget _buildListingCard(
     Map<String, dynamic> listing,
   ) {
-    final status = listing['status']?.toString();
+    final status =
+        listing['status']?.toString();
 
     final title =
         listing['title']?.toString() ??
@@ -577,12 +727,16 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
         listing['area']?.toString() ?? '';
 
     final description =
-        listing['description']?.toString() ?? '';
+        listing['description']?.toString() ??
+            '';
 
     final createdAt =
-        _formatDate(listing['created_at']);
+        _formatDate(
+      listing['created_at'],
+    );
 
-    final priceText = _priceText(listing);
+    final priceText =
+        _priceText(listing);
 
     return Card(
       margin: const EdgeInsets.symmetric(
@@ -592,85 +746,82 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
       elevation: 1.5,
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius:
+            BorderRadius.circular(18),
       ),
       child: InkWell(
         onTap: () => _openListing(listing),
         child: Padding(
-          padding: const EdgeInsets.all(15),
+          padding: const EdgeInsets.all(12),
           child: Column(
             crossAxisAlignment:
                 CrossAxisAlignment.stretch,
             children: [
-              // العنوان والحالة
+              // الصورة + العنوان + الحالة
               Row(
                 crossAxisAlignment:
                     CrossAxisAlignment.start,
                 children: [
+                  _buildImage(listing),
+
+                  const SizedBox(width: 12),
+
                   Expanded(
-                    child: Text(
-                      title,
-                      maxLines: 2,
-                      overflow:
-                          TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight:
-                            FontWeight.bold,
-                        height: 1.25,
-                      ),
+                    child: Column(
+                      crossAxisAlignment:
+                          CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          crossAxisAlignment:
+                              CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                title,
+                                maxLines: 3,
+                                overflow:
+                                    TextOverflow.ellipsis,
+                                style:
+                                    const TextStyle(
+                                  fontSize: 17,
+                                  fontWeight:
+                                      FontWeight.bold,
+                                  height: 1.25,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 10),
+
+                        _buildStatusBadge(status),
+
+                        const SizedBox(height: 10),
+
+                        Text(
+                          priceText,
+                          maxLines: 2,
+                          overflow:
+                              TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight:
+                                FontWeight.bold,
+                            color: Theme.of(
+                              context,
+                            )
+                                .colorScheme
+                                .primary,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  _buildStatusBadge(status),
                 ],
               ),
 
               const SizedBox(height: 13),
-
-              // السعر
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 11,
-                ),
-                decoration: BoxDecoration(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .primary
-                      .withValues(alpha: 0.06),
-                  borderRadius:
-                      BorderRadius.circular(13),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.payments_outlined,
-                      size: 21,
-                      color: Theme.of(context)
-                          .colorScheme
-                          .primary,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        priceText,
-                        style: TextStyle(
-                          fontSize: 17,
-                          fontWeight:
-                              FontWeight.bold,
-                          color: Theme.of(context)
-                              .colorScheme
-                              .primary,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 12),
 
               // معلومات الإعلان
               if (area.isNotEmpty ||
@@ -689,19 +840,21 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
                         createdAt.isNotEmpty)
                       const SizedBox(width: 12),
                     if (createdAt.isNotEmpty)
-                      _buildInfoRow(
-                        icon: Icons
-                            .calendar_today_outlined,
-                        text: createdAt,
+                      Expanded(
+                        child: _buildInfoRow(
+                          icon: Icons
+                              .calendar_today_outlined,
+                          text: createdAt,
+                        ),
                       ),
                   ],
                 ),
 
               if (description.isNotEmpty) ...[
-                const SizedBox(height: 12),
+                const SizedBox(height: 11),
                 Container(
                   padding:
-                      const EdgeInsets.all(11),
+                      const EdgeInsets.all(10),
                   decoration: BoxDecoration(
                     color: Colors.grey
                         .withValues(alpha: 0.06),
@@ -723,18 +876,21 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
                 ),
               ],
 
-              const SizedBox(height: 14),
+              const SizedBox(height: 13),
 
-              // فتح التفاصيل
-              OutlinedButton.icon(
-                onPressed: () =>
-                    _openListing(listing),
-                icon: const Icon(
-                  Icons.visibility_outlined,
-                  size: 18,
-                ),
-                label: const Text(
-                  'عرض الإعلان',
+              // عرض الإعلان
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () =>
+                      _openListing(listing),
+                  icon: const Icon(
+                    Icons.visibility_outlined,
+                    size: 18,
+                  ),
+                  label: const Text(
+                    'عرض الإعلان',
+                  ),
                 ),
               ),
 
@@ -754,7 +910,9 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
                         Icons.edit_outlined,
                         size: 18,
                       ),
-                      label: const Text('تعديل'),
+                      label: const Text(
+                        'تعديل',
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -766,7 +924,9 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
                         Icons.delete_outline,
                         size: 18,
                       ),
-                      label: const Text('حذف'),
+                      label: const Text(
+                        'حذف',
+                      ),
                       style:
                           OutlinedButton.styleFrom(
                         foregroundColor:
@@ -845,7 +1005,8 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
         ),
         const SizedBox(height: 8),
         Padding(
-          padding: const EdgeInsets.symmetric(
+          padding:
+              const EdgeInsets.symmetric(
             horizontal: 24,
           ),
           child: Text(
