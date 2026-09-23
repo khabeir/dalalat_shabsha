@@ -2177,17 +2177,6 @@ final latestListings = _listings
         bottomNavigationBar: _buildBottomNavigation(),
       ),
     );
-  },
-
-            Expanded(
-              child: _buildBody(),
-            ),
-          ],
-        ),
-
-        bottomNavigationBar:
-            _buildBottomNavigation(),
-      ),
-    );
   }
+
 }
