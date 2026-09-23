@@ -15,6 +15,7 @@ State<ListingDetailsScreen> createState() => _ListingDetailsScreenState();
 }
 
 class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
+	bool _isCommercial = false;
 final _supabase = Supabase.instance.client;
 
 Map<String, dynamic>? _listing;
@@ -29,6 +30,21 @@ String? _error;
 void initState() {
 super.initState();
 _loadListing();
+}
+
+String _formatDate(dynamic value) {
+  if (value == null) return 'غير محدد';
+
+  final date = DateTime.tryParse(value.toString());
+  if (date == null) return 'غير محدد';
+
+  final localDate = date.toLocal();
+
+  final day = localDate.day.toString().padLeft(2, '0');
+  final month = localDate.month.toString().padLeft(2, '0');
+  final year = localDate.year.toString();
+
+  return '$day/$month/$year';
 }
 
 Future<void> _loadListing() async {
@@ -77,6 +93,7 @@ created_at
     _listing = Map<String, dynamic>.from(listing);
     _images = List<Map<String, dynamic>>.from(images);
     _favorite = favorite;
+    _isCommercial = isCommercial;
     _loading = false;
   });
 } catch (e) {
@@ -182,6 +199,25 @@ return ClipRRect(
   ),
 );
 
+}
+
+final now = DateTime.now().toUtc().toIso8601String();
+
+var isCommercial = false;
+
+try {
+  final promotion = await _supabase
+      .from('promoted_listings')
+      .select('id')
+      .eq('listing_id', widget.listingId)
+      .eq('is_active', true)
+      .lte('start_at', now)
+      .gt('end_at', now)
+      .limit(1);
+
+  isCommercial = promotion.isNotEmpty;
+} catch (_) {
+  // إذا تعذر التحقق، نعرض الإعلان دون شارة تجارية.
 }
 
 Widget _buildImageError(String message) {
@@ -496,14 +532,17 @@ final description =
 
 final area = _listing!['area']?.toString() ?? '';
 
+final createdAt = _formatDate(_listing!['created_at']);
+
 return ListView(
   padding: const EdgeInsets.all(16),
   children: [
+    // صور الإعلان
     if (_images.isNotEmpty)
       Column(
         children: [
           SizedBox(
-            height: 260,
+            height: 270,
             child: PageView.builder(
               itemCount: _images.length,
               onPageChanged: (index) {
@@ -519,15 +558,20 @@ return ListView(
               },
             ),
           ),
-
           if (_images.length > 1) ...[
             const SizedBox(height: 10),
-            Text(
-              '${_currentImageIndex + 1} / ${_images.length}',
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.photo_library_outlined, size: 18),
+                const SizedBox(width: 6),
+                Text(
+                  '${_currentImageIndex + 1} من ${_images.length}',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
             ),
           ],
         ],
@@ -536,132 +580,242 @@ return ListView(
       Container(
         height: 220,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(18),
           color: Theme.of(context)
               .colorScheme
               .surfaceContainerHighest,
         ),
-        child: const Icon(
-          Icons.image_outlined,
-          size: 80,
+        child: const Center(
+          child: Icon(Icons.image_outlined, size: 80),
         ),
       ),
 
     const SizedBox(height: 20),
+
+    // عنوان الإعلان والشارة التجارية
+    if (_isCommercial)
+      Align(
+        alignment: Alignment.centerRight,
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 6,
+          ),
+          decoration: BoxDecoration(
+            color: Colors.orange.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.campaign_outlined,
+                size: 18,
+                color: Colors.deepOrange,
+              ),
+              SizedBox(width: 6),
+              Text(
+                'إعلان تجاري',
+                style: TextStyle(
+                  color: Colors.deepOrange,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+
+    const SizedBox(height: 10),
 
     Text(
       title,
       style: const TextStyle(
         fontSize: 25,
         fontWeight: FontWeight.bold,
+        height: 1.4,
       ),
     ),
 
     const SizedBox(height: 12),
 
-    Text(
-      _priceText(),
-      style: TextStyle(
-        fontSize: 21,
-        fontWeight: FontWeight.bold,
-        color: Theme.of(context).colorScheme.primary,
+    // السعر
+    Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.primaryContainer,
+        borderRadius: BorderRadius.circular(16),
       ),
-    ),
-
-    const SizedBox(height: 18),
-
-    if (area.isNotEmpty)
-      _InfoRow(
-        icon: Icons.location_on_outlined,
-        title: 'المنطقة',
-        value: area,
-      ),
-
-    _InfoRow(
-      icon: Icons.inventory_2_outlined,
-      title: 'الحالة',
-      value: _conditionText(),
-    ),
-
-    const SizedBox(height: 20),
-
-    const Text(
-      'الوصف',
-      style: TextStyle(
-        fontSize: 20,
-        fontWeight: FontWeight.bold,
-      ),
-    ),
-
-    const SizedBox(height: 8),
-
-    Text(
-      description.isEmpty
-          ? 'لا يوجد وصف لهذا الإعلان.'
-          : description,
-      style: const TextStyle(
-        fontSize: 16,
-        height: 1.6,
-      ),
-    ),
-
-    const SizedBox(height: 28),
-
-      Row(
+      child: Row(
         children: [
-          Expanded(
-            child: SizedBox(
-              height: 52,
-              child: FilledButton.icon(
-                onPressed: _callSeller,
-                icon: const Icon(Icons.phone),
-                label: const Text(
-                  'اتصال',
-                  style: TextStyle(fontSize: 17),
-                ),
-              ),
-            ),
+          Icon(
+            Icons.sell_outlined,
+            color: Theme.of(context).colorScheme.primary,
+            size: 26,
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 12),
           Expanded(
-            child: SizedBox(
-              height: 52,
-              child: OutlinedButton.icon(
-                onPressed: _openWhatsApp,
-                icon: const Icon(Icons.chat),
-                label: const Text(
-                  'WhatsApp',
-                  style: TextStyle(fontSize: 17),
-                ),
+            child: Text(
+              _priceText(),
+              style: TextStyle(
+                fontSize: 21,
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.primary,
               ),
             ),
           ),
         ],
       ),
+    ),
+
+    const SizedBox(height: 16),
+
+    // معلومات الإعلان
+    Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: Theme.of(context).colorScheme.outlineVariant,
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'معلومات الإعلان',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            _InfoRow(
+              icon: Icons.calendar_month_outlined,
+              title: 'تاريخ الإعلان',
+              value: createdAt,
+            ),
+
+            if (area.isNotEmpty)
+              _InfoRow(
+                icon: Icons.location_on_outlined,
+                title: 'المنطقة',
+                value: area,
+              ),
+
+            _InfoRow(
+              icon: Icons.inventory_2_outlined,
+              title: 'الحالة',
+              value: _conditionText(),
+            ),
+          ],
+        ),
+      ),
+    ),
+
+    const SizedBox(height: 20),
+
+    // وصف الإعلان
+    Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: Theme.of(context).colorScheme.outlineVariant,
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.description_outlined),
+                SizedBox(width: 8),
+                Text(
+                  'وصف الإعلان',
+                  style: TextStyle(
+                    fontSize: 19,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              description.isEmpty
+                  ? 'لا يوجد وصف لهذا الإعلان.'
+                  : description,
+              style: const TextStyle(
+                fontSize: 16,
+                height: 1.8,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+
+    const SizedBox(height: 20),
+
+    // أزرار التواصل
+    Row(
+      children: [
+        Expanded(
+          child: SizedBox(
+            height: 52,
+            child: FilledButton.icon(
+              onPressed: _callSeller,
+              icon: const Icon(Icons.phone),
+              label: const Text(
+                'اتصال',
+                style: TextStyle(fontSize: 17),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: SizedBox(
+            height: 52,
+            child: OutlinedButton.icon(
+              onPressed: _openWhatsApp,
+              icon: const Icon(Icons.chat),
+              label: const Text(
+                'WhatsApp',
+                style: TextStyle(fontSize: 16),
+              ),
+            ),
+          ),
+        ),
+      ],
+    ),
 
     const SizedBox(height: 12),
 
     OutlinedButton.icon(
       onPressed: _toggleFavorite,
       icon: Icon(
-        _favorite
-            ? Icons.favorite
-            : Icons.favorite_border,
+        _favorite ? Icons.favorite : Icons.favorite_border,
       ),
       label: Text(
-        _favorite
-            ? 'إزالة من المفضلة'
-            : 'إضافة إلى المفضلة',
+        _favorite ? 'إزالة من المفضلة' : 'إضافة إلى المفضلة',
       ),
     ),
 
-    const SizedBox(height: 12),
+    const SizedBox(height: 8),
 
     TextButton.icon(
       onPressed: _reportListing,
       icon: const Icon(Icons.flag_outlined),
       label: const Text('الإبلاغ عن هذا الإعلان'),
     ),
+
+    const SizedBox(height: 20),
   ],
 );
 
