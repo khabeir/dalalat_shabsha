@@ -1972,7 +1972,7 @@ final latestListings = _listings
     );
   }
 
-  @override
+    @override
   Widget build(BuildContext context) {
     final user = _supabase.auth.currentUser;
 
@@ -1982,6 +1982,9 @@ final latestListings = _listings
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
+        // =========================
+        // القائمة الجانبية
+        // =========================
         drawer: Drawer(
           width: 285,
           elevation: 3,
@@ -1994,9 +1997,16 @@ final latestListings = _listings
           child: SafeArea(
             child: Column(
               children: [
+                // =========================
+                // رأس القائمة / الحساب
+                // =========================
                 _buildDrawerHeader(user, name),
+
                 const SizedBox(height: 5),
 
+                // =========================
+                // محتوى القائمة
+                // =========================
                 Expanded(
                   child: ListView(
                     padding: const EdgeInsets.symmetric(
@@ -2004,6 +2014,7 @@ final latestListings = _listings
                       vertical: 2,
                     ),
                     children: [
+                      // الملف الشخصي / تسجيل الدخول
                       _buildDrawerItem(
                         icon: user == null
                             ? Icons.login_outlined
@@ -2017,6 +2028,7 @@ final latestListings = _listings
                         },
                       ),
 
+                      // إضافة إعلان
                       _buildDrawerItem(
                         icon: Icons.add_circle_outline,
                         title: 'إضافة إعلان',
@@ -2028,16 +2040,22 @@ final latestListings = _listings
 
                       const SizedBox(height: 5),
 
+                      // =========================
+                      // الإدارة
+                      // =========================
                       if (_isAdmin) ...[
                         _buildDrawerItem(
-                          icon: Icons.admin_panel_settings_outlined,
+                          icon:
+                              Icons.admin_panel_settings_outlined,
                           title: 'لوحة تحكم الإدارة',
-                          subtitle: 'إدارة ومراجعة الإعلانات',
+                          subtitle:
+                              'إدارة ومراجعة الإعلانات',
                           onTap: () async {
                             Navigator.pop(context);
                             await _openAdminPanel();
                           },
                         ),
+
                         const Padding(
                           padding: EdgeInsets.symmetric(
                             horizontal: 8,
@@ -2047,6 +2065,9 @@ final latestListings = _listings
                         ),
                       ],
 
+                      // =========================
+                      // الأقسام
+                      // =========================
                       _buildDrawerSectionTitle(
                         'الأقسام',
                         Icons.grid_view_rounded,
@@ -2057,40 +2078,50 @@ final latestListings = _listings
                           padding: EdgeInsets.all(12),
                           child: Text(
                             'لا توجد أقسام حالياً',
-                            style: TextStyle(fontSize: 13),
+                            style: TextStyle(
+                              fontSize: 13,
+                            ),
                           ),
                         )
                       else
-                        ..._categories.map((category) {
-                          final categoryId =
-                              category['id'] as int?;
-                          final categoryName =
-                              category['name']?.toString() ??
-                                  'بدون اسم';
-                          final selected =
-                              _selectedCategoryId == categoryId;
+                        ..._categories.map(
+                          (category) {
+                            final categoryId =
+                                category['id'] as int?;
 
-                          return _buildDrawerItem(
-                            icon: _categoryIcon(categoryName),
-                            title: categoryName,
-                            selected: selected,
-                            onTap: () {
-                              Navigator.pop(context);
+                            final categoryName =
+                                category['name']?.toString() ??
+                                    'بدون اسم';
 
-                              if (categoryId == null) {
-                                return;
-                              }
+                            final selected =
+                                _selectedCategoryId ==
+                                    categoryId;
 
-                              setState(() {
-                                _selectedCategoryId = categoryId;
-                                _searchQuery = '';
-                                _searchController.clear();
-                              });
+                            return _buildDrawerItem(
+                              icon: _categoryIcon(
+                                categoryName,
+                              ),
+                              title: categoryName,
+                              selected: selected,
+                              onTap: () {
+                                Navigator.pop(context);
 
-                              _loadData();
-                            },
-                          );
-                        }),
+                                if (categoryId == null) {
+                                  return;
+                                }
+
+                                setState(() {
+                                  _selectedCategoryId =
+                                      categoryId;
+                                  _searchQuery = '';
+                                  _searchController.clear();
+                                });
+
+                                _loadData();
+                              },
+                            );
+                          },
+                        ),
 
                       const Padding(
                         padding: EdgeInsets.symmetric(
@@ -2100,6 +2131,9 @@ final latestListings = _listings
                         child: Divider(height: 1),
                       ),
 
+                      // =========================
+                      // نشاط المستخدم
+                      // =========================
                       _buildDrawerSectionTitle(
                         'حسابي',
                         Icons.account_circle_outlined,
@@ -2125,6 +2159,9 @@ final latestListings = _listings
 
                       const SizedBox(height: 6),
 
+                      // =========================
+                      // تسجيل الخروج
+                      // =========================
                       if (user != null)
                         _buildDrawerItem(
                           icon: Icons.logout,
@@ -2139,6 +2176,9 @@ final latestListings = _listings
                   ),
                 ),
 
+                // =========================
+                // أسفل القائمة
+                // =========================
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.fromLTRB(
@@ -2170,13 +2210,98 @@ final latestListings = _listings
           ),
         ),
 
-        // محتوى الصفحة الرئيسي
-        body: _buildBody(),
+        // =========================
+        // AppBar
+        // =========================
+        appBar: AppBar(
+          centerTitle: false,
+          titleSpacing: 0,
+          elevation: 0,
+          title: Text(
+            'دلالة شبشة',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+              color:
+                  Theme.of(context).colorScheme.primary,
+            ),
+          ),
+          actions: [
+            IconButton(
+              tooltip: 'تحديث',
+              onPressed: () {
+                _loadData();
+                _checkAdminStatus();
+              },
+              icon: const Icon(
+                Icons.refresh,
+              ),
+            ),
+            _buildPostListingButton(),
+            _buildProfileButton(),
+          ],
+        ),
 
+        // =========================
+        // محتوى الصفحة
+        // =========================
+        body: Column(
+          crossAxisAlignment:
+              CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                13,
+                4,
+                13,
+                8,
+              ),
+              child: Column(
+                children: [
+                  Text(
+                    'في مكان واحد - تسوق واعلن بسهولة',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: Theme.of(context)
+                          .colorScheme
+                          .primary,
+                    ),
+                  ),
+
+                  if (user != null &&
+                      name != null &&
+                      name.trim().isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(
+                        top: 3,
+                      ),
+                      child: Text(
+                        'مرحباً يا $name 👋',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade700,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+
+            Expanded(
+              child: _buildBody(),
+            ),
+          ],
+        ),
+
+        // =========================
         // شريط التنقل السفلي
-        bottomNavigationBar: _buildBottomNavigation(),
+        // =========================
+        bottomNavigationBar:
+            _buildBottomNavigation(),
       ),
     );
   }
-
 }
