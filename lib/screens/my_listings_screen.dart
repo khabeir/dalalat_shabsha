@@ -335,32 +335,48 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
     }
   }
 
-  String _priceText(Map<String, dynamic> listing) {
-    final priceType =
-        listing['price_type']?.toString();
+  String _formatPrice(dynamic value) {
+  if (value == null) return '';
 
-    if (priceType == 'contact' ||
-        listing['price'] == null) {
-      return 'السعر عند التواصل';
-    }
+  final number = num.tryParse(value.toString());
 
-    final price = listing['price'];
-
-    final currency =
-        listing['currency']?.toString() ?? 'SDG';
-
-    final formattedPrice = price is num
-        ? price.toStringAsFixed(
-            price % 1 == 0 ? 0 : 2,
-          )
-        : price.toString();
-
-    if (priceType == 'negotiable') {
-      return '$formattedPrice $currency قابل للتفاوض';
-    }
-
-    return '$formattedPrice $currency';
+  if (number == null) {
+    return value.toString();
   }
+
+  if (number % 1 != 0) {
+    return number.toStringAsFixed(2).replaceAllMapped(
+      RegExp(r'\B(?=(\d{3})+(?!\d))'),
+      (match) => ',',
+    );
+  }
+
+  return number
+      .toInt()
+      .toString()
+      .replaceAllMapped(
+        RegExp(r'\B(?=(\d{3})+(?!\d))'),
+        (match) => ',',
+      );
+}
+
+String _priceText(Map<String, dynamic> listing) {
+  final priceType = listing['price_type']?.toString();
+  final price = listing['price'];
+  final currency = listing['currency']?.toString() ?? 'SDG';
+
+  if (priceType == 'contact' || price == null) {
+    return 'السعر عند التواصل';
+  }
+
+  final formattedPrice = _formatPrice(price);
+
+  if (priceType == 'negotiable') {
+    return '$formattedPrice $currency قابل للتفاوض';
+  }
+
+  return '$formattedPrice $currency';
+}
 
   void _openListing(Map<String, dynamic> listing) {
     final listingId = listing['id'];
