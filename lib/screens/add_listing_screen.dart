@@ -12,6 +12,11 @@ class AddListingScreen extends StatefulWidget {
 }
 
 class _AddListingScreenState extends State<AddListingScreen> {
+  static const Color _brandPurple = Color(0xFF5125A8);
+  static const Color _deepPurple = Color(0xFF351477);
+  static const Color _warmCream = Color(0xFFFFFBF5);
+  static const Color _accentOrange = Color(0xFFFFB21A);
+
   final _formKey = GlobalKey<FormState>();
 
   final _titleController = TextEditingController();
@@ -476,8 +481,17 @@ class _AddListingScreenState extends State<AddListingScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         SizedBox(
-          height: 50,
+          height: 56,
           child: FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: _brandPurple,
+              foregroundColor: Colors.white,
+              elevation: 4,
+              shadowColor: _brandPurple.withValues(alpha: .28),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+              ),
+            ),
             onPressed: _saving ? null : _saveListing,
             icon: _saving
                 ? const SizedBox(
@@ -518,12 +532,33 @@ class _AddListingScreenState extends State<AddListingScreen> {
           if (!didPop) _onBackPressed();
         },
         child: Scaffold(
+          backgroundColor: _warmCream,
           appBar: AppBar(
+            elevation: 0,
+            centerTitle: true,
+            foregroundColor: Colors.white,
+            flexibleSpace: const DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topRight,
+                  end: Alignment.bottomLeft,
+                  colors: [_deepPurple, _brandPurple, Color(0xFF7045C1)],
+                ),
+              ),
+            ),
+            leading: IconButton(
+              tooltip: 'رجوع',
+              icon: const Icon(Icons.arrow_back_rounded),
+              onPressed: _onBackPressed,
+            ),
             title: const Text(
               'إضافة إعلان',
-              style: TextStyle(fontSize: 19, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                letterSpacing: .2,
+              ),
             ),
-            centerTitle: true,
           ),
           body: _loadingCategories
               ? const Center(child: CircularProgressIndicator())
@@ -533,7 +568,7 @@ class _AddListingScreenState extends State<AddListingScreen> {
                   child: ListView(
                     keyboardDismissBehavior:
                         ScrollViewKeyboardDismissBehavior.onDrag,
-                    padding: const EdgeInsets.fromLTRB(14, 10, 14, 24),
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 30),
                     children: [
                       _buildReviewNotice(),
 
