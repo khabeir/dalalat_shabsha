@@ -18,6 +18,10 @@ class _ReportGroup {
     required this.listing,
     required this.reports,
   });
+
+  // عدد المبلّغين المختلفين (لا نحسب تكرار نفس الشخص).
+  int get reporterCount =>
+      reports.map((report) => report['reporter_id']).toSet().length;
 }
 
 class AdminListingsScreen extends StatefulWidget {
@@ -536,7 +540,11 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
   // البلاغات مجمّعة حسب الإعلان (الإعلانات المتاحة أو المعلقة فقط).
   Future<void> _loadReports() async {
     try {
-      final response = await _supabase.from('reports').select().limit(500);
+      final response = await _supabase
+          .from('reports')
+          .select()
+          .inFilter('status', ['pending', 'reviewing'])
+          .limit(500);
 
       final reports = List<Map<String, dynamic>>.from(response);
 
@@ -595,7 +603,7 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
         );
       }
 
-      groups.sort((a, b) => b.reports.length.compareTo(a.reports.length));
+      groups.sort((a, b) => b.reporterCount.compareTo(a.reporterCount));
 
       if (!mounted) return;
 
@@ -610,8 +618,8 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
 
       setState(() {
         _reportsError =
-            'تعذر تحميل البلاغات. تأكد من سماح سياسات الأمان (RLS) للأدمن '
-            'بقراءة جدول reports.';
+            'تعذر تحميل البلاغات. شغّل سكربت supabase_security.sql '
+            'ليُسمح للأدمن بقراءة جدول reports.';
       });
     }
   }
@@ -662,6 +670,19 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
 
     try {
       await _supabase.from('listings').update(payload).eq('id', id);
+
+      // رفض الإعلان يُغلق بلاغاته (اختياري، لا يوقف العملية إن فشل).
+      if (status == 'rejected') {
+        try {
+          await _supabase
+              .from('reports')
+              .update({'status': 'resolved'})
+              .eq('listing_id', id)
+              .inFilter('status', ['pending', 'reviewing']);
+        } catch (e) {
+          debugPrint('resolve reports error: $e');
+        }
+      }
 
       if (!mounted) return;
 
@@ -715,7 +736,7 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
   Future<void> _dismissReports(_ReportGroup group) async {
     final confirmed = await _confirm(
       title: 'تجاهل البلاغات',
-      message: 'سيتم حذف ${group.reports.length} بلاغ على هذا الإعلان '
+      message: 'سيتم إغلاق ${group.reports.length} بلاغ على هذا الإعلان '
           'وإبقاء الإعلان منشوراً. متابعة؟',
       confirmLabel: 'تجاهل',
     );
@@ -725,15 +746,16 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
     try {
       await _supabase
           .from('reports')
-          .delete()
-          .eq('listing_id', group.listingId);
+          .update({'status': 'dismissed'})
+          .eq('listing_id', group.listingId)
+          .inFilter('status', ['pending', 'reviewing']);
 
       _showSnack('تم تجاهل البلاغات');
 
       await _loadReports();
     } catch (e) {
       debugPrint('dismissReports error: $e');
-      _showSnack('تعذر حذف البلاغات');
+      _showSnack('تعذر إغلاق البلاغات');
     }
   }
 
@@ -1267,7 +1289,7 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  '${group.reports.length} بلاغ',
+                  '${group.reporterCount} بلاغ',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     color: colorScheme.onErrorContainer,
@@ -1281,6 +1303,7 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
                 padding: const EdgeInsets.only(bottom: 4),
                 child: Text(
                   '• ${(report['reason']?.toString().trim().isNotEmpty ?? false) ? report['reason'] : 'بدون سبب'}'
+                  '${(report['details']?.toString().trim().isNotEmpty ?? false) ? ' — ${report['details']}' : ''}'
                   '${_timeAgo(report['created_at']).isEmpty ? '' : '  (${_timeAgo(report['created_at'])})'}',
                   style: TextStyle(
                     fontSize: 13,

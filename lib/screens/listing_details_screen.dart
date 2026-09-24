@@ -315,7 +315,7 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
 
     try {
       final profile = await _supabase
-          .from('profiles')
+          .from('seller_public_info')
           .select('full_name')
           .eq('id', sellerId)
           .maybeSingle();
@@ -568,20 +568,24 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
 
     if (user == null || !mounted) return;
 
-    final reason = await showModalBottomSheet<String>(
+    final result = await showModalBottomSheet<Map<String, String>>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
       builder: (_) => const _ReportSheet(),
     );
 
-    if (reason == null || reason.trim().isEmpty) return;
+    final reason = result?['reason']?.trim() ?? '';
+    final details = result?['details']?.trim() ?? '';
+
+    if (reason.isEmpty) return;
 
     try {
       await _supabase.from('reports').insert({
         'reporter_id': user.id,
         'listing_id': widget.listingId,
-        'reason': reason.trim(),
+        'reason': reason,
+        'details': details.isEmpty ? null : details,
       });
 
       _showSnack('تم إرسال البلاغ للمراجعة، شكراً لك');
@@ -1490,10 +1494,7 @@ class _ReportSheetState extends State<_ReportSheet> {
       return;
     }
 
-    Navigator.pop(
-      context,
-      note.isEmpty ? _selected : '$_selected: $note',
-    );
+    Navigator.pop(context, {'reason': _selected!, 'details': note});
   }
 
   @override
