@@ -314,13 +314,13 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
     if (sellerId == null) return;
 
     try {
-      final profile = await _supabase
-          .from('seller_public_info')
-          .select('full_name')
-          .eq('id', sellerId)
-          .maybeSingle();
+      // دالة آمنة تعيد الاسم فقط (بدون الهاتف أو المنطقة).
+      final result = await _supabase.rpc(
+        'get_seller_name',
+        params: {'p_seller_id': sellerId},
+      );
 
-      final name = profile?['full_name']?.toString().trim();
+      final name = result?.toString().trim();
 
       if (!mounted) return;
 
