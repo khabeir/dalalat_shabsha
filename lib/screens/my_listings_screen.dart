@@ -72,10 +72,7 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
     try {
       final response = await _supabase
           .from('listings')
-          .select(
-            'id, category_id, title, description, price, currency, '
-            'price_type, condition, area, contact_phone, status, created_at',
-          )
+          .select() // كل الأعمدة (يشمل rejection_reason إن وُجد)
           .eq('seller_id', user.id)
           .order('created_at', ascending: false);
 
@@ -710,6 +707,27 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
                       ),
                     ],
                   ),
+
+                  if (status == 'rejected')
+                    Container(
+                      margin: const EdgeInsets.only(top: 8, left: 6),
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: colorScheme.errorContainer.withValues(alpha: 0.6),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        (listing['rejection_reason']?.toString().trim().isNotEmpty ?? false)
+                            ? 'سبب الرفض: ${listing['rejection_reason']}\n'
+                                'عدّل الإعلان ثم احفظ ليُعاد إرساله للمراجعة.'
+                            : 'تم رفض الإعلان. عدّله ثم احفظ ليُعاد إرساله للمراجعة.',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          height: 1.5,
+                          color: colorScheme.onErrorContainer,
+                        ),
+                      ),
+                    ),
 
                   if (status == 'pending')
                     Padding(

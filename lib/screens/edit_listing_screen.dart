@@ -409,6 +409,8 @@ class _EditListingScreenState extends State<EditListingScreen> {
         'area': _areaController.text.trim(),
         'contact_phone': cleanPhone(_phoneController.text),
         if (needsReview) 'status': 'pending',
+        if (needsReview && widget.listing.containsKey('rejection_reason'))
+          'rejection_reason': null,
       }).eq('id', listingId);
 
       // الصور: رفع الجديدة وترتيب الكل حسب مكانها في النموذج.
@@ -522,7 +524,10 @@ class _EditListingScreenState extends State<EditListingScreen> {
 
     switch (_status) {
       case 'rejected':
-        message = 'تم رفض هذا الإعلان. عدّله ثم احفظ ليُعاد إرساله للمراجعة.';
+        final reason = widget.listing['rejection_reason']?.toString().trim() ?? '';
+        message = reason.isEmpty
+            ? 'تم رفض هذا الإعلان. عدّله ثم احفظ ليُعاد إرساله للمراجعة.'
+            : 'سبب الرفض: $reason\nعدّل الإعلان ثم احفظ ليُعاد إرساله للمراجعة.';
         background = colorScheme.errorContainer;
         foreground = colorScheme.onErrorContainer;
         break;
