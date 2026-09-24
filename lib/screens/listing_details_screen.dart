@@ -1291,7 +1291,9 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
                   children: [
                     if (area.isNotEmpty)
                       _buildChip(Icons.location_on_outlined, area),
-                    _buildChip(Icons.inventory_2_outlined, _conditionText()),
+                    if (listing['condition'] == 'new' ||
+                        listing['condition'] == 'used')
+                      _buildChip(Icons.inventory_2_outlined, _conditionText()),
                     if (_categoryName != null)
                       _buildChip(Icons.category_outlined, _categoryName!),
                     if (timeAgo.isNotEmpty)

@@ -1,8 +1,8 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+import 'listing_form_widgets.dart';
 
 class EditListingScreen extends StatefulWidget {
   final Map<String, dynamic> listing;
@@ -17,9 +17,15 @@ class EditListingScreen extends StatefulWidget {
 }
 
 class _EditListingScreenState extends State<EditListingScreen> {
+  // إن كانت true: تعديل العنوان أو الوصف أو الصور أو المنطقة أو الهاتف
+  // أو التصنيف لإعلان "متاح" يعيده إلى "قيد المراجعة".
+  // غيّرها إلى false إن أردت أن تُطبَّق التعديلات فوراً دون مراجعة.
+  static const bool _reviewOnEdit = true;
+
+  static const _priceTypes = ['fixed', 'negotiable', 'contact'];
+
   final SupabaseClient _supabase = Supabase.instance.client;
   final ImagePicker _imagePicker = ImagePicker();
-
   final _formKey = GlobalKey<FormState>();
 
   late final TextEditingController _titleController;
@@ -34,49 +40,55 @@ class _EditListingScreenState extends State<EditListingScreen> {
 
   List<Map<String, dynamic>> _categories = [];
 
-  List<Map<String, dynamic>> _existingImages = [];
-  final List<XFile> _newImages = [];
+  // الصور الأصلية من الخادم، والصور الحالية في النموذج (مع الجديدة).
+  List<ListingImageItem> _originalImages = [];
+  List<ListingImageItem> _images = [];
+
+  // لقطة الحالة عند فتح الشاشة، لمعرفة هل تغيّر شيء.
+  String? _initialSnapshot;
 
   bool _loadingCategories = true;
   bool _loadingImages = true;
   bool _saving = false;
+  String? _progress;
 
-  static const int _maxImages = 6;
+  int? get _listingId {
+    final id = widget.listing['id'];
+    return id is int ? id : null;
+  }
+
+  String? get _status => widget.listing['status']?.toString();
 
   @override
   void initState() {
     super.initState();
 
+    final listing = widget.listing;
+
     _titleController = TextEditingController(
-      text: widget.listing['title']?.toString() ?? '',
+      text: listing['title']?.toString() ?? '',
     );
-
     _descriptionController = TextEditingController(
-      text: widget.listing['description']?.toString() ?? '',
+      text: listing['description']?.toString() ?? '',
     );
-
-    _priceController = TextEditingController(
-      text: widget.listing['price']?.toString() ?? '',
-    );
-
+    _priceController = TextEditingController(text: _initialPriceText());
     _areaController = TextEditingController(
-      text: widget.listing['area']?.toString() ?? '',
+      text: listing['area']?.toString() ?? '',
     );
-
     _phoneController = TextEditingController(
-      text: widget.listing['contact_phone']?.toString() ?? '',
+      text: listing['contact_phone']?.toString() ?? '',
     );
 
-    final categoryId = widget.listing['category_id'];
+    final categoryId = listing['category_id'];
 
-    if (categoryId is int) {
-      _selectedCategoryId = categoryId;
-    }
+    if (categoryId is int) _selectedCategoryId = categoryId;
 
-    _priceType = widget.listing['price_type']?.toString() ?? 'negotiable';
+    final priceType = listing['price_type']?.toString();
+    _priceType = _priceTypes.contains(priceType) ? priceType! : 'negotiable';
 
+    final condition = listing['condition']?.toString();
     _condition =
-        widget.listing['condition']?.toString() ?? 'not_applicable';
+        kConditionOptions.containsKey(condition) ? condition! : 'not_applicable';
 
     _loadCategories();
     _loadImages();
@@ -92,6 +104,109 @@ class _EditListingScreenState extends State<EditListingScreen> {
     super.dispose();
   }
 
+  // السعر بدون ".0" الزائدة (250000.0 → 250000).
+  String _initialPriceText() {
+    final price = widget.listing['price'];
+
+    if (price == null) return '';
+
+    final number = num.tryParse(price.toString());
+
+    if (number == null) return price.toString();
+
+    return number == number.truncate()
+        ? number.toInt().toString()
+        : number.toString();
+  }
+
+  // =========================
+  // أدوات مساعدة
+  // =========================
+  void _showSnack(String message, {int seconds = 4}) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          duration: Duration(seconds: seconds),
+        ),
+      );
+  }
+
+  String _snapshot() {
+    return [
+      _titleController.text.trim(),
+      _descriptionController.text.trim(),
+      _priceController.text.trim(),
+      _areaController.text.trim(),
+      _phoneController.text.trim(),
+      '$_selectedCategoryId',
+      _priceType,
+      _condition,
+      _images.map((image) => image.key).join(','),
+    ].join('\u0001');
+  }
+
+  bool get _hasChanges {
+    final initial = _initialSnapshot;
+
+    return initial != null && initial != _snapshot();
+  }
+
+  // هل تغيّرت حقول يراجعها المشرف؟ (السعر والحالة لا تحتاج مراجعة)
+  bool get _contentChanged {
+    final listing = widget.listing;
+
+    return _titleController.text.trim() !=
+            (listing['title']?.toString().trim() ?? '') ||
+        _descriptionController.text.trim() !=
+            (listing['description']?.toString().trim() ?? '') ||
+        _areaController.text.trim() !=
+            (listing['area']?.toString().trim() ?? '') ||
+        cleanPhone(_phoneController.text) !=
+            cleanPhone(listing['contact_phone']?.toString() ?? '') ||
+        _selectedCategoryId != listing['category_id'];
+  }
+
+  bool get _imagesChanged {
+    return _images.map((image) => image.key).join(',') !=
+        _originalImages.map((image) => image.key).join(',');
+  }
+
+  bool get _needsReview {
+    if (_status == 'rejected') return true;
+
+    if (_status == 'approved' && _reviewOnEdit) {
+      return _contentChanged || _imagesChanged;
+    }
+
+    return false;
+  }
+
+  Future<void> _onBackPressed() async {
+    if (_saving) return;
+
+    if (!_hasChanges) {
+      Navigator.pop(context);
+      return;
+    }
+
+    final leave = await confirmListingDialog(
+      context,
+      title: 'تعديلات غير محفوظة',
+      message: 'لديك تعديلات لم تُحفظ. هل تريد الخروج وتجاهلها؟',
+      confirmLabel: 'خروج',
+      destructive: true,
+    );
+
+    if (leave && mounted) Navigator.pop(context);
+  }
+
+  // =========================
+  // تحميل البيانات
+  // =========================
   Future<void> _loadCategories() async {
     try {
       final response = await _supabase
@@ -107,602 +222,517 @@ class _EditListingScreenState extends State<EditListingScreen> {
         _loadingCategories = false;
       });
     } catch (e) {
+      debugPrint('loadCategories error: $e');
+
       if (!mounted) return;
 
-      setState(() {
-        _loadingCategories = false;
-      });
+      setState(() => _loadingCategories = false);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('تعذر تحميل الأقسام: $e'),
-        ),
-      );
+      _showSnack('تعذر تحميل الأقسام');
     }
   }
 
   Future<void> _loadImages() async {
+    final listingId = _listingId;
+
+    if (listingId == null) {
+      setState(() => _loadingImages = false);
+      return;
+    }
+
     try {
-      final listingId = widget.listing['id'];
-
-      if (listingId is! int) {
-        throw Exception('رقم الإعلان غير صحيح');
-      }
-
       final response = await _supabase
           .from('listing_images')
           .select('id, image_path, sort_order')
           .eq('listing_id', listingId)
           .order('sort_order');
 
-      if (!mounted) return;
+      final items = <ListingImageItem>[];
 
-      setState(() {
-        _existingImages = List<Map<String, dynamic>>.from(response);
-        _loadingImages = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
+      for (final row in List<Map<String, dynamic>>.from(response)) {
+        final id = row['id'];
+        final path = row['image_path']?.toString().trim() ?? '';
 
-      setState(() {
-        _loadingImages = false;
-      });
+        if (id is! int || path.isEmpty) continue;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('تعذر تحميل صور الإعلان: $e'),
-        ),
-      );
-    }
-  }
+        final url = path.startsWith('http')
+            ? path
+            : _supabase.storage.from(kListingImagesBucket).getPublicUrl(path);
 
-  int get _totalImages {
-    return _existingImages.length + _newImages.length;
-  }
-
-  Future<void> _pickImages() async {
-    final remaining = _maxImages - _totalImages;
-
-    if (remaining <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('يمكنك الاحتفاظ بـ 6 صور كحد أقصى للإعلان'),
-        ),
-      );
-      return;
-    }
-
-    try {
-      final images = await _imagePicker.pickMultiImage(
-        imageQuality: 80,
-        maxWidth: 1600,
-        maxHeight: 1600,
-      );
-
-      if (images.isEmpty) return;
-
-      final selected = images.take(remaining).toList();
-
-      setState(() {
-        _newImages.addAll(selected);
-      });
-
-      if (images.length > remaining && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'تمت إضافة $remaining صورة فقط لأن الحد الأقصى هو $_maxImages صور',
-            ),
+        items.add(
+          ListingImageItem.remote(
+            id: id,
+            path: path,
+            url: url,
+            sortOrder: row['sort_order'] is int ? row['sort_order'] as int : null,
           ),
         );
       }
-    } catch (e) {
+
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('تعذر اختيار الصور: $e'),
-        ),
-      );
+      setState(() {
+        _originalImages = List.of(items);
+        _images = List.of(items);
+        _loadingImages = false;
+        _initialSnapshot = _snapshot();
+      });
+    } catch (e) {
+      debugPrint('loadImages error: $e');
+
+      if (!mounted) return;
+
+      // نسمح بتعديل النصوص، لكن الصور لن تُمَس عند الحفظ.
+      setState(() {
+        _loadingImages = false;
+        _initialSnapshot = _snapshot();
+      });
+
+      _showSnack('تعذر تحميل صور الإعلان');
     }
   }
 
-  Future<void> _deleteExistingImage(int index) async {
-    if (_saving) return;
-
-    final image = _existingImages[index];
-
-    final imageId = image['id'];
-    final imagePath = image['image_path']?.toString();
-
-    if (imageId is! int || imagePath == null || imagePath.isEmpty) {
-      return;
-    }
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) {
-        return Directionality(
-          textDirection: TextDirection.rtl,
-          child: AlertDialog(
-            title: const Text('حذف الصورة'),
-            content: const Text(
-              'هل تريد حذف هذه الصورة من الإعلان؟',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.pop(dialogContext, false);
-                },
-                child: const Text('إلغاء'),
-              ),
-              FilledButton(
-                onPressed: () {
-                  Navigator.pop(dialogContext, true);
-                },
-                child: const Text('حذف'),
-              ),
-            ],
-          ),
-        );
-      },
+  // =========================
+  // الصور
+  // =========================
+  Future<void> _addImages() async {
+    final picked = await pickListingImages(
+      context,
+      _imagePicker,
+      remaining: kMaxListingImages - _images.length,
     );
 
-    if (confirmed != true || !mounted) return;
-
-    try {
-      setState(() {
-        _saving = true;
-      });
-
-      await _supabase
-          .from('listing_images')
-          .delete()
-          .eq('id', imageId);
-
-      try {
-        await _supabase.storage
-            .from('listing-images')
-            .remove([imagePath]);
-      } catch (_) {
-        // إذا كان ملف Storage غير موجود، لا نمنع حذف سجل الصورة.
-      }
-
-      if (!mounted) return;
-
-      setState(() {
-        _existingImages.removeAt(index);
-        _saving = false;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('تم حذف الصورة'),
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-
-      setState(() {
-        _saving = false;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('تعذر حذف الصورة: $e'),
-        ),
-      );
-    }
-  }
-
-  void _removeNewImage(int index) {
-    if (_saving) return;
+    if (picked.isEmpty || !mounted) return;
 
     setState(() {
-      _newImages.removeAt(index);
+      _images.addAll(picked.map(ListingImageItem.local));
     });
   }
 
-  String _contentType(String extension) {
-    switch (extension.toLowerCase()) {
-      case 'png':
-        return 'image/png';
-      case 'webp':
-        return 'image/webp';
-      case 'heic':
-        return 'image/heic';
-      case 'gif':
-        return 'image/gif';
-      case 'jpg':
-      case 'jpeg':
-      default:
-        return 'image/jpeg';
+  // الحذف هنا يخص النموذج فقط، ولا يُنفَّذ على الخادم إلا عند "حفظ".
+  void _removeImage(int index) {
+    setState(() => _images.removeAt(index));
+  }
+
+  void _makeCover(int index) {
+    setState(() {
+      final item = _images.removeAt(index);
+      _images.insert(0, item);
+    });
+
+    _showSnack('تم تعيين الصورة كغلاف للإعلان', seconds: 2);
+  }
+
+  Future<void> _deleteRemovedImages(List<ListingImageItem> removed) async {
+    final ids = removed.map((image) => image.id).whereType<int>().toList();
+
+    if (ids.isNotEmpty) {
+      await _supabase.from('listing_images').delete().inFilter('id', ids);
+    }
+
+    final paths = removed
+        .map((image) => image.path)
+        .whereType<String>()
+        .where((path) => path.isNotEmpty && !path.startsWith('http'))
+        .toList();
+
+    if (paths.isEmpty) return;
+
+    try {
+      await _supabase.storage.from(kListingImagesBucket).remove(paths);
+    } catch (e) {
+      debugPrint('remove storage files error: $e');
     }
   }
 
-  Future<void> _uploadNewImages(int listingId) async {
-    for (int i = 0; i < _newImages.length; i++) {
-      final image = _newImages[i];
-
-      final originalExtension = image.path.contains('.')
-          ? image.path.split('.').last.toLowerCase()
-          : 'jpg';
-
-      final extension =
-          originalExtension == 'jpeg' ? 'jpg' : originalExtension;
-
-      final fileName =
-          '${DateTime.now().millisecondsSinceEpoch}_$i.$extension';
-
-      final imagePath = '$listingId/$fileName';
-
-      final fileBytes = await image.readAsBytes();
-
-      await _supabase.storage
-          .from('listing-images')
-          .uploadBinary(
-            imagePath,
-            fileBytes,
-            fileOptions: FileOptions(
-              contentType: _contentType(extension),
-              upsert: false,
-            ),
-          );
-
-      final sortOrder = _existingImages.length + i;
-
-      await _supabase.from('listing_images').insert({
-        'listing_id': listingId,
-        'image_path': imagePath,
-        'sort_order': sortOrder,
-      });
-    }
-  }
-
+  // =========================
+  // الحفظ
+  // =========================
   Future<void> _saveChanges() async {
-    if (!_formKey.currentState!.validate()) {
+    if (_saving) return;
+
+    if (_loadingImages) {
+      _showSnack('يتم تحميل الصور، انتظر لحظة');
       return;
     }
 
-    if (_selectedCategoryId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('اختر القسم أولاً.'),
-        ),
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+
+    final categoryId = _selectedCategoryId;
+
+    if (categoryId == null) {
+      _showSnack('اختر القسم أولاً');
+      return;
+    }
+
+    final listingId = _listingId;
+
+    if (listingId == null) {
+      _showSnack('رقم الإعلان غير صحيح');
+      return;
+    }
+
+    if (!_hasChanges) {
+      _showSnack('لم تُجرِ أي تغيير');
+      return;
+    }
+
+    final needsReview = _needsReview;
+
+    if (needsReview && _status == 'approved') {
+      final confirmed = await confirmListingDialog(
+        context,
+        title: 'سيعود الإعلان للمراجعة',
+        message: 'تعديل هذه البيانات يتطلب مراجعة الإدارة. سيختفي الإعلان '
+            'مؤقتاً حتى تتم الموافقة على التعديلات. هل تريد المتابعة؟',
+        confirmLabel: 'متابعة',
       );
-      return;
+
+      if (!confirmed || !mounted) return;
     }
 
-    if (_priceType != 'contact' &&
-        _priceController.text.trim().isNotEmpty &&
-        double.tryParse(_priceController.text.trim()) == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('أدخل سعراً صحيحاً.'),
-        ),
-      );
-      return;
-    }
-
-    final listingId = widget.listing['id'];
-
-    if (listingId is! int) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('رقم الإعلان غير صحيح.'),
-        ),
-      );
-      return;
-    }
+    FocusScope.of(context).unfocus();
 
     setState(() {
       _saving = true;
+      _progress = 'جاري حفظ البيانات...';
     });
 
     try {
-      final price = _priceType == 'contact'
-          ? null
-          : double.tryParse(_priceController.text.trim());
+      await _supabase.from('listings').update({
+        'category_id': categoryId,
+        'title': _titleController.text.trim(),
+        'description': _descriptionController.text.trim(),
+        'price': _priceType == 'contact' ? null : parsePrice(_priceController.text),
+        'price_type': _priceType,
+        'condition': _condition,
+        'area': _areaController.text.trim(),
+        'contact_phone': cleanPhone(_phoneController.text),
+        if (needsReview) 'status': 'pending',
+      }).eq('id', listingId);
 
-      await _supabase
-          .from('listings')
-          .update({
-            'category_id': _selectedCategoryId,
-            'title': _titleController.text.trim(),
-            'description': _descriptionController.text.trim(),
-            'price': price,
-            'price_type': _priceType,
-            'condition': _condition,
-            'area': _areaController.text.trim(),
-            'contact_phone': _phoneController.text.trim(),
-          })
-          .eq('id', listingId);
+      // الصور: رفع الجديدة وترتيب الكل حسب مكانها في النموذج.
+      final finalImages = List<ListingImageItem>.from(_images);
 
-      if (_newImages.isNotEmpty) {
-        await _uploadNewImages(listingId);
+      var failedUploads = 0;
+      var warning = false;
+
+      for (var i = 0; i < finalImages.length; i++) {
+        final item = finalImages[i];
+
+        if (item.isLocal) {
+          if (mounted) {
+            setState(() {
+              _progress = 'جاري رفع الصورة ${i + 1} من ${finalImages.length}...';
+            });
+          }
+
+          try {
+            await uploadListingImage(
+              supabase: _supabase,
+              listingId: listingId,
+              image: item.file!,
+              fileIndex: i,
+              sortOrder: i,
+            );
+          } catch (e) {
+            debugPrint('upload image $i failed: $e');
+            failedUploads++;
+          }
+        } else if (item.id != null && item.sortOrder != i) {
+          try {
+            await _supabase
+                .from('listing_images')
+                .update({'sort_order': i}).eq('id', item.id!);
+          } catch (e) {
+            debugPrint('update sort_order failed: $e');
+            warning = true;
+          }
+        }
+      }
+
+      final keptIds = finalImages
+          .where((image) => !image.isLocal)
+          .map((image) => image.id)
+          .toSet();
+
+      final removed = _originalImages
+          .where((image) => !keptIds.contains(image.id))
+          .toList();
+
+      if (removed.isNotEmpty) {
+        if (mounted) setState(() => _progress = 'جاري حذف الصور المحذوفة...');
+
+        try {
+          await _deleteRemovedImages(removed);
+        } catch (e) {
+          debugPrint('delete removed images failed: $e');
+          warning = true;
+        }
       }
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('تم تعديل الإعلان بنجاح.'),
-        ),
+      final buffer = StringBuffer(
+        needsReview
+            ? 'تم حفظ التعديلات، والإعلان الآن بانتظار المراجعة.'
+            : 'تم تعديل الإعلان بنجاح.',
+      );
+
+      if (failedUploads > 0) {
+        buffer.write('\nتعذر رفع $failedUploads من الصور، حاول إضافتها مرة أخرى.');
+      }
+
+      if (warning) {
+        buffer.write('\nتعذر تحديث بعض الصور، تحقق منها لاحقاً.');
+      }
+
+      _showSnack(
+        buffer.toString(),
+        seconds: (failedUploads > 0 || warning) ? 7 : 4,
       );
 
       Navigator.pop(context, true);
-    } on PostgrestException catch (e) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('تعذر تعديل الإعلان: ${e.message}'),
-        ),
-      );
-    } on StorageException catch (e) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'تم تعديل بيانات الإعلان، لكن تعذر رفع إحدى الصور: ${e.message}',
-          ),
-          duration: const Duration(seconds: 5),
-        ),
-      );
     } catch (e) {
-      if (!mounted) return;
+      debugPrint('saveChanges error: $e');
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('حدث خطأ أثناء تعديل الإعلان: $e'),
-          duration: const Duration(seconds: 5),
-        ),
+      _showSnack(
+        'تعذر حفظ التعديلات. تحقق من اتصال الإنترنت وحاول مرة أخرى.',
+        seconds: 5,
       );
     } finally {
       if (mounted) {
         setState(() {
           _saving = false;
+          _progress = null;
         });
       }
     }
   }
 
-  InputDecoration _decoration(String label, IconData icon) {
-    return InputDecoration(
-      labelText: label,
-      prefixIcon: Icon(icon),
-      border: const OutlineInputBorder(),
+  // =========================
+  // الواجهة
+  // =========================
+  Widget _buildStatusBanner() {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    String? message;
+    Color background = colorScheme.tertiaryContainer;
+    Color foreground = colorScheme.onTertiaryContainer;
+
+    switch (_status) {
+      case 'rejected':
+        message = 'تم رفض هذا الإعلان. عدّله ثم احفظ ليُعاد إرساله للمراجعة.';
+        background = colorScheme.errorContainer;
+        foreground = colorScheme.onErrorContainer;
+        break;
+      case 'approved':
+        if (_reviewOnEdit) {
+          message = 'تعديل العنوان أو الوصف أو الصور أو المنطقة أو رقم التواصل '
+              'يعيد الإعلان إلى المراجعة. تعديل السعر والحالة لا يحتاج مراجعة.';
+        }
+        break;
+      case 'pending':
+        message = 'الإعلان قيد المراجعة حالياً، وسيظهر بعد موافقة الإدارة.';
+        break;
+    }
+
+    if (message == null) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: background.withValues(alpha: 0.7),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.info_outline, size: 20, color: foreground),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(
+                fontSize: 13,
+                height: 1.5,
+                color: foreground,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailsSection() {
+    return ListingSectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const ListingSectionTitle(
+            icon: Icons.edit_note_outlined,
+            title: 'بيانات الإعلان',
+          ),
+
+          const SizedBox(height: 14),
+
+          ListingCategoryField(
+            categories: _categories,
+            value: _selectedCategoryId,
+            onChanged: (value) => setState(() => _selectedCategoryId = value),
+          ),
+
+          const SizedBox(height: 12),
+
+          TextFormField(
+            controller: _titleController,
+            textInputAction: TextInputAction.next,
+            maxLength: kMaxTitleLength,
+            decoration: listingInputDecoration(
+              context,
+              label: 'عنوان الإعلان',
+              icon: Icons.title_outlined,
+            ),
+            validator: validateListingTitle,
+          ),
+
+          const SizedBox(height: 8),
+
+          TextFormField(
+            controller: _descriptionController,
+            maxLines: 5,
+            maxLength: kMaxDescriptionLength,
+            decoration: listingInputDecoration(
+              context,
+              label: 'وصف الإعلان',
+              icon: Icons.description_outlined,
+              alignLabelWithHint: true,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildImagesSection() {
     if (_loadingImages) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(20),
-          child: CircularProgressIndicator(),
-        ),
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 28),
+        child: Center(child: CircularProgressIndicator()),
       );
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'صور الإعلان',
-          style: TextStyle(
-            fontSize: 17,
-            fontWeight: FontWeight.bold,
+    return ListingImagesSection(
+      items: _images,
+      enabled: !_saving,
+      showNewBadge: true,
+      onAdd: _addImages,
+      onRemove: _removeImage,
+      onMakeCover: _makeCover,
+    );
+  }
+
+  Widget _buildContactSection() {
+    return ListingSectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const ListingSectionTitle(
+            icon: Icons.location_on_outlined,
+            title: 'الموقع والتواصل',
           ),
-        ),
 
-        const SizedBox(height: 6),
+          const SizedBox(height: 14),
 
-        Text(
-          '$_totalImages / $_maxImages صور',
-          style: TextStyle(
-            color: Colors.grey.shade600,
-            fontSize: 13,
-          ),
-        ),
-
-        const SizedBox(height: 12),
-
-        if (_existingImages.isNotEmpty)
-          SizedBox(
-            height: 115,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: _existingImages.length,
-              separatorBuilder: (_, __) {
-                return const SizedBox(width: 10);
-              },
-              itemBuilder: (context, index) {
-                final image = _existingImages[index];
-                final imagePath = image['image_path']?.toString() ?? '';
-
-                final imageUrl = imagePath.isEmpty
-                    ? ''
-                    : _supabase.storage
-                        .from('listing-images')
-                        .getPublicUrl(imagePath);
-
-                return Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: imageUrl.isEmpty
-                          ? Container(
-                              width: 110,
-                              height: 110,
-                              color: Colors.grey.shade200,
-                              child: const Icon(
-                                Icons.broken_image_outlined,
-                                size: 35,
-                              ),
-                            )
-                          : Image.network(
-                              imageUrl,
-                              width: 110,
-                              height: 110,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) {
-                                return Container(
-                                  width: 110,
-                                  height: 110,
-                                  color: Colors.grey.shade200,
-                                  child: const Icon(
-                                    Icons.broken_image_outlined,
-                                    size: 35,
-                                  ),
-                                );
-                              },
-                            ),
-                    ),
-
-                    Positioned(
-                      top: -7,
-                      right: -7,
-                      child: Material(
-                        color: Colors.red,
-                        shape: const CircleBorder(),
-                        child: InkWell(
-                          customBorder: const CircleBorder(),
-                          onTap: _saving
-                              ? null
-                              : () => _deleteExistingImage(index),
-                          child: const Padding(
-                            padding: EdgeInsets.all(5),
-                            child: Icon(
-                              Icons.close,
-                              color: Colors.white,
-                              size: 18,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    Positioned(
-                      bottom: 5,
-                      left: 5,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.black54,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          '${index + 1}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                );
-              },
+          TextFormField(
+            controller: _areaController,
+            textInputAction: TextInputAction.next,
+            decoration: listingInputDecoration(
+              context,
+              label: 'المنطقة',
+              icon: Icons.location_on_outlined,
             ),
           ),
 
-        if (_newImages.isNotEmpty) ...[
           const SizedBox(height: 12),
 
-          SizedBox(
-            height: 115,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: _newImages.length,
-              separatorBuilder: (_, __) {
-                return const SizedBox(width: 10);
-              },
-              itemBuilder: (context, index) {
-                final image = _newImages[index];
-
-                return Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Image.file(
-                        File(image.path),
-                        width: 110,
-                        height: 110,
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-
-                    Positioned(
-                      top: -7,
-                      right: -7,
-                      child: Material(
-                        color: Colors.red,
-                        shape: const CircleBorder(),
-                        child: InkWell(
-                          customBorder: const CircleBorder(),
-                          onTap: _saving
-                              ? null
-                              : () => _removeNewImage(index),
-                          child: const Padding(
-                            padding: EdgeInsets.all(5),
-                            child: Icon(
-                              Icons.close,
-                              color: Colors.white,
-                              size: 18,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    Positioned(
-                      bottom: 5,
-                      left: 5,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.black54,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Text(
-                          'جديدة',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 11,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                );
-              },
+          TextFormField(
+            controller: _phoneController,
+            keyboardType: TextInputType.phone,
+            textInputAction: TextInputAction.done,
+            decoration: listingInputDecoration(
+              context,
+              label: 'رقم التواصل',
+              icon: Icons.phone_outlined,
             ),
+            validator: validateContactPhone,
           ),
         ],
+      ),
+    );
+  }
 
-        const SizedBox(height: 12),
+  Widget _buildSaveButton() {
+    final colorScheme = Theme.of(context).colorScheme;
 
-        OutlinedButton.icon(
-          onPressed:
-              _saving || _totalImages >= _maxImages ? null : _pickImages,
-          icon: const Icon(Icons.add_photo_alternate_outlined),
-          label: Text(
-            _totalImages >= _maxImages
-                ? 'تم الوصول إلى الحد الأقصى'
-                : 'إضافة صور',
-          ),
-        ),
-      ],
+    // يتحدث عنوان الزر مع الكتابة دون إعادة بناء النموذج كله.
+    return ListenableBuilder(
+      listenable: Listenable.merge([
+        _titleController,
+        _descriptionController,
+        _priceController,
+        _areaController,
+        _phoneController,
+      ]),
+      builder: (context, _) {
+        final resubmit = _needsReview && _hasChanges;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SizedBox(
+              height: 50,
+              child: FilledButton.icon(
+                onPressed: (_saving || _loadingImages) ? null : _saveChanges,
+                icon: _saving
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Icon(
+                        resubmit ? Icons.send_outlined : Icons.save_outlined,
+                        size: 21,
+                      ),
+                label: Text(
+                  _saving
+                      ? 'جاري الحفظ...'
+                      : (resubmit ? 'حفظ وإرسال للمراجعة' : 'حفظ التعديلات'),
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+
+            if (_saving && _progress != null) ...[
+              const SizedBox(height: 10),
+              Text(
+                _progress!,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ],
+        );
+      },
     );
   }
 
@@ -710,221 +740,71 @@ class _EditListingScreenState extends State<EditListingScreen> {
   Widget build(BuildContext context) {
     return Directionality(
       textDirection: TextDirection.rtl,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('تعديل الإعلان'),
-          centerTitle: true,
-        ),
-        body: _loadingCategories
-            ? const Center(
-                child: CircularProgressIndicator(),
-              )
-            : Form(
-                key: _formKey,
-                child: ListView(
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    DropdownButtonFormField<int>(
-                      initialValue: _selectedCategoryId,
-                      decoration: _decoration(
-                        'القسم',
-                        Icons.category_outlined,
-                      ),
-                      items: _categories.map((category) {
-                        final id = category['id'];
+      child: PopScope(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop) _onBackPressed();
+        },
+        child: Scaffold(
+          appBar: AppBar(
+            title: const Text(
+              'تعديل الإعلان',
+              style: TextStyle(fontSize: 19, fontWeight: FontWeight.w600),
+            ),
+            centerTitle: true,
+          ),
+          body: _loadingCategories
+              ? const Center(child: CircularProgressIndicator())
+              : Form(
+                  key: _formKey,
+                  autovalidateMode: AutovalidateMode.onUserInteraction,
+                  child: ListView(
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
+                    padding: const EdgeInsets.fromLTRB(14, 10, 14, 24),
+                    children: [
+                      _buildStatusBanner(),
 
-                        return DropdownMenuItem<int>(
-                          value: id is int ? id : null,
-                          child: Text(
-                            '${category['icon'] ?? ''} ${category['name']}',
-                          ),
-                        );
-                      }).toList(),
-                      onChanged: _saving
-                          ? null
-                          : (value) {
-                              setState(() {
-                                _selectedCategoryId = value;
-                              });
-                            },
-                      validator: (value) {
-                        if (value == null) {
-                          return 'اختر القسم';
-                        }
-                        return null;
-                      },
-                    ),
+                      _buildDetailsSection(),
 
-                    const SizedBox(height: 16),
+                      const SizedBox(height: 12),
 
-                    TextFormField(
-                      controller: _titleController,
-                      decoration: _decoration(
-                        'عنوان الإعلان',
-                        Icons.title,
-                      ),
-                      textInputAction: TextInputAction.next,
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'أدخل عنوان الإعلان';
-                        }
+                      ListingSectionCard(child: _buildImagesSection()),
 
-                        if (value.trim().length < 3) {
-                          return 'العنوان قصير جداً';
-                        }
+                      const SizedBox(height: 12),
 
-                        return null;
-                      },
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    TextFormField(
-                      controller: _descriptionController,
-                      decoration: _decoration(
-                        'الوصف',
-                        Icons.description_outlined,
-                      ),
-                      minLines: 4,
-                      maxLines: 7,
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    _buildImagesSection(),
-
-                    const SizedBox(height: 20),
-
-                    DropdownButtonFormField<String>(
-                      initialValue: _priceType,
-                      decoration: _decoration(
-                        'نوع السعر',
-                        Icons.payments_outlined,
-                      ),
-                      items: const [
-                        DropdownMenuItem(
-                          value: 'fixed',
-                          child: Text('سعر ثابت'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'negotiable',
-                          child: Text('قابل للتفاوض'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'contact',
-                          child: Text('السعر عند التواصل'),
-                        ),
-                      ],
-                      onChanged: _saving
-                          ? null
-                          : (value) {
-                              if (value == null) return;
-
-                              setState(() {
-                                _priceType = value;
-
-                                if (value == 'contact') {
-                                  _priceController.clear();
-                                }
-                              });
-                            },
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    if (_priceType != 'contact')
-                      TextFormField(
-                        controller: _priceController,
-                        decoration: _decoration(
-                          'السعر',
-                          Icons.attach_money,
-                        ),
-                        keyboardType:
-                            const TextInputType.numberWithOptions(
-                          decimal: true,
+                      ListingSectionCard(
+                        child: ListingPriceSection(
+                          priceType: _priceType,
+                          controller: _priceController,
+                          onPriceTypeChanged: (value) {
+                            setState(() => _priceType = value);
+                          },
                         ),
                       ),
 
-                    if (_priceType != 'contact')
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 12),
 
-                    DropdownButtonFormField<String>(
-                      initialValue: _condition,
-                      decoration: _decoration(
-                        'الحالة',
-                        Icons.info_outline,
-                      ),
-                      items: const [
-                        DropdownMenuItem(
-                          value: 'new',
-                          child: Text('جديد'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'used',
-                          child: Text('مستعمل'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'not_applicable',
-                          child: Text('لا ينطبق'),
-                        ),
-                      ],
-                      onChanged: _saving
-                          ? null
-                          : (value) {
-                              if (value == null) return;
-
-                              setState(() {
-                                _condition = value;
-                              });
-                            },
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    TextFormField(
-                      controller: _areaController,
-                      decoration: _decoration(
-                        'المنطقة',
-                        Icons.location_on_outlined,
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    TextFormField(
-                      controller: _phoneController,
-                      decoration: _decoration(
-                        'رقم التواصل',
-                        Icons.phone_outlined,
-                      ),
-                      keyboardType: TextInputType.phone,
-                    ),
-
-                    const SizedBox(height: 24),
-
-                    SizedBox(
-                      height: 52,
-                      child: FilledButton.icon(
-                        onPressed: _saving ? null : _saveChanges,
-                        icon: _saving
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Icon(Icons.save_outlined),
-                        label: Text(
-                          _saving
-                              ? 'جاري الحفظ والرفع...'
-                              : 'حفظ التعديلات',
+                      ListingSectionCard(
+                        child: ListingConditionSection(
+                          condition: _condition,
+                          onChanged: (value) {
+                            setState(() => _condition = value);
+                          },
                         ),
                       ),
-                    ),
-                  ],
+
+                      const SizedBox(height: 12),
+
+                      _buildContactSection(),
+
+                      const SizedBox(height: 18),
+
+                      _buildSaveButton(),
+                    ],
+                  ),
                 ),
-              ),
+        ),
       ),
     );
   }
