@@ -27,6 +27,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _loading = true;
   bool _saving = false;
   bool _isPhoneAccount = false;
+  bool _deleting = false;
 
   String? _error;
   String? _email;
@@ -401,6 +402,54 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  // =========================
+  // حذف الحساب نهائياً
+  // =========================
+  Future<void> _deleteAccount() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => const _DeleteAccountDialog(),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _deleting = true);
+
+    try {
+      await _supabase.functions.invoke('delete-account');
+    } catch (e) {
+      debugPrint('deleteAccount error: $e');
+
+      if (!mounted) return;
+
+      setState(() => _deleting = false);
+
+      if (e is FunctionException && e.status == 403) {
+        _showMessage('حسابات الإدارة لا يمكن حذفها من التطبيق');
+      } else {
+        _showMessage('تعذر حذف الحساب. حاول مرة أخرى لاحقاً.');
+      }
+      return;
+    }
+
+    // الحساب حُذف من الخادم، نُنهي الجلسة محلياً فقط.
+    try {
+      await _supabase.auth.signOut(scope: SignOutScope.local);
+    } catch (_) {}
+
+    if (!mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+
+    Navigator.of(context).popUntil((route) => route.isFirst);
+
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(content: Text('تم حذف حسابك وبياناتك نهائياً')),
+      );
+  }
+
   // عند الخروج من الصفحة مع تعديلات غير محفوظة.
   Future<void> _onPopBlocked() async {
     final leave = await _confirm(
@@ -749,6 +798,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
             icon: const Icon(Icons.logout),
             label: const Text('تسجيل الخروج'),
           ),
+
+          const SizedBox(height: 8),
+
+          TextButton.icon(
+            onPressed: _deleting ? null : _deleteAccount,
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.red.shade700,
+            ),
+            icon: _deleting
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.delete_forever_outlined),
+            label: Text(_deleting ? 'جارٍ حذف الحساب...' : 'حذف حسابي نهائياً'),
+          ),
         ],
       ),
     );
@@ -788,9 +854,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: PopScope(
-        canPop: !_isDirty || _saving,
+        canPop: !_deleting && (!_isDirty || _saving),
         onPopInvokedWithResult: (didPop, _) {
-          if (!didPop) _onPopBlocked();
+          if (!didPop && !_deleting) _onPopBlocked();
         },
         child: Scaffold(
           appBar: AppBar(
@@ -798,6 +864,83 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           body: _buildBody(),
         ),
+      ),
+    );
+  }
+}
+
+// =========================
+// تأكيد حذف الحساب (يتطلب كتابة كلمة "حذف")
+// =========================
+class _DeleteAccountDialog extends StatefulWidget {
+  const _DeleteAccountDialog();
+
+  @override
+  State<_DeleteAccountDialog> createState() => _DeleteAccountDialogState();
+}
+
+class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
+  static const _confirmWord = 'حذف';
+
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final matches = _controller.text.trim() == _confirmWord;
+
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: AlertDialog(
+        title: const Text('حذف الحساب نهائياً'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'سيتم حذف حسابك وجميع إعلاناتك وصورك ومفضلتك بشكل نهائي، '
+              'ولا يمكن التراجع عن ذلك.',
+              style: TextStyle(height: 1.6),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              'للتأكيد اكتب كلمة "$_confirmWord" في الحقل:',
+              style: TextStyle(
+                fontSize: 13,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _controller,
+              autofocus: true,
+              onChanged: (_) => setState(() {}),
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('إلغاء'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.red.shade700,
+            ),
+            onPressed: matches ? () => Navigator.pop(context, true) : null,
+            child: const Text('حذف الحساب'),
+          ),
+        ],
       ),
     );
   }
