@@ -63,7 +63,7 @@ class _HomeScreenState extends State<HomeScreen>
   static const _gold = Color(0xFFFFC93C);
 
   // ارتفاع الترويسة بدون شريط الحالة.
-  static const _headerContentHeight = 236.0;
+  static const _headerContentHeight = 200.0;
 
   // صور اختيارية (انظر التعليق في أعلى الملف).
   static const _headerAsset = 'assets/images/home_header.jpg';
@@ -95,7 +95,7 @@ class _HomeScreenState extends State<HomeScreen>
     _BannerSlide(
       'ابحث بسهولة',
       'عن أي شيء',
-      ['أقسام منظمة', 'بحث بالحي', 'الأحدث أولاً'],
+      ['أقسام منظمة', 'بحث سريع', 'الأحدث أولاً'],
       'تصفح الأقسام',
       _BannerAction.browseCategories,
     ),
