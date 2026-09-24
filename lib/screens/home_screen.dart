@@ -1,5 +1,5 @@
 // =============================================================
-// الصفحة الرئيسية لتطبيق دلالة شبشة (نسخة محسّنة ومدموجة)
+// الصفحة الرئيسية لتطبيق دلالة شبشة (التصميم الجديد)
 //
 // الحزم المطلوبة في pubspec.yaml:
 //   intl: ^0.19.0
@@ -11,12 +11,19 @@
 //      إن لم توجد يعمل الكود تلقائياً بالطريقة القديمة (طلب منفصل للصور).
 //   3) عمود icon في جدول categories (اختياري): مفاتيح مثل car, home, phone.
 //      إن كان فارغاً تُستخدم الأيقونة حسب اسم القسم كما كان سابقاً.
+//   4) صور الترويسة والبانر اختيارية: ضع صورتك في
+//        assets/images/home_header.jpg   (خلفية الترويسة)
+//        assets/images/home_banner.jpg   (صورة البانر)
+//      وأضف assets/images/ إلى pubspec.yaml. وإن لم توجد يظهر رسم
+//      مشهد شبشة المرسوم بالكود.
 // =============================================================
 
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart' show NumberFormat;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -44,8 +51,55 @@ class _HomeScreenState extends State<HomeScreen>
   static const _categoryPageSize = 30;
   static const _searchPoolSize = 500;
 
-  static const _cardWidth = 158.0;
-  static const _cardHeight = 225.0;
+  static const _cardWidth = 172.0;
+  static const _cardHeight = 272.0;
+
+  // ألوان الهوية.
+  static const _brand = Color(0xFF5B2DB5);
+  static const _brandDark = Color(0xFF3B1785);
+  static const _brandSoft = Color(0xFFEFE9FF);
+  static const _ink = Color(0xFF241A55);
+  static const _orange = Color(0xFFFF9F1C);
+  static const _gold = Color(0xFFFFC93C);
+
+  // ارتفاع الترويسة بدون شريط الحالة.
+  static const _headerContentHeight = 236.0;
+
+  // صور اختيارية (انظر التعليق في أعلى الملف).
+  static const _headerAsset = 'assets/images/home_header.jpg';
+  static const _bannerAsset = 'assets/images/home_banner.jpg';
+
+  // شرائح بانر العروض.
+  static const _slides = <_BannerSlide>[
+    _BannerSlide(
+      'كل ما تحتاجه',
+      'في مكان واحد',
+      ['إعلانات مميزة', 'بيع وشراء محلي', 'انتشار واسع'],
+      'أضف إعلانك الآن',
+      _BannerAction.addListing,
+    ),
+    _BannerSlide(
+      'بيع أسرع',
+      'بصور واضحة',
+      ['صوّر بالكاميرا', 'حتى 6 صور', 'سعر واضح'],
+      'أضف إعلانك الآن',
+      _BannerAction.addListing,
+    ),
+    _BannerSlide(
+      'تسوق بثقة',
+      'من أهل شبشة',
+      ['عاين قبل الدفع', 'قابل البائع في مكان عام'],
+      'تصفح الأقسام',
+      _BannerAction.browseCategories,
+    ),
+    _BannerSlide(
+      'ابحث بسهولة',
+      'عن أي شيء',
+      ['أقسام منظمة', 'بحث بالحي', 'الأحدث أولاً'],
+      'تصفح الأقسام',
+      _BannerAction.browseCategories,
+    ),
+  ];
 
   static const _listingColumns =
       'id, title, description, price, currency, price_type, '
@@ -61,6 +115,13 @@ class _HomeScreenState extends State<HomeScreen>
   final _supabase = Supabase.instance.client;
   final _searchController = TextEditingController();
   final _scrollController = ScrollController();
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
+  final _categoriesKey = GlobalKey();
+  final _bannerController = PageController();
+  final _bannerIndex = ValueNotifier<int>(0);
+
+  // هل الترويسة ظاهرة (لتغيير لون أيقونات شريط الحالة).
+  final _headerVisible = ValueNotifier<bool>(true);
 
   // =========================
   // الحالة
@@ -86,9 +147,13 @@ class _HomeScreenState extends State<HomeScreen>
 
   Timer? _debounce;
   Timer? _promotedRefreshTimer;
+  Timer? _bannerTimer;
+
+  _ListMode _mode = _ListMode.home;
 
   bool get _isSearching => _searchQuery.trim().isNotEmpty;
-  bool get _isFiltering => _isSearching || _selectedCategoryId != null;
+  bool get _isFiltering =>
+      _isSearching || _selectedCategoryId != null || _mode != _ListMode.home;
 
   // =========================
   // الدورة الحياتية
@@ -108,12 +173,27 @@ class _HomeScreenState extends State<HomeScreen>
       const Duration(minutes: 5),
       (_) => _loadPromotedListings(),
     );
+
+    // تقليب شرائح البانر كل 5 ثوان.
+    _bannerTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (!mounted || !_bannerController.hasClients) return;
+
+      _bannerController.animateToPage(
+        (_bannerIndex.value + 1) % _slides.length,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOut,
+      );
+    });
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _promotedRefreshTimer?.cancel();
+    _bannerTimer?.cancel();
+    _bannerController.dispose();
+    _bannerIndex.dispose();
+    _headerVisible.dispose();
     _debounce?.cancel();
     _searchController.dispose();
     _scrollController.dispose();
@@ -128,12 +208,19 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
-  // التحميل التلقائي للمزيد عند نهاية القائمة (داخل القسم فقط).
+  // التمرير: لون شريط الحالة + التحميل التلقائي للمزيد.
   void _onScroll() {
     if (!_scrollController.hasClients) return;
-    if (_selectedCategoryId == null || _isSearching) return;
 
     final position = _scrollController.position;
+
+    _headerVisible.value = position.pixels < 110;
+
+    // التحميل التلقائي داخل القسم أو "أحدث الإعلانات" فقط.
+    final canLoadMore =
+        _selectedCategoryId != null || _mode == _ListMode.latest;
+
+    if (!canLoadMore || _isSearching) return;
 
     if (position.pixels >= position.maxScrollExtent - 400) {
       _loadListings(reset: false);
@@ -198,6 +285,13 @@ class _HomeScreenState extends State<HomeScreen>
   // نتائج البحث/القسم. البحث يعمل على مجموعة أكبر (حتى 500 إعلان)
   // تُحمّل مرة واحدة عند أول بحث، ثم يُبحث فيها محلياً بالتطبيع العربي.
   List<Map<String, dynamic>> get _visibleResults {
+    // "عرض الكل" للإعلانات المميزة.
+    if (_mode == _ListMode.featured &&
+        _selectedCategoryId == null &&
+        !_isSearching) {
+      return _activePromoted;
+    }
+
     final query = _normalizeSearchText(_searchQuery);
     final source = query.isEmpty ? _listings : (_searchPool ?? _listings);
 
@@ -559,6 +653,7 @@ class _HomeScreenState extends State<HomeScreen>
     if (clearSearch) _searchController.clear();
 
     setState(() {
+      _mode = _ListMode.home;
       _selectedCategoryId = id;
       _listingsLoading = true;
       if (clearSearch) _searchQuery = '';
@@ -580,6 +675,7 @@ class _HomeScreenState extends State<HomeScreen>
     _searchController.clear();
 
     setState(() {
+      _mode = _ListMode.home;
       _searchQuery = '';
       _selectedCategoryId = null;
       if (hadCategory) _listingsLoading = true;
@@ -594,6 +690,19 @@ class _HomeScreenState extends State<HomeScreen>
     } catch (_) {
       _showSnack('تعذر تحميل الإعلانات، حاول مرة أخرى');
     }
+  }
+
+  // "عرض الكل" للإعلانات المميزة أو الأحدث.
+  void _showAll(_ListMode mode) {
+    _debounce?.cancel();
+    _searchController.clear();
+
+    setState(() {
+      _mode = mode;
+      _searchQuery = '';
+    });
+
+    _scrollToTop();
   }
 
   String? get _selectedCategoryName {
@@ -744,6 +853,7 @@ class _HomeScreenState extends State<HomeScreen>
 
     setState(() {});
     await _checkAdminStatus();
+    await _loadFavorites();
   }
 
   Future<void> _openAddListing() async {
@@ -947,7 +1057,7 @@ class _HomeScreenState extends State<HomeScreen>
 
   Widget _buildListingImage(
     Map<String, dynamic> listing, {
-    double height = 110,
+    double height = 122,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
     final imageUrl = _imageUrl(listing['image_path']);
@@ -983,6 +1093,844 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   // =========================
+  // ألوان وأيقونات الأقسام
+  // =========================
+  static const _tones = <_Tone>[
+    _Tone(Color(0xFFEFE7FF), Color(0xFF5B2DB5)), // بنفسجي
+    _Tone(Color(0xFFFFF1D1), Color(0xFFF59E0B)), // أصفر
+    _Tone(Color(0xFFDDF5EA), Color(0xFF0F9D7A)), // أخضر
+    _Tone(Color(0xFFDFEDFF), Color(0xFF2563EB)), // أزرق
+    _Tone(Color(0xFFFFE3E9), Color(0xFFE11D48)), // وردي
+    _Tone(Color(0xFFE9EEF5), Color(0xFF475569)), // رمادي
+  ];
+
+  _Tone _toneFor(String name, int index) {
+    switch (name.trim()) {
+      case 'عقارات':
+      case 'موبايلات وإلكترونيات':
+        return _tones[0];
+      case 'سيارات ومركبات':
+      case 'مواشي وحيوانات':
+      case 'مواد غذائية':
+        return _tones[1];
+      case 'أثاث ومستلزمات منزلية':
+      case 'محاصيل زراعية':
+        return _tones[2];
+      case 'ملابس وأحذية':
+      case 'أجهزة كهربائية':
+      case 'وظائف':
+        return _tones[3];
+      case 'خدمات':
+        return _tones[4];
+      case 'أدوات ومعدات':
+      case 'أخرى':
+        return _tones[5];
+      default:
+        return _tones[index % _tones.length];
+    }
+  }
+
+  IconData _filledCategoryIcon(String name) {
+    switch (name.trim()) {
+      case 'سيارات ومركبات':
+        return Icons.directions_car_rounded;
+      case 'عقارات':
+        return Icons.home_rounded;
+      case 'موبايلات وإلكترونيات':
+        return Icons.smartphone_rounded;
+      case 'أجهزة كهربائية':
+        return Icons.electrical_services_rounded;
+      case 'ملابس وأحذية':
+        return Icons.shopping_bag_rounded;
+      case 'أثاث ومستلزمات منزلية':
+        return Icons.weekend_rounded;
+      case 'مواشي وحيوانات':
+        return Icons.pets_rounded;
+      case 'محاصيل زراعية':
+        return Icons.agriculture_rounded;
+      case 'مواد غذائية':
+        return Icons.restaurant_rounded;
+      case 'أدوات ومعدات':
+        return Icons.build_rounded;
+      case 'خدمات':
+        return Icons.handshake_rounded;
+      case 'وظائف':
+        return Icons.work_rounded;
+      case 'أخرى':
+        return Icons.more_horiz_rounded;
+      default:
+        return Icons.category_rounded;
+    }
+  }
+
+  Map<String, dynamic>? _categoryById(dynamic id) {
+    for (final category in _categories) {
+      if (category['id'] == id) return category;
+    }
+    return null;
+  }
+
+  // =========================
+  // ألوان الصفحة
+  // =========================
+  bool get _isDark => Theme.of(context).brightness == Brightness.dark;
+
+  Color get _pageBackground => Color.alphaBlend(
+        _brand.withValues(alpha: _isDark ? 0.06 : 0.045),
+        Theme.of(context).colorScheme.surface,
+      );
+
+  Color get _titleColor =>
+      _isDark ? Theme.of(context).colorScheme.onSurface : _ink;
+
+  Color get _cardColor => _isDark
+      ? Theme.of(context).colorScheme.surfaceContainerHigh
+      : Colors.white;
+
+  // =========================
+  // الترويسة (صورة شبشة + الشعار + البحث)
+  // =========================
+  Widget _buildHeader(double topPadding) {
+    final height = topPadding + _headerContentHeight;
+
+    return SizedBox(
+      height: height,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned.fill(
+            child: Image.asset(
+              _headerAsset,
+              fit: BoxFit.cover,
+              alignment: Alignment.bottomCenter,
+              errorBuilder: (_, __, ___) => const RepaintBoundary(
+                child: CustomPaint(painter: _ShabshaScenePainter()),
+              ),
+            ),
+          ),
+
+          // تدرج علوي خفيف لوضوح شريط الحالة.
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: topPadding + 64,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withValues(alpha: 0.22),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          Positioned(
+            top: topPadding + 10,
+            left: 16,
+            right: 16,
+            child: _buildTopRow(),
+          ),
+
+          Positioned(
+            left: 16,
+            right: 16,
+            bottom: 36,
+            child: _buildSearchField(),
+          ),
+
+          // حافة الصفحة المنحنية أسفل الترويسة.
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: 30,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: _pageBackground,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(30),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTopRow() {
+    final user = _supabase.auth.currentUser;
+
+    const glow = [
+      Shadow(color: Colors.white, blurRadius: 10),
+      Shadow(color: Colors.white, blurRadius: 4),
+    ];
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        // (يمين) زر القائمة
+        Tooltip(
+          message: 'القائمة',
+          child: InkWell(
+            borderRadius: BorderRadius.circular(24),
+            onTap: () => _scaffoldKey.currentState?.openDrawer(),
+            child: const Padding(
+              padding: EdgeInsets.all(8),
+              child: Icon(Icons.menu_rounded, size: 30, color: _brandDark),
+            ),
+          ),
+        ),
+
+        const SizedBox(width: 2),
+
+        _buildLogo(),
+
+        const SizedBox(width: 8),
+
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: AlignmentDirectional.centerStart,
+                child: Text(
+                  'دلالة شبشة',
+                  style: TextStyle(
+                    fontSize: 30,
+                    fontWeight: FontWeight.w900,
+                    height: 1.1,
+                    color: _brandDark,
+                    shadows: glow,
+                  ),
+                ),
+              ),
+              Text(
+                'سوقك المحلي في شبشة',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w700,
+                  color: _brandDark,
+                  shadows: glow,
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // (يسار) حساب المستخدم
+        Tooltip(
+          message: user == null ? 'تسجيل الدخول' : 'الملف الشخصي',
+          child: GestureDetector(
+            onTap: _openProfile,
+            child: Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.94),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.15),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Icon(
+                user == null
+                    ? Icons.person_outline_rounded
+                    : Icons.person_rounded,
+                size: 26,
+                color: _brandDark,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLogo() {
+    return SizedBox(
+      width: 46,
+      height: 52,
+      child: Stack(
+        alignment: Alignment.topCenter,
+        clipBehavior: Clip.none,
+        children: [
+          const Icon(Icons.location_on_rounded, size: 52, color: _brand),
+          const Positioned(
+            top: 12,
+            child: Icon(
+              Icons.shopping_cart_rounded,
+              size: 17,
+              color: Colors.white,
+            ),
+          ),
+          Positioned(
+            top: 0,
+            left: 0,
+            child: Container(
+              width: 15,
+              height: 15,
+              decoration: const BoxDecoration(
+                color: _gold,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.local_offer_rounded,
+                size: 9,
+                color: _brandDark,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSearchField() {
+    return Container(
+      height: 54,
+      decoration: BoxDecoration(
+        color: _isDark
+            ? Theme.of(context).colorScheme.surfaceContainerHigh
+            : Colors.white,
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: [
+          BoxShadow(
+            color: _brand.withValues(alpha: 0.20),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: ValueListenableBuilder<TextEditingValue>(
+        valueListenable: _searchController,
+        builder: (context, value, _) {
+          return TextField(
+            controller: _searchController,
+            textInputAction: TextInputAction.search,
+            onChanged: _onSearchChanged,
+            style: const TextStyle(fontSize: 15),
+            decoration: InputDecoration(
+              hintText: 'ابحث عن إعلان أو منطقة ...',
+              hintStyle: TextStyle(
+                fontSize: 14.5,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+              prefixIcon: Icon(
+                Icons.search_rounded,
+                size: 27,
+                color: _titleColor,
+              ),
+              suffixIcon: value.text.isNotEmpty
+                  ? IconButton(
+                      onPressed: _clearSearch,
+                      tooltip: 'مسح البحث',
+                      icon: const Icon(Icons.close_rounded, size: 21),
+                    )
+                  : null,
+              filled: false,
+              isDense: true,
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(vertical: 17),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // =========================
+  // بانر العروض المتحرك
+  // =========================
+  Widget _buildBannerCarousel() {
+    return Column(
+      children: [
+        SizedBox(
+          height: 196,
+          child: PageView.builder(
+            controller: _bannerController,
+            itemCount: _slides.length,
+            onPageChanged: (index) => _bannerIndex.value = index,
+            itemBuilder: (context, index) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: _buildBannerSlide(_slides[index]),
+              );
+            },
+          ),
+        ),
+
+        const SizedBox(height: 10),
+
+        ValueListenableBuilder<int>(
+          valueListenable: _bannerIndex,
+          builder: (context, current, _) {
+            return Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(_slides.length, (index) {
+                final active = index == current;
+
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 250),
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  width: active ? 12 : 8,
+                  height: active ? 12 : 8,
+                  decoration: BoxDecoration(
+                    color: active ? _brand : _brand.withValues(alpha: 0.22),
+                    shape: BoxShape.circle,
+                  ),
+                );
+              }),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  void _onBannerAction(_BannerAction action) {
+    switch (action) {
+      case _BannerAction.addListing:
+        _openAddListing();
+        break;
+      case _BannerAction.browseCategories:
+        _scrollToCategories();
+        break;
+    }
+  }
+
+  void _scrollToCategories() {
+    final target = _categoriesKey.currentContext;
+
+    if (target == null) return;
+
+    Scrollable.ensureVisible(
+      target,
+      duration: const Duration(milliseconds: 400),
+      curve: Curves.easeInOut,
+      alignment: 0.05,
+    );
+  }
+
+  Widget _buildBannerSlide(_BannerSlide slide) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(26),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final width = constraints.maxWidth;
+          final photoWidth = width * 0.56;
+
+          return Stack(
+            children: [
+              const Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                      colors: [
+                        Color(0xFF3B1785),
+                        Color(0xFF5B2DB5),
+                        Color(0xFF7A45DA),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+
+              // الصورة على اليمين بحافة منحنية.
+              Positioned(
+                right: 0,
+                top: 0,
+                bottom: 0,
+                width: photoWidth,
+                child: ClipPath(
+                  clipper: const _PhotoClipper(),
+                  child: Image.asset(
+                    _bannerAsset,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const RepaintBoundary(
+                      child: CustomPaint(painter: _ShabshaScenePainter()),
+                    ),
+                  ),
+                ),
+              ),
+
+              Positioned(
+                right: 0,
+                top: 0,
+                bottom: 0,
+                width: photoWidth,
+                child: const IgnorePointer(
+                  child: CustomPaint(painter: _SwooshPainter()),
+                ),
+              ),
+
+              Positioned(
+                left: 18,
+                top: 14,
+                bottom: 14,
+                width: width * 0.58,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: AlignmentDirectional.centerStart,
+                      child: Text(
+                        slide.line1,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 25,
+                          fontWeight: FontWeight.w900,
+                          height: 1.2,
+                        ),
+                      ),
+                    ),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: AlignmentDirectional.centerStart,
+                      child: Text(
+                        slide.line2,
+                        style: const TextStyle(
+                          color: _gold,
+                          fontSize: 25,
+                          fontWeight: FontWeight.w900,
+                          height: 1.2,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 3,
+                      children: [
+                        for (final bullet in slide.bullets)
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 5,
+                                height: 5,
+                                decoration: const BoxDecoration(
+                                  color: _gold,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                bullet,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    GestureDetector(
+                      onTap: () => _onBannerAction(slide.action),
+                      child: Container(
+                        height: 42,
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFFFB02E), Color(0xFFFF8A00)],
+                          ),
+                          borderRadius: BorderRadius.circular(22),
+                          boxShadow: [
+                            BoxShadow(
+                              color: _orange.withValues(alpha: 0.45),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              slide.cta,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Icon(
+                              slide.action == _BannerAction.addListing
+                                  ? Icons.add_circle_outline_rounded
+                                  : Icons.grid_view_rounded,
+                              color: Colors.white,
+                              size: 22,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  // =========================
+  // عناوين الأقسام
+  // =========================
+  Widget _sectionHeader(
+    String title, {
+    IconData? icon,
+    Color? iconColor,
+    VoidCallback? onViewAll,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 24, color: iconColor ?? _brand),
+            const SizedBox(width: 8),
+          ],
+          Expanded(
+            child: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 19,
+                fontWeight: FontWeight.w900,
+                color: _titleColor,
+              ),
+            ),
+          ),
+          if (onViewAll != null)
+            InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: onViewAll,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'عرض الكل',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: _isDark
+                            ? Theme.of(context).colorScheme.primary
+                            : _brand,
+                      ),
+                    ),
+                    Icon(
+                      Icons.chevron_left_rounded,
+                      size: 22,
+                      color: _isDark
+                          ? Theme.of(context).colorScheme.primary
+                          : _brand,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // =========================
+  // الأقسام
+  // =========================
+  Widget _buildCategoryTile(
+    Map<String, dynamic> category,
+    int index, {
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    final name = category['name']?.toString() ?? 'بدون اسم';
+    final tone = _toneFor(name, index);
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+        decoration: BoxDecoration(
+          color: _isDark ? tone.fg.withValues(alpha: 0.16) : tone.bg,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(
+            color: selected ? tone.fg : Colors.transparent,
+            width: 2,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: tone.fg.withValues(alpha: selected ? 0.28 : 0.12),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(_filledCategoryIcon(name), size: 34, color: tone.fg),
+            const SizedBox(height: 8),
+            Text(
+              name,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.2,
+                fontWeight: FontWeight.w700,
+                color: _titleColor,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCategoriesSection() {
+    return Column(
+      key: _categoriesKey,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _sectionHeader(
+          'الأقسام',
+          icon: Icons.grid_view_rounded,
+          onViewAll: _categories.isEmpty ? null : _showAllCategories,
+        ),
+
+        const SizedBox(height: 10),
+
+        if (_categories.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 14),
+            child: Center(child: Text('لا توجد أقسام متاحة حالياً')),
+          )
+        else
+          SizedBox(
+            height: 118,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: _categories.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 10),
+              itemBuilder: (context, index) {
+                final category = _categories[index];
+                final categoryId = category['id'] as int?;
+                final selected = _selectedCategoryId == categoryId;
+
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 14),
+                  child: SizedBox(
+                    width: 88,
+                    child: _buildCategoryTile(
+                      category,
+                      index,
+                      selected: selected,
+                      onTap: () {
+                        if (categoryId == null) return;
+
+                        _selectCategory(selected ? null : categoryId);
+                      },
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+      ],
+    );
+  }
+
+  // كل الأقسام في نافذة سفلية.
+  void _showAllCategories() {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (sheetContext) {
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'كل الأقسام',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+                  ),
+                  const SizedBox(height: 14),
+                  Flexible(
+                    child: GridView.builder(
+                      shrinkWrap: true,
+                      itemCount: _categories.length,
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 3,
+                        mainAxisSpacing: 12,
+                        crossAxisSpacing: 12,
+                        childAspectRatio: 1.05,
+                      ),
+                      itemBuilder: (context, index) {
+                        final category = _categories[index];
+                        final categoryId = category['id'] as int?;
+
+                        return _buildCategoryTile(
+                          category,
+                          index,
+                          selected: _selectedCategoryId == categoryId,
+                          onTap: () {
+                            Navigator.pop(sheetContext);
+
+                            if (categoryId != null) {
+                              _selectCategory(categoryId, clearSearch: true);
+                            }
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // =========================
   // بطاقة الإعلان
   // =========================
   Widget _buildListingCard(
@@ -1002,200 +1950,254 @@ class _HomeScreenState extends State<HomeScreen>
     final meta = [
       if (area.isNotEmpty) area,
       _timeAgo(listing['created_at']),
-    ].where((part) => part.isNotEmpty).join(' · ');
+    ].where((part) => part.isNotEmpty).join(' - ');
+
+    final category = _categoryById(listing['category_id']);
+    final categoryName = category?['name']?.toString() ?? '';
 
     final isFavorite = id != null && _favoriteIds.contains(id);
     final isNegotiable = listing['price_type'] == 'negotiable';
+    final priceText = _formatPrice(listing);
+    final isContactPrice = priceText == 'السعر عند التواصل';
 
     return SizedBox(
       width: fillWidth ? double.infinity : _cardWidth,
-      child: Card(
-        margin: EdgeInsets.zero,
-        elevation: 0,
-        clipBehavior: Clip.antiAlias,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-          side: BorderSide(
-            color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-          ),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(22),
+          boxShadow: [
+            BoxShadow(
+              color: _brand.withValues(alpha: 0.12),
+              blurRadius: 14,
+              offset: const Offset(0, 5),
+            ),
+          ],
         ),
-        child: InkWell(
-          onTap: () => _openListingDetails(listing),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Stack(
-                children: [
-                  _buildListingImage(listing, height: 110),
+        child: Material(
+          color: _cardColor,
+          borderRadius: BorderRadius.circular(22),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: () => _openListingDetails(listing),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Stack(
+                  children: [
+                    _buildListingImage(listing, height: 122),
 
-                  if (isCommercial)
-                    Positioned(
-                      top: 6,
-                      right: 6,
-                      child: Container(
+                    if (categoryName.isNotEmpty)
+                      Positioned(
+                        top: 9,
+                        right: 9,
+                        // نترك مكاناً لزر المفضلة على اليسار.
+                        left: 48,
+                        child: Align(
+                          alignment: AlignmentDirectional.centerStart,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 9,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _brand,
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  _filledCategoryIcon(categoryName),
+                                  size: 14,
+                                  color: Colors.white,
+                                ),
+                                const SizedBox(width: 4),
+                                Flexible(
+                                  child: Text(
+                                    categoryName,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+
+                    if (id != null)
+                      Positioned(
+                        top: 3,
+                        left: 3,
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => _toggleFavorite(id),
+                          child: Padding(
+                            padding: const EdgeInsets.all(6),
+                            child: Container(
+                              width: 34,
+                              height: 34,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.14),
+                                    blurRadius: 6,
+                                  ),
+                                ],
+                              ),
+                              child: Icon(
+                                isFavorite
+                                    ? Icons.favorite_rounded
+                                    : Icons.favorite_border_rounded,
+                                size: 20,
+                                color: isFavorite ? Colors.red : _brand,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+
+                    if (isCommercial)
+                      Positioned(
+                        bottom: 8,
+                        right: 9,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _gold,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.star_rounded,
+                                size: 13,
+                                color: _brandDark,
+                              ),
+                              SizedBox(width: 3),
+                              Text(
+                                'مميز',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  color: _brandDark,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 15,
+                          height: 1.25,
+                          fontWeight: FontWeight.w800,
+                          color: _titleColor,
+                        ),
+                      ),
+
+                      const SizedBox(height: 7),
+
+                      Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 7,
-                          vertical: 3,
+                          horizontal: 10,
+                          vertical: 5,
                         ),
                         decoration: BoxDecoration(
-                          color: colorScheme.primary,
-                          borderRadius: BorderRadius.circular(20),
+                          color: _isDark
+                              ? colorScheme.primary.withValues(alpha: 0.18)
+                              : _brandSoft,
+                          borderRadius: BorderRadius.circular(10),
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
+                        child: Text(
+                          priceText,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: isContactPrice ? 12.5 : 14.5,
+                            fontWeight: FontWeight.w800,
+                            color: _isDark ? colorScheme.primary : _brand,
+                          ),
+                        ),
+                      ),
+
+                      if (meta.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Row(
                           children: [
-                            Icon(
-                              Icons.local_offer,
-                              color: colorScheme.onPrimary,
-                              size: 11,
+                            const Icon(
+                              Icons.location_on_rounded,
+                              size: 15,
+                              color: _brand,
                             ),
-                            const SizedBox(width: 3),
-                            Text(
-                              'إعلان تجاري',
-                              style: TextStyle(
-                                color: colorScheme.onPrimary,
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                meta,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
                               ),
                             ),
                           ],
                         ),
-                      ),
-                    ),
+                      ],
 
-                  if (id != null)
-                    Positioned(
-                      top: 6,
-                      left: 6,
-                      child: Material(
-                        color: Colors.white.withValues(alpha: 0.92),
-                        shape: const CircleBorder(),
-                        child: InkWell(
-                          customBorder: const CircleBorder(),
-                          onTap: () => _toggleFavorite(id),
-                          child: Padding(
-                            padding: const EdgeInsets.all(6),
-                            child: Icon(
-                              isFavorite
-                                  ? Icons.favorite
-                                  : Icons.favorite_border,
-                              size: 18,
-                              color: isFavorite
-                                  ? Colors.red
-                                  : Colors.grey.shade700,
+                      if (isNegotiable) ...[
+                        const SizedBox(height: 7),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 9,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _isDark
+                                ? colorScheme.primary.withValues(alpha: 0.18)
+                                : _brandSoft,
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Text(
+                            'سعر قابل للتفاوض',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                              color: _isDark ? colorScheme.primary : _brand,
                             ),
                           ),
                         ),
-                      ),
-                    ),
-                ],
-              ),
-
-              Padding(
-                padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w600,
-                        height: 1.25,
-                      ),
-                    ),
-
-                    const SizedBox(height: 4),
-
-                    Text(
-                      _formatPrice(listing),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        color: colorScheme.primary,
-                      ),
-                    ),
-
-                    if (isNegotiable)
-                      Text(
-                        'قابل للتفاوض',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-
-                    if (meta.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.location_on_outlined,
-                            size: 13,
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                          const SizedBox(width: 3),
-                          Expanded(
-                            child: Text(
-                              meta,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                color: colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
-      ),
-    );
-  }
-
-  // =========================
-  // مكوّنات الصفحة
-  // =========================
-  Widget _sectionTitle(
-    String title, {
-    Widget? trailing,
-    IconData? icon,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 9),
-      child: Row(
-        children: [
-          if (icon != null) ...[
-            Icon(
-              icon,
-              size: 19,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-            const SizedBox(width: 6),
-          ],
-          Expanded(
-            child: Text(
-              title,
-              style: const TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          if (trailing != null) trailing,
-        ],
       ),
     );
   }
@@ -1205,156 +2207,18 @@ class _HomeScreenState extends State<HomeScreen>
     bool commercial = false,
   }) {
     return SizedBox(
-      height: _cardHeight,
+      height: _cardHeight + 16,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
         itemCount: listings.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 9),
+        separatorBuilder: (_, __) => const SizedBox(width: 12),
         itemBuilder: (context, index) {
-          return _buildListingCard(
-            listings[index],
-            isCommercial: commercial,
-          );
-        },
-      ),
-    );
-  }
-
-  // بانر ترحيبي يحلّ محل الجملة الدعائية وزر "ضع إعلانك" في الـ AppBar.
-  Widget _buildPromoBanner() {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-      decoration: BoxDecoration(
-        color: colorScheme.primary,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'عندك شيء للبيع؟',
-                  style: TextStyle(
-                    color: colorScheme.onPrimary,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'في مكان واحد - تسوق واعلن بسهولة',
-                  style: TextStyle(
-                    color: colorScheme.onPrimary.withValues(alpha: 0.85),
-                    fontSize: 12,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                FilledButton(
-                  onPressed: _openAddListing,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: colorScheme.onPrimary,
-                    foregroundColor: colorScheme.primary,
-                    minimumSize: const Size(0, 34),
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                    visualDensity: VisualDensity.compact,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  child: const Text(
-                    'أضف إعلانك الآن',
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 10),
-          Icon(
-            Icons.campaign_outlined,
-            size: 52,
-            color: colorScheme.onPrimary.withValues(alpha: 0.9),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCategories() {
-    if (_categories.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 12),
-        child: Center(
-          child: Text('لا توجد أقسام متاحة حالياً'),
-        ),
-      );
-    }
-
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return SizedBox(
-      height: 72,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: _categories.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 7),
-        itemBuilder: (context, index) {
-          final category = _categories[index];
-
-          final categoryId = category['id'] as int?;
-          final categoryName = category['name']?.toString() ?? 'بدون اسم';
-          final selected = _selectedCategoryId == categoryId;
-
-          return InkWell(
-            borderRadius: BorderRadius.circular(10),
-            onTap: () {
-              if (categoryId == null) return;
-
-              _selectCategory(selected ? null : categoryId);
-            },
-            child: Container(
-              width: 80,
-              padding: const EdgeInsets.symmetric(
-                horizontal: 5,
-                vertical: 6,
-              ),
-              decoration: BoxDecoration(
-                color: selected
-                    ? colorScheme.primaryContainer
-                    : colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: selected ? colorScheme.primary : Colors.transparent,
-                ),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    _iconForCategory(category),
-                    size: 22,
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    categoryName,
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      height: 1.1,
-                    ),
-                  ),
-                ],
-              ),
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _buildListingCard(
+              listings[index],
+              isCommercial: commercial,
             ),
           );
         },
@@ -1362,48 +2226,9 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  Widget _buildSearchField() {
-    return SizedBox(
-      height: 43,
-      child: ValueListenableBuilder<TextEditingValue>(
-        valueListenable: _searchController,
-        builder: (context, value, _) {
-          return TextField(
-            controller: _searchController,
-            textInputAction: TextInputAction.search,
-            onChanged: _onSearchChanged,
-            decoration: InputDecoration(
-              hintText: 'ابحث عن إعلان أو منطقة...',
-              hintStyle: const TextStyle(fontSize: 13),
-              prefixIcon: const Icon(
-                Icons.search,
-                size: 21,
-              ),
-              suffixIcon: value.text.isNotEmpty
-                  ? IconButton(
-                      padding: EdgeInsets.zero,
-                      onPressed: _clearSearch,
-                      icon: const Icon(
-                        Icons.clear,
-                        size: 19,
-                      ),
-                      tooltip: 'مسح البحث',
-                    )
-                  : null,
-              filled: true,
-              contentPadding: const EdgeInsets.symmetric(vertical: 8),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(11),
-                borderSide: BorderSide.none,
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  // نتائج البحث أو القسم: شبكة من عمودين.
+  // =========================
+  // نتائج البحث / القسم / عرض الكل
+  // =========================
   Widget _buildSearchResults() {
     final colorScheme = Theme.of(context).colorScheme;
     final results = _visibleResults;
@@ -1413,23 +2238,62 @@ class _HomeScreenState extends State<HomeScreen>
     final showSpinner =
         _listingsLoading || (_isSearching && _searchPoolLoading);
 
-    final title = _isSearching
-        ? 'نتائج البحث'
-        : (_selectedCategoryName ?? 'إعلانات القسم');
+    final String title;
+
+    if (_isSearching) {
+      title = 'نتائج البحث';
+    } else if (_selectedCategoryId != null) {
+      title = _selectedCategoryName ?? 'إعلانات القسم';
+    } else if (_mode == _ListMode.featured) {
+      title = 'إعلانات مميزة';
+    } else {
+      title = 'أحدث الإعلانات';
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _sectionTitle(
-          title,
-          trailing: Text(
-            '${results.length} إعلان',
-            style: TextStyle(
-              fontSize: 12,
-              color: colorScheme.onSurfaceVariant,
-            ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 19,
+                    fontWeight: FontWeight.w900,
+                    color: _titleColor,
+                  ),
+                ),
+              ),
+              Text(
+                '${results.length} إعلان',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(width: 6),
+              TextButton.icon(
+                onPressed: _clearFilters,
+                style: TextButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                ),
+                icon: const Icon(Icons.close_rounded, size: 17),
+                label: const Text(
+                  'إلغاء التصفية',
+                  style: TextStyle(fontSize: 12.5),
+                ),
+              ),
+            ],
           ),
         ),
+
+        const SizedBox(height: 12),
 
         if (showSpinner && results.isEmpty)
           const Padding(
@@ -1438,42 +2302,42 @@ class _HomeScreenState extends State<HomeScreen>
           )
         else if (results.isEmpty)
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 35),
+            padding: const EdgeInsets.symmetric(vertical: 35, horizontal: 16),
             child: Column(
               children: [
-                const Icon(
-                  Icons.search_off_outlined,
-                  size: 45,
-                ),
+                const Icon(Icons.search_off_outlined, size: 48),
                 const SizedBox(height: 9),
                 Text(
                   _isSearching
                       ? 'لم نجد إعلانات تطابق بحثك'
-                      : 'لا توجد إعلانات في هذا القسم حالياً',
+                      : 'لا توجد إعلانات هنا حالياً',
                 ),
               ],
             ),
           )
         else
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: results.length,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              mainAxisSpacing: 10,
-              crossAxisSpacing: 10,
-              mainAxisExtent: _cardHeight,
-            ),
-            itemBuilder: (context, index) {
-              final listing = results[index];
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: results.length,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                mainAxisSpacing: 14,
+                crossAxisSpacing: 12,
+                mainAxisExtent: _cardHeight,
+              ),
+              itemBuilder: (context, index) {
+                final listing = results[index];
 
-              return _buildListingCard(
-                listing,
-                fillWidth: true,
-                isCommercial: promotedIds.contains(listing['id']),
-              );
-            },
+                return _buildListingCard(
+                  listing,
+                  fillWidth: true,
+                  isCommercial: promotedIds.contains(listing['id']),
+                );
+              },
+            ),
           ),
 
         if (_loadingMore)
@@ -1487,6 +2351,9 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
+  // =========================
+  // أقسام الصفحة الرئيسية
+  // =========================
   Widget _buildHomeSections() {
     if (_listingsLoading) {
       return const Padding(
@@ -1502,10 +2369,7 @@ class _HomeScreenState extends State<HomeScreen>
         padding: EdgeInsets.symmetric(vertical: 32),
         child: Column(
           children: [
-            Icon(
-              Icons.inventory_2_outlined,
-              size: 45,
-            ),
+            Icon(Icons.inventory_2_outlined, size: 48),
             SizedBox(height: 10),
             Text('لا توجد إعلانات متاحة حالياً'),
           ],
@@ -1513,7 +2377,6 @@ class _HomeScreenState extends State<HomeScreen>
       );
     }
 
-    // فصل الإعلانات التجارية عن أحدث الإعلانات.
     final promotedIds = promoted.map((listing) => listing['id']).toSet();
 
     final latestListings = _listings
@@ -1521,189 +2384,158 @@ class _HomeScreenState extends State<HomeScreen>
         .take(10)
         .toList();
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (promoted.isNotEmpty) ...[
-          _sectionTitle(
-            'إعلانات تجارية',
-            icon: Icons.local_offer_outlined,
-          ),
-          _buildHorizontalListings(promoted, commercial: true),
-          const SizedBox(height: 20),
-        ],
+    // صفوف الأقسام التي فيها إعلانات.
+    final categoryRows = <Widget>[];
 
-        if (latestListings.isNotEmpty) ...[
-          _sectionTitle(
-            'أحدث الإعلانات',
-            icon: Icons.access_time,
-          ),
-          _buildHorizontalListings(latestListings),
-          const SizedBox(height: 20),
-        ],
+    for (var i = 0; i < _categories.length; i++) {
+      final category = _categories[i];
+      final categoryId = category['id'] as int?;
 
-        _sectionTitle(
-          'معروضات الأقسام',
-          icon: Icons.grid_view_rounded,
-        ),
+      if (categoryId == null) continue;
 
-        ..._categories.map((category) {
-          final categoryId = category['id'] as int?;
-          final categoryName = category['name']?.toString() ?? 'بدون اسم';
+      final items = _listings
+          .where((listing) => listing['category_id'] == categoryId)
+          .take(8)
+          .toList();
 
-          if (categoryId == null) return const SizedBox.shrink();
+      if (items.isEmpty) continue;
 
-          final categoryListings = _listings
-              .where((listing) => listing['category_id'] == categoryId)
-              .take(8)
-              .toList();
+      final name = category['name']?.toString() ?? 'بدون اسم';
 
-          if (categoryListings.isEmpty) return const SizedBox.shrink();
-
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _sectionTitle(
-                  categoryName,
-                  icon: _iconForCategory(category),
-                  trailing: TextButton(
-                    onPressed: () => _selectCategory(categoryId),
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 7),
-                      visualDensity: VisualDensity.compact,
-                    ),
-                    child: const Text(
-                      'عرض الكل',
-                      style: TextStyle(fontSize: 12),
-                    ),
-                  ),
-                ),
-                _buildHorizontalListings(categoryListings),
-              ],
-            ),
-          );
-        }),
-      ],
-    );
-  }
-
-  Widget _buildBody() {
-    if (_loading) {
-      return const Center(
-        child: CircularProgressIndicator(),
-      );
-    }
-
-    if (_error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(22),
+      categoryRows.add(
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Icon(
-                Icons.wifi_off,
-                size: 42,
+              _sectionHeader(
+                name,
+                icon: _filledCategoryIcon(name),
+                iconColor: _toneFor(name, i).fg,
+                onViewAll: () => _selectCategory(categoryId),
               ),
-              const SizedBox(height: 10),
-              Text(
-                _error!,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 14),
-              FilledButton(
-                onPressed: _loadAll,
-                child: const Text('إعادة المحاولة'),
-              ),
+              const SizedBox(height: 12),
+              _buildHorizontalListings(items),
             ],
           ),
         ),
       );
     }
 
-    final user = _supabase.auth.currentUser;
-    final name = (user?.userMetadata?['full_name'] as String?)?.trim();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (promoted.isNotEmpty) ...[
+          _sectionHeader(
+            'إعلانات مميزة',
+            icon: Icons.local_fire_department_rounded,
+            iconColor: const Color(0xFFFF6A1A),
+            onViewAll: () => _showAll(_ListMode.featured),
+          ),
+          const SizedBox(height: 12),
+          _buildHorizontalListings(promoted),
+          const SizedBox(height: 14),
+        ],
+
+        if (latestListings.isNotEmpty) ...[
+          _sectionHeader(
+            'أحدث الإعلانات',
+            icon: Icons.schedule_rounded,
+            onViewAll: () => _showAll(_ListMode.latest),
+          ),
+          const SizedBox(height: 12),
+          _buildHorizontalListings(latestListings),
+          const SizedBox(height: 14),
+        ],
+
+        ...categoryRows,
+      ],
+    );
+  }
+
+  // =========================
+  // جسم الصفحة
+  // =========================
+  Widget _buildBody(double topPadding) {
+    final bottomInset = MediaQuery.of(context).padding.bottom;
+
+    final Widget content;
+
+    if (_loading) {
+      content = const Padding(
+        padding: EdgeInsets.symmetric(vertical: 90),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    } else if (_error != null) {
+      content = Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          children: [
+            const Icon(Icons.wifi_off, size: 44),
+            const SizedBox(height: 10),
+            Text(_error!, textAlign: TextAlign.center),
+            const SizedBox(height: 14),
+            FilledButton(
+              onPressed: _loadAll,
+              child: const Text('إعادة المحاولة'),
+            ),
+          ],
+        ),
+      );
+    } else {
+      final user = _supabase.auth.currentUser;
+      final name = (user?.userMetadata?['full_name'] as String?)?.trim();
+
+      content = Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (!_isFiltering) ...[
+            if (name != null && name.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                child: Text(
+                  'مرحباً يا $name 👋',
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            _buildBannerCarousel(),
+            const SizedBox(height: 16),
+          ],
+
+          _buildCategoriesSection(),
+
+          const SizedBox(height: 8),
+
+          if (_isFiltering) _buildSearchResults() else _buildHomeSections(),
+        ],
+      );
+    }
 
     return RefreshIndicator(
+      displacement: topPadding + 50,
       onRefresh: () => _loadAll(showSpinner: false),
       child: ListView(
         controller: _scrollController,
         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(13, 8, 13, 18),
+        // نحدد الحشوة صراحة حتى تبدأ الترويسة من أعلى الشاشة.
+        padding: EdgeInsets.only(bottom: 112 + bottomInset),
         children: [
-          _buildSearchField(),
-
-          const SizedBox(height: 12),
-
-          if (!_isFiltering) ...[
-            if (name != null && name.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Text(
-                  'مرحباً يا $name 👋',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ),
-            _buildPromoBanner(),
-            const SizedBox(height: 14),
-          ],
-
-          _sectionTitle(
-            'الأقسام',
-            trailing: TextButton(
-              onPressed: _clearFilters,
-              style: TextButton.styleFrom(
-                visualDensity: VisualDensity.compact,
-                padding: const EdgeInsets.symmetric(horizontal: 7),
-              ),
-              child: const Text(
-                'عرض الكل',
-                style: TextStyle(fontSize: 12),
-              ),
-            ),
-          ),
-
-          _buildCategories(),
-
-          const SizedBox(height: 15),
-
-          if (_isFiltering) _buildSearchResults() else _buildHomeSections(),
+          _buildHeader(topPadding),
+          content,
         ],
       ),
     );
   }
 
-  Widget _buildProfileButton() {
-    final user = _supabase.auth.currentUser;
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return IconButton(
-      tooltip: user == null ? 'تسجيل الدخول' : 'الملف الشخصي',
-      onPressed: _openProfile,
-      icon: CircleAvatar(
-        radius: 15,
-        backgroundColor: colorScheme.primaryContainer,
-        child: Icon(
-          user == null ? Icons.person_outline : Icons.person,
-          size: 19,
-          color: colorScheme.onPrimaryContainer,
-        ),
-      ),
-    );
-  }
-
   // =========================
-  // شريط التنقل السفلي
+  // شريط التنقل السفلي العائم
   // =========================
   Widget _buildBottomNavigation() {
     final colorScheme = Theme.of(context).colorScheme;
-    final primary = colorScheme.primary;
 
     Widget navItem({
       required IconData icon,
@@ -1711,33 +2543,40 @@ class _HomeScreenState extends State<HomeScreen>
       required VoidCallback onTap,
       bool selected = false,
     }) {
+      final color = selected ? _brand : colorScheme.onSurfaceVariant;
+
       return Expanded(
         child: InkWell(
+          borderRadius: BorderRadius.circular(24),
           onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 7),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  icon,
-                  size: 21,
-                  color: selected ? primary : colorScheme.onSurfaceVariant,
-                ),
-                const SizedBox(height: 3),
-                Text(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 26, color: color),
+              const SizedBox(height: 3),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
                   label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 11,
-                    fontWeight:
-                        selected ? FontWeight.bold : FontWeight.normal,
-                    color: selected ? primary : colorScheme.onSurfaceVariant,
+                    fontSize: 11.5,
+                    fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                    color: color,
                   ),
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(height: 4),
+              selected
+                  ? Container(
+                      width: 30,
+                      height: 3,
+                      decoration: BoxDecoration(
+                        color: _brand,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    )
+                  : const SizedBox(height: 3),
+            ],
           ),
         ),
       );
@@ -1745,82 +2584,126 @@ class _HomeScreenState extends State<HomeScreen>
 
     return SafeArea(
       top: false,
-      child: Container(
-        decoration: BoxDecoration(
-          color: colorScheme.surface,
-          border: Border(
-            top: BorderSide(
-              color: colorScheme.outlineVariant,
-              width: 0.6,
-            ),
-          ),
-        ),
-        child: Row(
-          textDirection: TextDirection.rtl,
+      child: SizedBox(
+        height: 104,
+        child: Stack(
+          clipBehavior: Clip.none,
           children: [
-            navItem(
-              icon: Icons.home_outlined,
-              label: 'الرئيسية',
-              selected: true,
-              // يصعد لأعلى الصفحة ويمسح الفلاتر بدون إعادة تحميل كل شيء.
-              onTap: _clearFilters,
-            ),
-
-            navItem(
-              icon: Icons.inventory_2_outlined,
-              label: 'إعلاناتي',
-              onTap: _openMyListings,
-            ),
-
-            // زر إضافة إعلان مميز بلون التطبيق.
-            Expanded(
-              child: InkWell(
-                onTap: _openAddListing,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 43,
-                        height: 34,
-                        decoration: BoxDecoration(
-                          color: primary,
-                          borderRadius: BorderRadius.circular(11),
-                        ),
-                        child: Icon(
-                          Icons.add,
-                          color: colorScheme.onPrimary,
-                          size: 25,
+            Positioned(
+              left: 14,
+              right: 14,
+              bottom: 8,
+              height: 68,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: _cardColor,
+                  borderRadius: BorderRadius.circular(30),
+                  boxShadow: [
+                    BoxShadow(
+                      color: _brand.withValues(alpha: 0.20),
+                      blurRadius: 24,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  textDirection: TextDirection.rtl,
+                  children: [
+                    navItem(
+                      icon: Icons.home_rounded,
+                      label: 'الرئيسية',
+                      selected: true,
+                      // يصعد لأعلى الصفحة ويمسح الفلاتر.
+                      onTap: _clearFilters,
+                    ),
+                    navItem(
+                      icon: Icons.list_alt_rounded,
+                      label: 'إعلاناتي',
+                      onTap: _openMyListings,
+                    ),
+                    Expanded(
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: _openAddListing,
+                        child: const Align(
+                          alignment: Alignment.bottomCenter,
+                          child: Padding(
+                            padding: EdgeInsets.only(bottom: 9),
+                            child: Text(
+                              'أضف إعلان',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w800,
+                                color: _brand,
+                              ),
+                            ),
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 3),
-                      Text(
-                        'أضف إعلان',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: primary,
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                    navItem(
+                      icon: Icons.favorite_border_rounded,
+                      label: 'المفضلة',
+                      onTap: _openFavorites,
+                    ),
+                    navItem(
+                      icon: Icons.person_outline_rounded,
+                      label: 'الملف الشخصي',
+                      onTap: _openProfile,
+                    ),
+                  ],
                 ),
               ),
             ),
 
-            navItem(
-              icon: Icons.favorite_border,
-              label: 'المفضلة',
-              onTap: _openFavorites,
-            ),
-
-            navItem(
-              icon: Icons.person_outline,
-              label: 'الملف الشخصي',
-              onTap: _openProfile,
+            Positioned(
+              top: 6,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: GestureDetector(
+                  onTap: _openAddListing,
+                  child: SizedBox(
+                    width: 84,
+                    height: 66,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      clipBehavior: Clip.none,
+                      children: [
+                        const CustomPaint(
+                          size: Size(84, 66),
+                          painter: _SparklesPainter(),
+                        ),
+                        Container(
+                          width: 60,
+                          height: 60,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: const LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [Color(0xFF8A5CE6), _brand],
+                            ),
+                            border: Border.all(color: Colors.white, width: 3),
+                            boxShadow: [
+                              BoxShadow(
+                                color: _brand.withValues(alpha: 0.40),
+                                blurRadius: 14,
+                                offset: const Offset(0, 6),
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.add_rounded,
+                            size: 36,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             ),
           ],
         ),
@@ -2229,36 +3112,478 @@ class _HomeScreenState extends State<HomeScreen>
   Widget build(BuildContext context) {
     final user = _supabase.auth.currentUser;
     final name = user?.userMetadata?['full_name'] as String?;
+    final topPadding = MediaQuery.of(context).padding.top;
 
     return Directionality(
       textDirection: TextDirection.rtl,
-      child: Scaffold(
-        drawer: _buildDrawer(user, name),
-
-        // AppBar مبسّط: العنوان والحساب فقط.
-        // زر "ضع إعلانك" أصبح في البانر والشريط السفلي والقائمة،
-        // والتحديث بالسحب للأسفل.
-        appBar: AppBar(
-          centerTitle: false,
-          titleSpacing: 0,
-          elevation: 0,
-          title: Text(
-            'دلالة شبشة',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w900,
-              color: Theme.of(context).colorScheme.primary,
-            ),
+      child: ValueListenableBuilder<bool>(
+        valueListenable: _headerVisible,
+        // أيقونات شريط الحالة بيضاء فوق الصورة، وداكنة بعد التمرير.
+        builder: (context, headerVisible, child) {
+          return AnnotatedRegion<SystemUiOverlayStyle>(
+            value: (headerVisible
+                    ? SystemUiOverlayStyle.light
+                    : SystemUiOverlayStyle.dark)
+                .copyWith(statusBarColor: Colors.transparent),
+            child: child!,
+          );
+        },
+        child: PopScope(
+          // زر الرجوع يلغي التصفية أولاً قبل الخروج من التطبيق.
+          canPop: !_isFiltering,
+          onPopInvokedWithResult: (didPop, _) {
+            if (!didPop) _clearFilters();
+          },
+          child: Scaffold(
+            key: _scaffoldKey,
+            backgroundColor: _pageBackground,
+            extendBody: true,
+            drawer: _buildDrawer(user, name),
+            body: _buildBody(topPadding),
+            bottomNavigationBar: _buildBottomNavigation(),
           ),
-          actions: [
-            _buildProfileButton(),
-          ],
         ),
-
-        body: _buildBody(),
-
-        bottomNavigationBar: _buildBottomNavigation(),
       ),
     );
   }
+}
+
+// =============================================================
+// أنواع مساعدة للتصميم
+// =============================================================
+
+// وضع عرض القائمة الكاملة (عرض الكل).
+enum _ListMode { home, featured, latest }
+
+// ألوان بطاقة القسم.
+class _Tone {
+  final Color bg;
+  final Color fg;
+
+  const _Tone(this.bg, this.fg);
+}
+
+enum _BannerAction { addListing, browseCategories }
+
+// شريحة في بانر العروض.
+class _BannerSlide {
+  final String line1;
+  final String line2;
+  final List<String> bullets;
+  final String cta;
+  final _BannerAction action;
+
+  const _BannerSlide(
+    this.line1,
+    this.line2,
+    this.bullets,
+    this.cta,
+    this.action,
+  );
+}
+
+// قص الصورة داخل البانر بحافة منحنية من جهة النص.
+class _PhotoClipper extends CustomClipper<Path> {
+  const _PhotoClipper();
+
+  @override
+  Path getClip(Size size) {
+    final w = size.width;
+    final h = size.height;
+
+    return Path()
+      ..moveTo(w * 0.34, 0)
+      ..lineTo(w, 0)
+      ..lineTo(w, h)
+      ..lineTo(w * 0.02, h)
+      ..cubicTo(w * 0.40, h * 0.86, w * 0.02, h * 0.42, w * 0.34, 0)
+      ..close();
+  }
+
+  @override
+  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
+}
+
+// الخط البرتقالي المنحني على حافة الصورة.
+class _SwooshPainter extends CustomPainter {
+  const _SwooshPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+
+    Path curve(double dx) {
+      return Path()
+        ..moveTo(w * 0.02 + dx, h)
+        ..cubicTo(w * 0.40 + dx, h * 0.86, w * 0.02 + dx, h * 0.42,
+            w * 0.34 + dx, 0);
+    }
+
+    canvas.drawPath(
+      curve(-3),
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 14
+        ..strokeCap = StrokeCap.round
+        ..color = const Color(0xFF7A45DA).withValues(alpha: 0.55),
+    );
+
+    canvas.drawPath(
+      curve(-6),
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 8
+        ..strokeCap = StrokeCap.round
+        ..shader = const LinearGradient(
+          begin: Alignment.bottomCenter,
+          end: Alignment.topCenter,
+          colors: [Color(0xFFFF9F1C), Color(0xFFFFC93C)],
+        ).createShader(Offset.zero & size),
+    );
+
+    canvas.drawPath(
+      curve(-17),
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.6
+        ..color = Colors.white.withValues(alpha: 0.35),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+// شرارات صغيرة حول زر "أضف إعلان".
+class _SparklesPainter extends CustomPainter {
+  const _SparklesPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+
+    final paint = Paint()
+      ..color = const Color(0xFFFFB02E)
+      ..strokeWidth = 2.6
+      ..strokeCap = StrokeCap.round;
+
+    for (final degrees in const [-150.0, -90.0, -30.0]) {
+      final angle = degrees * math.pi / 180;
+      final direction = Offset(math.cos(angle), math.sin(angle));
+
+      canvas.drawLine(
+        center + direction * 34,
+        center + direction * 41,
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+// رسم احتياطي لمشهد شبشة عند الغروب (مباني طينية ونخيل ونهر).
+// يظهر إذا لم تضف صورة حقيقية في assets/images.
+class _ShabshaScenePainter extends CustomPainter {
+  const _ShabshaScenePainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+    final horizon = h * 0.64;
+
+    // السماء
+    final skyRect = Rect.fromLTWH(0, 0, w, horizon + 1);
+
+    canvas.drawRect(
+      skyRect,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Color(0xFF7C9CEB),
+            Color(0xFFB6A4E8),
+            Color(0xFFF5B5A6),
+            Color(0xFFFFCB90),
+          ],
+          stops: [0.0, 0.38, 0.72, 1.0],
+        ).createShader(skyRect),
+    );
+
+    // سحب ناعمة
+    void cloud(double cx, double cy, double cw, double ch, Color color) {
+      canvas.drawOval(
+        Rect.fromCenter(
+          center: Offset(w * cx, h * cy),
+          width: w * cw,
+          height: h * ch,
+        ),
+        Paint()
+          ..color = color
+          ..maskFilter = MaskFilter.blur(BlurStyle.normal, h * 0.03),
+      );
+    }
+
+    cloud(0.20, 0.15, 0.50, 0.10, Colors.white.withValues(alpha: 0.30));
+    cloud(0.68, 0.10, 0.44, 0.09, const Color(0xFFFFC2C8).withValues(alpha: 0.45));
+    cloud(0.90, 0.26, 0.40, 0.08, Colors.white.withValues(alpha: 0.28));
+    cloud(0.42, 0.34, 0.60, 0.08, const Color(0xFFFFB27A).withValues(alpha: 0.40));
+
+    // وهج الشمس عند الأفق
+    canvas.drawRect(
+      skyRect,
+      Paint()
+        ..shader = const RadialGradient(
+          colors: [Color(0x99FFE3AA), Color(0x00FFE3AA)],
+        ).createShader(
+          Rect.fromCircle(center: Offset(w * 0.72, horizon), radius: w * 0.5),
+        ),
+    );
+
+    // تلال بعيدة
+    final hills = Path()
+      ..moveTo(0, horizon)
+      ..quadraticBezierTo(w * 0.2, horizon - h * 0.10, w * 0.42, horizon - h * 0.03)
+      ..quadraticBezierTo(w * 0.7, horizon - h * 0.12, w, horizon - h * 0.04)
+      ..lineTo(w, horizon)
+      ..close();
+
+    canvas.drawPath(
+      hills,
+      Paint()..color = const Color(0xFFD59A78).withValues(alpha: 0.55),
+    );
+
+    // المباني الطينية: [x, العرض, الارتفاع] كنسب من الأبعاد.
+    const buildings = <List<double>>[
+      [0.00, 0.11, 0.20],
+      [0.09, 0.10, 0.31],
+      [0.18, 0.13, 0.23],
+      [0.30, 0.10, 0.34],
+      [0.39, 0.10, 0.26],
+      [0.49, 0.13, 0.30],
+      [0.61, 0.11, 0.22],
+      [0.71, 0.12, 0.33],
+      [0.82, 0.10, 0.24],
+      [0.91, 0.10, 0.30],
+    ];
+
+    for (var i = 0; i < buildings.length; i++) {
+      final b = buildings[i];
+      final bx = w * b[0];
+      final bw = w * b[1];
+      final bh = h * b[2];
+      final top = horizon - bh;
+
+      final tone = i.isEven ? const Color(0xFFB9744A) : const Color(0xFFA5613C);
+      final shade = Color.lerp(tone, const Color(0xFF6B3A25), 0.35)!;
+      final rect = Rect.fromLTWH(bx, top, bw + 1, bh + 1);
+
+      canvas.drawRect(
+        rect,
+        Paint()
+          ..shader = LinearGradient(
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+            colors: [tone, shade],
+          ).createShader(rect),
+      );
+
+      // شرفات علوية
+      final teeth = math.max(3, (bw / (h * 0.045)).floor());
+      final toothWidth = bw / (teeth * 2 - 1);
+      final toothHeight = h * 0.022;
+
+      for (var t = 0; t < teeth; t++) {
+        canvas.drawRect(
+          Rect.fromLTWH(
+            bx + t * toothWidth * 2,
+            top - toothHeight,
+            toothWidth,
+            toothHeight + 1,
+          ),
+          Paint()..color = tone,
+        );
+      }
+
+      // نوافذ صغيرة
+      final windowPaint = Paint()
+        ..color = const Color(0xFF4A2A1B).withValues(alpha: 0.75);
+
+      final cols = math.max(2, (bw / (h * 0.09)).floor());
+      final rows = math.max(1, (bh / (h * 0.12)).floor() - 1);
+
+      for (var r = 0; r < rows; r++) {
+        for (var c = 0; c < cols; c++) {
+          final cx = bx + bw * (c + 0.5) / cols;
+          final cy = top + bh * 0.20 + r * (bh * 0.66 / rows);
+
+          canvas.drawRect(
+            Rect.fromCenter(
+              center: Offset(cx, cy),
+              width: h * 0.026,
+              height: h * 0.042,
+            ),
+            windowPaint,
+          );
+        }
+      }
+    }
+
+    // البرج
+    final towerWidth = w * 0.05;
+    final towerX = w * 0.45;
+    final towerHeight = h * 0.46;
+    final towerTop = horizon - towerHeight;
+
+    canvas.drawRect(
+      Rect.fromLTWH(towerX, towerTop, towerWidth, towerHeight + 1),
+      Paint()..color = const Color(0xFFB06A42),
+    );
+
+    canvas.drawRect(
+      Rect.fromLTWH(
+        towerX - towerWidth * 0.12,
+        towerTop,
+        towerWidth * 1.24,
+        h * 0.03,
+      ),
+      Paint()..color = const Color(0xFF8E512F),
+    );
+
+    canvas.drawArc(
+      Rect.fromLTWH(
+        towerX + towerWidth * 0.1,
+        towerTop - towerWidth * 0.5,
+        towerWidth * 0.8,
+        towerWidth,
+      ),
+      math.pi,
+      math.pi,
+      true,
+      Paint()..color = const Color(0xFF7A4326),
+    );
+
+    canvas.drawCircle(
+      Offset(towerX + towerWidth / 2, towerTop + h * 0.09),
+      towerWidth * 0.22,
+      Paint()..color = const Color(0xFFFFE8B0),
+    );
+
+    // النهر
+    final riverRect = Rect.fromLTWH(0, horizon, w, h - horizon);
+
+    canvas.drawRect(
+      riverRect,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Color(0xFFFFBE85),
+            Color(0xFFC99AB6),
+            Color(0xFF5E6FB0),
+            Color(0xFF3A3F86),
+          ],
+          stops: [0.0, 0.35, 0.75, 1.0],
+        ).createShader(riverRect),
+    );
+
+    // ضفة خضراء
+    final bank = Path()
+      ..moveTo(0, horizon + h * 0.01)
+      ..cubicTo(w * 0.15, horizon - h * 0.05, w * 0.30, horizon + h * 0.02,
+          w * 0.50, horizon - h * 0.02)
+      ..cubicTo(w * 0.70, horizon - h * 0.06, w * 0.85, horizon, w,
+          horizon - h * 0.02)
+      ..lineTo(w, horizon + h * 0.05)
+      ..lineTo(0, horizon + h * 0.05)
+      ..close();
+
+    canvas.drawPath(bank, Paint()..color = const Color(0xFF2E5B34));
+
+    // انعكاسات على الماء
+    final streak = Paint()..color = Colors.white.withValues(alpha: 0.22);
+
+    for (var i = 0; i < 6; i++) {
+      final y = horizon + h * (0.09 + i * 0.05);
+      final streakWidth = w * (0.22 + (i % 3) * 0.10);
+      final cx = w * (0.20 + ((i * 0.17) % 0.62));
+
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromCenter(
+            center: Offset(cx, y),
+            width: streakWidth,
+            height: h * 0.008,
+          ),
+          const Radius.circular(4),
+        ),
+        streak,
+      );
+    }
+
+    // النخيل
+    void palm(double bxFraction, double baseY, double height, double lean) {
+      final base = Offset(w * bxFraction, baseY);
+      final top = Offset(base.dx + lean * w, baseY - height);
+
+      final trunk = Path()
+        ..moveTo(base.dx, base.dy)
+        ..quadraticBezierTo(
+          base.dx + lean * w * 0.2,
+          baseY - height * 0.5,
+          top.dx,
+          top.dy,
+        );
+
+      canvas.drawPath(
+        trunk,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = math.max(2.0, h * 0.022)
+          ..strokeCap = StrokeCap.round
+          ..color = const Color(0xFF3F2A1A),
+      );
+
+      const angles = [-172.0, -150.0, -125.0, -100.0, -80.0, -55.0, -30.0, -8.0];
+
+      for (var i = 0; i < angles.length; i++) {
+        final angle = angles[i] * math.pi / 180;
+        final direction = Offset(math.cos(angle), math.sin(angle));
+        final length = height * 0.55;
+
+        final end = top + direction * length + Offset(0, length * 0.30);
+        final control =
+            top + direction * length * 0.55 + Offset(0, -length * 0.30);
+
+        final frond = Path()
+          ..moveTo(top.dx, top.dy)
+          ..quadraticBezierTo(control.dx, control.dy, end.dx, end.dy);
+
+        canvas.drawPath(
+          frond,
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = math.max(1.6, h * 0.016)
+            ..strokeCap = StrokeCap.round
+            ..color = i.isEven
+                ? const Color(0xFF1F5A2E)
+                : const Color(0xFF2E7A3E),
+        );
+      }
+    }
+
+    palm(0.10, horizon + h * 0.03, h * 0.46, 0.015);
+    palm(0.27, horizon, h * 0.36, -0.010);
+    palm(0.60, horizon + h * 0.02, h * 0.42, 0.010);
+    palm(0.78, horizon, h * 0.34, -0.012);
+    palm(0.94, horizon + h * 0.03, h * 0.50, -0.020);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
