@@ -746,7 +746,7 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
                   vertical: 4,
                 ),
                 decoration: BoxDecoration(
-                  Colors.black.withOpacity(0.6)
+                  Colors.black.withOpacity(0.6)              ,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
