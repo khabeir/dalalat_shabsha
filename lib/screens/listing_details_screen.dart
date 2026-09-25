@@ -70,13 +70,11 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
 
   bool get _isOwner {
     final user = _supabase.auth.currentUser;
-
     return user != null && user.id == _listing?['seller_id']?.toString();
   }
 
   String _timeAgo(dynamic value) {
     final date = DateTime.tryParse(value?.toString() ?? '')?.toLocal();
-
     if (date == null) return '';
 
     final diff = DateTime.now().difference(date);
@@ -101,7 +99,6 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
     }
 
     final number = num.tryParse(price.toString());
-
     if (number == null) return '$price $currency';
 
     return '${_numberFormat.format(number)} $currency';
@@ -145,10 +142,8 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
     return _supabase.storage.from('listing-images').getPublicUrl(cleanPath);
   }
 
-  // تحويل الأرقام العربية (٠١٢) إلى غربية (012).
   String _toWesternDigits(String input) {
     const arabic = '٠١٢٣٤٥٦٧٨٩';
-
     final buffer = StringBuffer();
 
     for (final char in input.split('')) {
@@ -159,7 +154,6 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
     return buffer.toString();
   }
 
-  // رقم مناسب لواتساب: بدون + وبرمز الدولة.
   String? _whatsappNumber(String phone) {
     var digits = _toWesternDigits(phone).replaceAll(RegExp(r'[^0-9]'), '');
 
@@ -178,7 +172,7 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
   // تحميل البيانات
   // =========================
   Future<void> _loadListing({bool silent = false}) async {
-    if (!silent && _error != null && mounted) {
+    if (!silent && mounted) {
       setState(() {
         _error = null;
         _loading = true;
@@ -212,9 +206,13 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
         _favorite = results[3] as bool;
         _loading = false;
         _error = null;
+        _currentImageIndex = 0;
       });
 
-      // معلومات إضافية تظهر عند وصولها دون تعطيل الصفحة.
+      if (_pageController.hasClients) {
+        _pageController.jumpToPage(0);
+      }
+
       _loadExtras(listing);
     } catch (e) {
       debugPrint('loadListing error: $e');
@@ -243,7 +241,6 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
     return List<Map<String, dynamic>>.from(response);
   }
 
-  // هل الإعلان تجاري ونشط حالياً؟
   Future<bool> _checkCommercial() async {
     try {
       final now = DateTime.now().toUtc().toIso8601String();
@@ -266,7 +263,6 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
   Future<bool> _checkFavorite() async {
     try {
       final user = _supabase.auth.currentUser;
-
       if (user == null) return false;
 
       final result = await _supabase
@@ -303,7 +299,6 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
           .maybeSingle();
 
       if (!mounted) return;
-
       setState(() => _categoryName = category?['name']?.toString());
     } catch (e) {
       debugPrint('loadCategoryName error: $e');
@@ -314,14 +309,12 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
     if (sellerId == null) return;
 
     try {
-      // دالة آمنة تعيد الاسم فقط (بدون الهاتف أو المنطقة).
       final result = await _supabase.rpc(
         'get_seller_name',
         params: {'p_seller_id': sellerId},
       );
 
       final name = result?.toString().trim();
-
       if (!mounted) return;
 
       if (name != null && name.isNotEmpty) {
@@ -339,7 +332,6 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
           .eq('status', 'approved');
 
       if (!mounted) return;
-
       setState(() => _sellerAdsCount = ads.length);
     } catch (e) {
       debugPrint('loadSellerAds error: $e');
@@ -360,7 +352,6 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
           .limit(8);
 
       final rows = List<Map<String, dynamic>>.from(response);
-
       if (rows.isEmpty) return;
 
       final ids = rows.map((row) => row['id']).toList();
@@ -372,7 +363,6 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
           .order('sort_order');
 
       final covers = <dynamic, dynamic>{};
-
       for (final image in List<Map<String, dynamic>>.from(imagesResponse)) {
         covers.putIfAbsent(image['listing_id'], () => image['image_path']);
       }
@@ -382,7 +372,6 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
       }
 
       if (!mounted) return;
-
       setState(() => _similar = rows);
     } catch (e) {
       debugPrint('loadSimilar error: $e');
@@ -390,7 +379,7 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
   }
 
   // =========================
-  // تسجيل الدخول
+  // مصادقة وتفاعل
   // =========================
   Future<bool> _ensureSignedIn() async {
     if (_supabase.auth.currentUser != null) return true;
@@ -404,32 +393,24 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
 
     if (result == true && _supabase.auth.currentUser != null) {
       final favorite = await _checkFavorite();
-
       if (!mounted) return false;
 
       setState(() => _favorite = favorite);
-
       return true;
     }
 
     return false;
   }
 
-  // =========================
-  // المفضلة
-  // =========================
   Future<void> _toggleFavorite() async {
     if (_favoriteBusy) return;
-
     if (!await _ensureSignedIn()) return;
 
     final user = _supabase.auth.currentUser;
-
     if (user == null) return;
 
     final wasFavorite = _favorite;
 
-    // تحديث فوري للواجهة ثم مزامنة مع الخادم.
     setState(() {
       _favorite = !wasFavorite;
       _favoriteBusy = true;
@@ -450,7 +431,6 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
       }
     } catch (e) {
       debugPrint('toggleFavorite error: $e');
-
       if (mounted) {
         setState(() => _favorite = wasFavorite);
         _showSnack('تعذر تحديث المفضلة');
@@ -460,12 +440,8 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
     if (mounted) setState(() => _favoriteBusy = false);
   }
 
-  // =========================
-  // التواصل والمشاركة
-  // =========================
   Future<void> _callSeller() async {
     final phone = _listing?['contact_phone']?.toString().trim();
-
     if (phone == null || phone.isEmpty) {
       _showSnack('رقم التواصل غير متوفر');
       return;
@@ -475,7 +451,6 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
 
     try {
       final launched = await launchUrl(Uri(scheme: 'tel', path: cleaned));
-
       if (!launched) _showSnack('تعذر فتح تطبيق الاتصال');
     } catch (_) {
       _showSnack('تعذر فتح تطبيق الاتصال');
@@ -484,21 +459,18 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
 
   Future<void> _openWhatsApp() async {
     final phone = _listing?['contact_phone']?.toString().trim();
-
     if (phone == null || phone.isEmpty) {
       _showSnack('رقم التواصل غير متوفر');
       return;
     }
 
     final number = _whatsappNumber(phone);
-
     if (number == null) {
       _showSnack('رقم التواصل غير صالح لواتساب');
       return;
     }
 
     final title = _listing?['title']?.toString().trim() ?? '';
-
     final message = title.isEmpty
         ? 'مرحباً، رأيت إعلانك في تطبيق دلالة شبشة.'
         : 'مرحباً، رأيت إعلانك "$title" في تطبيق دلالة شبشة. هل ما زال متاحاً؟';
@@ -515,17 +487,14 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
         uri,
         mode: LaunchMode.externalApplication,
       );
-
       if (!launched) _showSnack('تعذر فتح واتساب');
     } catch (_) {
       _showSnack('تعذر فتح واتساب');
     }
   }
 
-  // مشاركة الإعلان عبر واتساب (اختيار جهة الاتصال داخل واتساب).
   Future<void> _shareListing() async {
     final listing = _listing;
-
     if (listing == null) return;
 
     final title = listing['title']?.toString().trim() ?? '';
@@ -551,21 +520,16 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
         uri,
         mode: LaunchMode.externalApplication,
       );
-
       if (!launched) _showSnack('تعذر فتح واتساب للمشاركة');
     } catch (_) {
       _showSnack('تعذر فتح واتساب للمشاركة');
     }
   }
 
-  // =========================
-  // الإبلاغ
-  // =========================
   Future<void> _reportListing() async {
     if (!await _ensureSignedIn()) return;
 
     final user = _supabase.auth.currentUser;
-
     if (user == null || !mounted) return;
 
     final result = await showModalBottomSheet<Map<String, String>>(
@@ -607,7 +571,6 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
 
   void _openFullScreenGallery(int index) {
     final urls = _imageUrls;
-
     if (urls.isEmpty) return;
 
     Navigator.push(
@@ -616,6 +579,7 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
         builder: (_) => _FullScreenGallery(
           urls: urls,
           initialIndex: index.clamp(0, urls.length - 1),
+          listingId: widget.listingId,
         ),
       ),
     );
@@ -649,10 +613,10 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
     );
   }
 
-  Widget _networkImage(String url, {int memCacheWidth = 900}) {
+  Widget _networkImage(String url, {int memCacheWidth = 900, String? heroTag}) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return CachedNetworkImage(
+    Widget image = CachedNetworkImage(
       imageUrl: url,
       fit: BoxFit.cover,
       width: double.infinity,
@@ -669,6 +633,12 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
         message: 'تعذر تحميل الصورة',
       ),
     );
+
+    if (heroTag != null) {
+      return Hero(tag: heroTag, child: image);
+    }
+
+    return image;
   }
 
   Widget _buildGallery() {
@@ -676,7 +646,7 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
     final urls = _imageUrls;
 
     return SizedBox(
-      height: 300,
+      height: 310,
       child: Stack(
         children: [
           Positioned.fill(
@@ -689,9 +659,13 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
                       setState(() => _currentImageIndex = index);
                     },
                     itemBuilder: (context, index) {
+                      final heroTag = 'listing_img_${widget.listingId}_$index';
                       return GestureDetector(
                         onTap: () => _openFullScreenGallery(index),
-                        child: _networkImage(urls[index]),
+                        child: _networkImage(
+                          urls[index],
+                          heroTag: heroTag,
+                        ),
                       );
                     },
                   ),
@@ -709,6 +683,13 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
                 decoration: BoxDecoration(
                   color: colorScheme.primary,
                   borderRadius: BorderRadius.circular(20),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Colors.black26,
+                      blurRadius: 4,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -745,7 +726,7 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
                   return AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
                     margin: const EdgeInsets.symmetric(horizontal: 3),
-                    width: active ? 18 : 7,
+                    width: active ? 20 : 7,
                     height: 7,
                     decoration: BoxDecoration(
                       color: active ? Colors.white : Colors.white54,
@@ -761,11 +742,11 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
               left: 12,
               child: Container(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 9,
-                  vertical: 3,
+                  horizontal: 10,
+                  vertical: 4,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.black54,
+                  color: Colors.black60,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
@@ -773,6 +754,7 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 12,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
               ),
@@ -790,7 +772,7 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(20),
@@ -799,10 +781,10 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, size: 16, color: colorScheme.onSurfaceVariant),
-          const SizedBox(width: 5),
+          const SizedBox(width: 6),
           Text(
             text,
-            style: const TextStyle(fontSize: 12.5),
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
           ),
         ],
       ),
@@ -1143,7 +1125,6 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
     );
   }
 
-  // شريط التواصل الثابت أسفل الشاشة.
   Widget? _buildContactBar() {
     final listing = _listing;
 
@@ -1156,9 +1137,16 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
     return SafeArea(
       top: false,
       child: Container(
-        padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
           color: colorScheme.surface,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, -3),
+            ),
+          ],
           border: Border(
             top: BorderSide(color: colorScheme.outlineVariant, width: 0.6),
           ),
@@ -1167,31 +1155,39 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
           children: [
             Expanded(
               child: SizedBox(
-                height: 50,
+                height: 48,
                 child: FilledButton.icon(
                   onPressed: _callSeller,
+                  style: FilledButton.styleFrom(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
                   icon: const Icon(Icons.phone),
                   label: const Text(
                     'اتصال',
-                    style: TextStyle(fontSize: 16),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 12),
             Expanded(
               child: SizedBox(
-                height: 50,
+                height: 48,
                 child: FilledButton.icon(
                   onPressed: _openWhatsApp,
                   style: FilledButton.styleFrom(
                     backgroundColor: _whatsappGreen,
                     foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                   icon: const Icon(Icons.chat),
                   label: const Text(
                     'واتساب',
-                    style: TextStyle(fontSize: 16),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
@@ -1385,10 +1381,12 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
 class _FullScreenGallery extends StatefulWidget {
   final List<String> urls;
   final int initialIndex;
+  final int listingId;
 
   const _FullScreenGallery({
     required this.urls,
     required this.initialIndex,
+    required this.listingId,
   });
 
   @override
@@ -1423,20 +1421,25 @@ class _FullScreenGalleryState extends State<_FullScreenGallery> {
           itemCount: widget.urls.length,
           onPageChanged: (index) => setState(() => _index = index),
           itemBuilder: (context, index) {
+            final heroTag = 'listing_img_${widget.listingId}_$index';
+
             return InteractiveViewer(
               minScale: 1,
               maxScale: 4,
               child: Center(
-                child: CachedNetworkImage(
-                  imageUrl: widget.urls[index],
-                  fit: BoxFit.contain,
-                  placeholder: (_, __) => const Center(
-                    child: CircularProgressIndicator(color: Colors.white),
-                  ),
-                  errorWidget: (_, __, ___) => const Icon(
-                    Icons.broken_image_outlined,
-                    color: Colors.white54,
-                    size: 60,
+                child: Hero(
+                  tag: heroTag,
+                  child: CachedNetworkImage(
+                    imageUrl: widget.urls[index],
+                    fit: BoxFit.contain,
+                    placeholder: (_, __) => const Center(
+                      child: CircularProgressIndicator(color: Colors.white),
+                    ),
+                    errorWidget: (_, __, ___) => const Icon(
+                      Icons.broken_image_outlined,
+                      color: Colors.white54,
+                      size: 60,
+                    ),
                   ),
                 ),
               ),
