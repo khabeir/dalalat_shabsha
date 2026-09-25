@@ -6,356 +6,240 @@ import 'brand_theme.dart';
 class SupportContactCard extends StatelessWidget {
   final String title;
   final String subtitle;
-
-  // ============================================================
-  // √—ﬁ«„ «·œ⁄„
-  // €Ì¯— «·—ﬁ„Ì‰ ≈·Ï √—ﬁ«„ «·œ⁄„ «·ÕﬁÌﬁÌ….
-  //
-  // «” Œœ„ «·—ﬁ„ «·œÊ·Ì »œÊ‰ + œ«Œ· wa.me
-  // „À«· «·”Êœ«‰:
-  // 249912345678
-  // ============================================================
-  static const String whatsappNumber = '249912345678';
-  static const String phoneNumber = '+249912345678';
+  final String whatsappNumber;
+  final String phoneNumber;
 
   const SupportContactCard({
     super.key,
     required this.title,
     required this.subtitle,
+    this.whatsappNumber = '',
+    this.phoneNumber = '',
   });
 
-  // ============================================================
-  // › Õ Ê« ”«»
-  // ============================================================
   Future<void> _openWhatsApp(BuildContext context) async {
-    final message = Uri.encodeComponent(
-      '«·”·«„ ⁄·Ìﬂ„° √Õ «Ã „”«⁄œ… ›Ì  ÿ»Ìﬁ œ·«·… ‘»‘….',
-    );
+    final number = whatsappNumber.replaceAll(RegExp(r'[^0-9]'), '');
 
-    final uri = Uri.parse(
-      'https://wa.me/$whatsappNumber?text=$message',
-    );
+    if (number.isEmpty) {
+      _message(context, 'ŸÑŸÖ Ÿäÿ™ŸÖ ÿ•ÿπÿØÿßÿØ ÿ±ŸÇŸÖ Ÿàÿßÿ™ÿ≥ÿßÿ® ÿßŸÑÿØÿπŸÖ ÿ®ÿπÿØ.');
+      return;
+    }
+
+    final uri = Uri.parse('https://wa.me/$number');
 
     try {
-      final launched = await launchUrl(
+      if (!await launchUrl(
         uri,
         mode: LaunchMode.externalApplication,
-      );
-
-      if (!launched && context.mounted) {
-        _showError(context, ' ⁄–— › Õ Ê« ”«»');
+      )) {
+        _message(context, 'ÿ™ÿπÿ∞ÿ± ŸÅÿ™ÿ≠ Ÿàÿßÿ™ÿ≥ÿßÿ®.');
       }
     } catch (_) {
-      if (context.mounted) {
-        _showError(context, ' ⁄–— › Õ Ê« ”«»');
-      }
+      _message(context, 'ÿ™ÿπÿ∞ÿ± ŸÅÿ™ÿ≠ Ÿàÿßÿ™ÿ≥ÿßÿ®.');
     }
   }
 
-  // ============================================================
-  // «·« ’«·
-  // ============================================================
-  Future<void> _makePhoneCall(BuildContext context) async {
-    final uri = Uri.parse('tel:$phoneNumber');
+  Future<void> _call(BuildContext context) async {
+    if (phoneNumber.trim().isEmpty) {
+      _message(context, 'ŸÑŸÖ Ÿäÿ™ŸÖ ÿ•ÿπÿØÿßÿØ ÿ±ŸÇŸÖ Ÿáÿßÿ™ŸÅ ÿßŸÑÿØÿπŸÖ ÿ®ÿπÿØ.');
+      return;
+    }
+
+    final uri = Uri(
+      scheme: 'tel',
+      path: phoneNumber.trim(),
+    );
 
     try {
-      final launched = await launchUrl(
-        uri,
-        mode: LaunchMode.externalApplication,
-      );
-
-      if (!launched && context.mounted) {
-        _showError(context, ' ⁄–— › Õ  ÿ»Ìﬁ «·« ’«·');
+      if (!await launchUrl(uri)) {
+        _message(context, 'ÿ™ÿπÿ∞ÿ± ŸÅÿ™ÿ≠ ÿ™ÿ∑ÿ®ŸäŸÇ ÿßŸÑÿßÿ™ÿµÿßŸÑ.');
       }
     } catch (_) {
-      if (context.mounted) {
-        _showError(context, ' ⁄–— › Õ  ÿ»Ìﬁ «·« ’«·');
-      }
+      _message(context, 'ÿ™ÿπÿ∞ÿ± ÿ•ÿ¨ÿ±ÿßÿ° ÿßŸÑÿßÿ™ÿµÿßŸÑ.');
     }
   }
 
-  void _showError(BuildContext context, String message) {
+  void _message(BuildContext context, String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
-          content: Text(message),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+          content: Text(
+            message,
+            textDirection: TextDirection.rtl,
           ),
+          behavior: SnackBarBehavior.floating,
         ),
       );
   }
 
   @override
   Widget build(BuildContext context) {
+    final hasWhatsApp = whatsappNumber.trim().isNotEmpty;
+    final hasPhone = phoneNumber.trim().isNotEmpty;
+
     return Container(
       width: double.infinity,
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(24),
+        gradient: LinearGradient(
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+          colors: [
+            Brand.soft,
+            Theme.of(context).cardColor,
+          ],
+        ),
+        borderRadius: BorderRadius.circular(26),
         border: Border.all(
           color: Brand.primary.withValues(alpha: 0.10),
         ),
         boxShadow: [
           BoxShadow(
-            color: Brand.primary.withValues(alpha: 0.08),
-            blurRadius: 20,
+            color: Brand.primary.withValues(alpha: 0.10),
+            blurRadius: 22,
             offset: const Offset(0, 8),
           ),
         ],
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
-        child: Stack(
-          children: [
-            // ==================================================
-            // “Œ—›… Œ·›Ì… »”Ìÿ…
-            // ==================================================
-            Positioned(
-              top: -35,
-              left: -25,
-              child: Container(
-                width: 100,
-                height: 100,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 52,
+                height: 52,
                 decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Brand.primary.withValues(alpha: 0.045),
+                  color: Brand.primary,
+                  borderRadius: BorderRadius.circular(17),
+                ),
+                child: const Icon(
+                  Icons.support_agent_rounded,
+                  color: Colors.white,
+                  size: 29,
                 ),
               ),
-            ),
-
-            Positioned(
-              bottom: -45,
-              right: -30,
-              child: Container(
-                width: 120,
-                height: 120,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Brand.primary.withValues(alpha: 0.04),
+              const SizedBox(width: 13),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: Brand.ink,
+                        fontSize: 15.5,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        color: Brand.ink.withValues(alpha: 0.62),
+                        fontSize: 12.5,
+                        height: 1.5,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
+            ],
+          ),
 
-            Padding(
-              padding: const EdgeInsets.all(18),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // ==================================================
-                  // «·⁄‰Ê«‰ + «·√ÌﬁÊ‰…
-                  // ==================================================
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        width: 52,
-                        height: 52,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topRight,
-                            end: Alignment.bottomLeft,
-                            colors: [
-                              Brand.primary,
-                              Brand.primary.withValues(alpha: 0.78),
-                            ],
-                          ),
-                          borderRadius: BorderRadius.circular(17),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Brand.primary.withValues(alpha: 0.22),
-                              blurRadius: 14,
-                              offset: const Offset(0, 6),
-                            ),
-                          ],
-                        ),
-                        child: const Icon(
-                          Icons.support_agent_rounded,
-                          color: Colors.white,
-                          size: 28,
-                        ),
-                      ),
+          const SizedBox(height: 16),
 
-                      const SizedBox(width: 13),
+          Container(
+            height: 1,
+            color: Brand.primary.withValues(alpha: 0.08),
+          ),
 
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              title,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: Brand.ink,
-                                fontSize: 15.5,
-                                fontWeight: FontWeight.w900,
-                                height: 1.35,
-                              ),
-                            ),
-                            const SizedBox(height: 5),
-                            Text(
-                              subtitle,
-                              maxLines: 3,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: Brand.ink.withValues(alpha: 0.62),
-                                fontSize: 12.5,
-                                height: 1.55,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+          const SizedBox(height: 15),
+
+          Row(
+            children: [
+              if (hasWhatsApp)
+                Expanded(
+                  child: _SupportButton(
+                    icon: Icons.chat_rounded,
+                    label: 'Ÿàÿßÿ™ÿ≥ÿßÿ®',
+                    filled: true,
+                    onTap: () => _openWhatsApp(context),
                   ),
+                ),
 
-                  const SizedBox(height: 17),
+              if (hasWhatsApp && hasPhone)
+                const SizedBox(width: 10),
 
-                  // ==================================================
-                  // Œÿ ›«’·
-                  // ==================================================
-                  Container(
-                    height: 1,
-                    color: Brand.ink.withValues(alpha: 0.07),
+              if (hasPhone)
+                Expanded(
+                  child: _SupportButton(
+                    icon: Icons.phone_rounded,
+                    label: 'ÿßÿ™ÿµÿßŸÑ',
+                    filled: false,
+                    onTap: () => _call(context),
                   ),
-
-                  const SizedBox(height: 15),
-
-                  // ==================================================
-                  // √“—«— «· Ê«’·
-                  // ==================================================
-                  Row(
-                    children: [
-                      // ------------------------------
-                      // Ê« ”«»
-                      // ------------------------------
-                      Expanded(
-                        child: _SupportButton(
-                          icon: Icons.chat_rounded,
-                          label: 'Ê« ”«»',
-                          filled: true,
-                          onPressed: () => _openWhatsApp(context),
-                        ),
-                      ),
-
-                      const SizedBox(width: 10),
-
-                      // ------------------------------
-                      // « ’«·
-                      // ------------------------------
-                      Expanded(
-                        child: _SupportButton(
-                          icon: Icons.phone_rounded,
-                          label: '« ’«·',
-                          filled: false,
-                          onPressed: () => _makePhoneCall(context),
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 11),
-
-                  // ==================================================
-                  // „·«ÕŸ… ’€Ì—…
-                  // ==================================================
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.access_time_rounded,
-                        size: 14,
-                        color: Brand.ink.withValues(alpha: 0.45),
-                      ),
-                      const SizedBox(width: 5),
-                      Text(
-                        '‰Õ‰ Â‰« ·„”«⁄œ ﬂ',
-                        style: TextStyle(
-                          color: Brand.ink.withValues(alpha: 0.48),
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+                ),
+            ],
+          ),
+        ],
       ),
     );
   }
 }
 
-// =================================================================
-// “— «·œ⁄„
-// =================================================================
-
 class _SupportButton extends StatelessWidget {
   final IconData icon;
   final String label;
   final bool filled;
-  final VoidCallback onPressed;
+  final VoidCallback onTap;
 
   const _SupportButton({
     required this.icon,
     required this.label,
     required this.filled,
-    required this.onPressed,
+    required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onPressed,
+    return SizedBox(
+      height: 48,
+      child: Material(
+        color: filled ? Brand.primary : Colors.transparent,
         borderRadius: BorderRadius.circular(15),
-        child: Ink(
-          height: 46,
-          decoration: BoxDecoration(
-            color: filled
-                ? Brand.primary
-                : Brand.soft.withValues(alpha: 0.65),
-            borderRadius: BorderRadius.circular(15),
-            border: filled
-                ? null
-                : Border.all(
-                    color: Brand.primary.withValues(alpha: 0.12),
-                  ),
-            boxShadow: filled
-                ? [
-                    BoxShadow(
-                      color: Brand.primary.withValues(alpha: 0.18),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(15),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(15),
+              border: filled
+                  ? null
+                  : Border.all(
+                      color: Brand.primary.withValues(alpha: 0.25),
                     ),
-                  ]
-                : null,
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                size: 19,
-                color: filled ? Colors.white : Brand.primary,
-              ),
-              const SizedBox(width: 7),
-              Text(
-                label,
-                style: TextStyle(
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  icon,
+                  size: 20,
                   color: filled ? Colors.white : Brand.primary,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w900,
                 ),
-              ),
-            ],
+                const SizedBox(width: 8),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: filled ? Colors.white : Brand.primary,
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
