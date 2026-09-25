@@ -90,7 +90,7 @@ class ListingSection extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      'ÚÑÖ Çáßá',
+                      'Ø¹Ø±Ø¶ Ø§Ù„ÙƒÙ„',
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
@@ -158,7 +158,7 @@ class ListingSection extends StatelessWidget {
               size: 48,
             ),
             SizedBox(height: 10),
-            Text('áÇ ÊæÌÏ ÅÚáÇäÇÊ ãÊÇÍÉ ÍÇáíÇğ'),
+            Text('Ù„Ø§ ØªÙˆØ¬Ø¯ Ø¥Ø¹Ù„Ø§Ù†Ø§Øª Ù…ØªØ§Ø­Ø© Ø­Ø§Ù„ÙŠØ§Ù‹'),
           ],
         ),
       );
@@ -193,7 +193,7 @@ class ListingSection extends StatelessWidget {
       if (items.isEmpty) continue;
 
       final name =
-          category['name']?.toString() ?? 'ÈÏæä ÇÓã';
+          category['name']?.toString() ?? 'Ø¨Ø¯ÙˆÙ† Ø§Ø³Ù…';
 
       categoryRows.add(
         Padding(
@@ -222,25 +222,20 @@ class ListingSection extends StatelessWidget {
         if (promoted.isNotEmpty) ...[
           _sectionHeader(
             context,
-            'ÅÚáÇäÇÊ ããíÒÉ',
+            'Ø¥Ø¹Ù„Ø§Ù†Ø§Øª Ù…Ù…ÙŠØ²Ø©',
             icon: Icons.local_fire_department_rounded,
             iconColor: const Color(0xFFFF6A1A),
             onViewAll: onShowFeatured,
           ),
           const SizedBox(height: 12),
-
-          // äÍÇİÙ Úáì ÇáÓáæß ÇáÓÇÈŞ:
-          // ÇáÅÚáÇä ÇáããíÒ İí ÇáÕİÍÉ ÇáÑÆíÓíÉ
-          // áÇ íõÚÇãá ßÅÚáÇä ÊÌÇÑí.
           _buildHorizontalListings(promoted),
-
           const SizedBox(height: 14),
         ],
 
         if (latestListings.isNotEmpty) ...[
           _sectionHeader(
             context,
-            'ÃÍÏË ÇáÅÚáÇäÇÊ',
+            'Ø£Ø­Ø¯Ø« Ø§Ù„Ø¥Ø¹Ù„Ø§Ù†Ø§Øª',
             icon: Icons.schedule_rounded,
             onViewAll: onShowLatest,
           ),
