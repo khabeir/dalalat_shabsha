@@ -1,5 +1,4 @@
-// Orginal home screen 
-// =====================================
+// =============================================================
 // الصفحة الرئيسية لتطبيق دلالة شبشة (التصميم الجديد)
 //
 // الحزم المطلوبة في pubspec.yaml:
@@ -64,7 +63,7 @@ class _HomeScreenState extends State<HomeScreen>
   static const _gold = Color(0xFFFFC93C);
 
   // ارتفاع الترويسة بدون شريط الحالة.
-  static const _headerContentHeight = 188.0;
+  static const _headerContentHeight = 200.0;
 
   // صور اختيارية (انظر التعليق في أعلى الملف).
   static const _headerAsset = 'assets/images/home_header.jpg';
@@ -75,7 +74,7 @@ class _HomeScreenState extends State<HomeScreen>
     _BannerSlide(
       'كل ما تحتاجه',
       'في مكان واحد',
-      ['إعلانات مجانية', 'بيع وشراء محلي', 'دعم مجتمعك'],
+      ['إعلانات مميزة', 'بيع وشراء محلي', 'انتشار واسع'],
       'أضف إعلانك الآن',
       _BannerAction.addListing,
     ),
@@ -96,7 +95,7 @@ class _HomeScreenState extends State<HomeScreen>
     _BannerSlide(
       'ابحث بسهولة',
       'عن أي شيء',
-      ['أقسام منظمة', 'بحث بالحي', 'الأحدث أولاً'],
+      ['أقسام منظمة', 'بحث سريع', 'الأحدث أولاً'],
       'تصفح الأقسام',
       _BannerAction.browseCategories,
     ),
@@ -1458,11 +1457,22 @@ class _HomeScreenState extends State<HomeScreen>
   // =========================
   // بانر العروض المتحرك
   // =========================
+  void _onBannerAction(_BannerAction action) {
+    switch (action) {
+      case _BannerAction.addListing:
+        _openAddListing();
+        break;
+      case _BannerAction.browseCategories:
+        _scrollToCategories();
+        break;
+    }
+  }
+
   Widget _buildBannerCarousel() {
     return Column(
       children: [
         SizedBox(
-          height: 150,
+          height: 170,
           child: PageView.builder(
             controller: _bannerController,
             itemCount: _slides.length,
@@ -1475,9 +1485,7 @@ class _HomeScreenState extends State<HomeScreen>
             },
           ),
         ),
-
         const SizedBox(height: 10),
-
         ValueListenableBuilder<int>(
           valueListenable: _bannerIndex,
           builder: (context, current, _) {
@@ -1488,12 +1496,12 @@ class _HomeScreenState extends State<HomeScreen>
 
                 return AnimatedContainer(
                   duration: const Duration(milliseconds: 250),
-                  margin: const EdgeInsets.symmetric(horizontal: 4),
-                  width: active ? 12 : 8,
-                  height: active ? 12 : 8,
+                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                  width: active ? 20 : 7,
+                  height: 7,
                   decoration: BoxDecoration(
-                    color: active ? _brand : _brand.withValues(alpha: 0.22),
-                    shape: BoxShape.circle,
+                    color: active ? _brand : _brand.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(4),
                   ),
                 );
               }),
@@ -1504,37 +1512,13 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  void _onBannerAction(_BannerAction action) {
-    switch (action) {
-      case _BannerAction.addListing:
-        _openAddListing();
-        break;
-      case _BannerAction.browseCategories:
-        _scrollToCategories();
-        break;
-    }
-  }
-
-  void _scrollToCategories() {
-    final target = _categoriesKey.currentContext;
-
-    if (target == null) return;
-
-    Scrollable.ensureVisible(
-      target,
-      duration: const Duration(milliseconds: 400),
-      curve: Curves.easeInOut,
-      alignment: 0.05,
-    );
-  }
-
   Widget _buildBannerSlide(_BannerSlide slide) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(26),
+      borderRadius: BorderRadius.circular(24),
       child: LayoutBuilder(
         builder: (context, constraints) {
           final width = constraints.maxWidth;
-          final photoWidth = width * 0.34;
+          final photoWidth = width * 0.48;
 
           return Stack(
             children: [
@@ -1542,8 +1526,8 @@ class _HomeScreenState extends State<HomeScreen>
                 child: DecoratedBox(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
+                      begin: Alignment.centerRight,
+                      end: Alignment.centerLeft,
                       colors: [
                         Color(0xFF3B1785),
                         Color(0xFF5B2DB5),
@@ -1553,8 +1537,6 @@ class _HomeScreenState extends State<HomeScreen>
                   ),
                 ),
               ),
-
-              // الصورة على اليمين بحافة منحنية.
               Positioned(
                 right: 0,
                 top: 0,
@@ -1565,13 +1547,17 @@ class _HomeScreenState extends State<HomeScreen>
                   child: Image.asset(
                     _bannerAsset,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => const RepaintBoundary(
-                      child: CustomPaint(painter: _ShabshaScenePainter()),
+                    errorBuilder: (_, __, ___) => Container(
+                      color: Colors.white24,
+                      child: const Icon(
+                        Icons.directions_car,
+                        color: Colors.white,
+                        size: 48,
+                      ),
                     ),
                   ),
                 ),
               ),
-
               Positioned(
                 right: 0,
                 top: 0,
@@ -1581,12 +1567,11 @@ class _HomeScreenState extends State<HomeScreen>
                   child: CustomPaint(painter: _SwooshPainter()),
                 ),
               ),
-
               Positioned(
-                left: 18,
-                top: 14,
-                bottom: 14,
-                width: width * 0.66,
+                left: 16,
+                top: 12,
+                bottom: 12,
+                right: photoWidth - 10,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -1598,9 +1583,9 @@ class _HomeScreenState extends State<HomeScreen>
                         slide.line1,
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 25,
+                          fontSize: 20,
                           fontWeight: FontWeight.w900,
-                          height: 1.2,
+                          height: 1.1,
                         ),
                       ),
                     ),
@@ -1611,19 +1596,19 @@ class _HomeScreenState extends State<HomeScreen>
                         slide.line2,
                         style: const TextStyle(
                           color: _gold,
-                          fontSize: 25,
+                          fontSize: 20,
                           fontWeight: FontWeight.w900,
-                          height: 1.2,
+                          height: 1.1,
                         ),
                       ),
                     ),
-                    const SizedBox(height: 5),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 2,
-                      children: [
-                        for (final bullet in slide.bullets)
-                          Row(
+                    const SizedBox(height: 6),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: slide.bullets.map((bullet) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 2),
+                          child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Container(
@@ -1634,56 +1619,57 @@ class _HomeScreenState extends State<HomeScreen>
                                   shape: BoxShape.circle,
                                 ),
                               ),
-                              const SizedBox(width: 4),
+                              const SizedBox(width: 5),
                               Text(
                                 bullet,
                                 style: const TextStyle(
                                   color: Colors.white,
-                                  fontSize: 11.5,
+                                  fontSize: 10.5,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
                             ],
                           ),
-                      ],
+                        );
+                      }).toList(),
                     ),
-                    const SizedBox(height: 7),
+                    const SizedBox(height: 8),
                     GestureDetector(
                       onTap: () => _onBannerAction(slide.action),
                       child: Container(
-                        height: 36,
+                        height: 34,
                         padding: const EdgeInsets.symmetric(horizontal: 14),
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
                             colors: [Color(0xFFFFB02E), Color(0xFFFF8A00)],
                           ),
-                          borderRadius: BorderRadius.circular(22),
+                          borderRadius: BorderRadius.circular(18),
                           boxShadow: [
                             BoxShadow(
-                              color: _orange.withValues(alpha: 0.45),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
+                              color: _orange.withValues(alpha: 0.35),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
                             ),
                           ],
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text(
-                              slide.cta,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
                             Icon(
                               slide.action == _BannerAction.addListing
                                   ? Icons.add_circle_outline_rounded
                                   : Icons.grid_view_rounded,
                               color: Colors.white,
-                              size: 22,
+                              size: 16,
+                            ),
+                            const SizedBox(width: 5),
+                            Text(
+                              slide.cta,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w800,
+                              ),
                             ),
                           ],
                         ),
@@ -3164,498 +3150,75 @@ class _Tone {
   const _Tone(this.bg, this.fg);
 }
 
-// ============================================================
-// Banner
-// ============================================================
+enum _BannerAction { addListing, browseCategories }
 
-enum _BannerAction {
-  addListing,
-  browseCategories,
-}
-
+// شريحة في بانر العروض.
 class _BannerSlide {
-  final String title;
-  final String subtitle;
+  final String line1;
+  final String line2;
   final List<String> bullets;
-  final String buttonText;
+  final String cta;
   final _BannerAction action;
 
-  const _BannerSlide({
-    required this.title,
-    required this.subtitle,
-    required this.bullets,
-    required this.buttonText,
-    required this.action,
-  });
-}
-
-final List<_BannerSlide> _slides = const [
-  _BannerSlide(
-    title: 'كل ما تحتاجه',
-    subtitle: 'في مكان واحد',
-    bullets: [
-      'إعلانات مميزة',
-      'بيع وشراء محلي',
-      'انتشار واسع',
-    ],
-    buttonText: 'أضف إعلانك الآن',
-    action: _BannerAction.addListing,
-  ),
-  _BannerSlide(
-    title: 'بيع أسرع',
-    subtitle: 'بصور واضحة',
-    bullets: [
-      'صوّر بالكاميرا',
-      'حتى 6 صور',
-      'سعر واضح',
-    ],
-    buttonText: 'أضف إعلانك الآن',
-    action: _BannerAction.addListing,
-  ),
-  _BannerSlide(
-    title: 'تسوق بثقة',
-    subtitle: 'من أهل شبشة',
-    bullets: [
-      'عاين قبل الدفع',
-      'قابل البائع في مكان عام',
-    ],
-    buttonText: 'تصفح الأقسام',
-    action: _BannerAction.browseCategories,
-  ),
-  _BannerSlide(
-    title: 'ابحث بسهولة',
-    subtitle: 'عن أي شيء',
-    bullets: [
-      'أقسام منظمة',
-      'بحث سريع',
-      'الأحدث أولاً',
-    ],
-    buttonText: 'تصفح الأقسام',
-    action: _BannerAction.browseCategories,
-  ),
-];
-
-final PageController _bannerController = PageController();
-int _bannerIndex = 0;
-Timer? _bannerTimer;
-
-void _startBannerTimer() {
-  _bannerTimer?.cancel();
-
-  _bannerTimer = Timer.periodic(
-    const Duration(seconds: 5),
-    (_) {
-      if (!_bannerController.hasClients) return;
-
-      final nextPage = (_bannerIndex + 1) % _slides.length;
-
-      _bannerController.animateToPage(
-        nextPage,
-        duration: const Duration(milliseconds: 500),
-        curve: Curves.easeInOut,
-      );
-    },
+  const _BannerSlide(
+    this.line1,
+    this.line2,
+    this.bullets,
+    this.cta,
+    this.action,
   );
 }
 
-void _onBannerAction(_BannerAction action) {
-  switch (action) {
-    case _BannerAction.addListing:
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => const AddListingScreen(),
-        ),
-      );
-      break;
-
-    case _BannerAction.browseCategories:
-      // استخدم هنا نفس شاشة الأقسام الموجودة في مشروعك
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => const CategoriesScreen(),
-        ),
-      );
-      break;
-  }
-}
-
-Widget _buildBannerCarousel() {
-  return Column(
-    children: [
-      SizedBox(
-        height: 170,
-        child: PageView.builder(
-          controller: _bannerController,
-          itemCount: _slides.length,
-          onPageChanged: (index) {
-            setState(() {
-              _bannerIndex = index;
-            });
-          },
-          itemBuilder: (context, index) {
-            return _buildBannerSlide(_slides[index]);
-          },
-        ),
-      ),
-
-      const SizedBox(height: 8),
-
-      Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: List.generate(
-          _slides.length,
-          (index) {
-            final selected = index == _bannerIndex;
-
-            return AnimatedContainer(
-              duration: const Duration(milliseconds: 250),
-              margin: const EdgeInsets.symmetric(horizontal: 3),
-              width: selected ? 20 : 7,
-              height: 7,
-              decoration: BoxDecoration(
-                color: selected
-                    ? const Color(0xFF673AB7)
-                    : Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(10),
-              ),
-            );
-          },
-        ),
-      ),
-    ],
-  );
-}
-
-Widget _buildBannerSlide(_BannerSlide slide) {
-  return Container(
-    margin: const EdgeInsets.symmetric(horizontal: 16),
-    decoration: BoxDecoration(
-      borderRadius: BorderRadius.circular(24),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withOpacity(0.08),
-          blurRadius: 12,
-          offset: const Offset(0, 5),
-        ),
-      ],
-    ),
-    child: ClipRRect(
-      borderRadius: BorderRadius.circular(24),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final width = constraints.maxWidth;
-          final photoWidth = width * 0.48;
-
-          return Stack(
-            children: [
-              // الخلفية
-              Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.centerRight,
-                    end: Alignment.centerLeft,
-                    colors: [
-                      Color(0xFF4A148C),
-                      Color(0xFF7B1FA2),
-                      Color(0xFF9C27B0),
-                    ],
-                  ),
-                ),
-              ),
-
-              // الصورة
-              Positioned.fill(
-                child: Align(
-                  alignment: Alignment.centerRight,
-                  child: SizedBox(
-                    width: photoWidth,
-                    height: double.infinity,
-                    child: ClipPath(
-                      clipper: _PhotoClipper(),
-                      child: Image.asset(
-                        'assets/images/home_banner.jpg',
-                        fit: BoxFit.cover,
-                        alignment: Alignment.center,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-
-              // المحتوى
-              Positioned.fill(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    18,
-                    12,
-                    18,
-                    10,
-                  ),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: SizedBox(
-                      width: width * 0.66,
-                      child: Directionality(
-                        textDirection: TextDirection.rtl,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              slide.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 20,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-
-                            const SizedBox(height: 1),
-
-                            Text(
-                              slide.subtitle,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-
-                            const SizedBox(height: 5),
-
-                            ...slide.bullets.map(
-                              (bullet) => Padding(
-                                padding:
-                                    const EdgeInsets.only(bottom: 1),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(
-                                      Icons.check_circle,
-                                      size: 12,
-                                      color: Colors.white,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Flexible(
-                                      child: Text(
-                                        bullet,
-                                        maxLines: 1,
-                                        overflow:
-                                            TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 10.5,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-
-                            const SizedBox(height: 5),
-
-                            SizedBox(
-                              height: 28,
-                              child: ElevatedButton(
-                                onPressed: () =>
-                                    _onBannerAction(slide.action),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.white,
-                                  foregroundColor:
-                                      const Color(0xFF6A1B9A),
-                                  elevation: 0,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius:
-                                        BorderRadius.circular(20),
-                                  ),
-                                ),
-                                child: Text(
-                                  slide.buttonText,
-                                  style: const TextStyle(
-                                    fontSize: 10.5,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-
-              // الزخرفة
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: CustomPaint(
-                    painter: _SwooshPainter(),
-                  ),
-                ),
-              ),
-            ],
-          );
-        },
-      ),
-    ),
-  );
-}
-
-// ============================================================
-// Banner photo clipper
-// ============================================================
-
+// قص الصورة داخل البانر بحافة منحنية من جهة النص.
 class _PhotoClipper extends CustomClipper<Path> {
+  const _PhotoClipper();
+
   @override
   Path getClip(Size size) {
-    final w = size.width;
-    final h = size.height;
-
-    return Path()
-      ..moveTo(w * 0.34, 0)
-      ..lineTo(w, 0)
-      ..lineTo(w, h)
-      ..lineTo(w * 0.02, h)
-      ..cubicTo(
-        w * 0.40,
-        h * 0.86,
-        w * 0.02,
-        h * 0.42,
-        w * 0.34,
-        0,
-      )
-      ..close();
+    final path = Path();
+    path.moveTo(size.width * 0.25, 0);
+    path.quadraticBezierTo(
+      0,
+      size.height * 0.5,
+      size.width * 0.35,
+      size.height,
+    );
+    path.lineTo(size.width, size.height);
+    path.lineTo(size.width, 0);
+    path.close();
+    return path;
   }
 
   @override
-  bool shouldReclip(covariant CustomClipper<Path> oldClipper) {
-    return false;
-  }
+  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
 }
-
-// ============================================================
-// Banner decorative swoosh
-// ============================================================
 
 class _SwooshPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-
-    Path curve(double dx) {
-      return Path()
-        ..moveTo(w * 0.02 + dx, h)
-        ..cubicTo(
-          w * 0.40 + dx,
-          h * 0.86,
-          w * 0.02 + dx,
-          h * 0.42,
-          w * 0.34 + dx,
-          0,
-        );
-    }
-
-    // الخط البنفسجي
-    final purplePaint = Paint()
-      ..color = const Color(0xFF6A1B9A)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 14
-      ..strokeCap = StrokeCap.round;
-
-    canvas.drawPath(curve(0), purplePaint);
-
-    // الخط الذهبي
-    final goldPaint = Paint()
-      ..shader = const LinearGradient(
-        colors: [
-          Color(0xFFFFB300),
-          Color(0xFFFFD54F),
-        ],
-      ).createShader(
-        Rect.fromLTWH(0, 0, w, h),
-      )
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 8
-      ..strokeCap = StrokeCap.round;
-
-    canvas.drawPath(curve(3), goldPaint);
-
-    // اللمسة البيضاء
-    final whitePaint = Paint()
-      ..color = Colors.white.withOpacity(0.9)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.6;
-
-    canvas.drawPath(curve(5), whitePaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) {
-    return false;
-  }
-}
+  const _SwooshPainter();
 
   @override
   void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
+    final paint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.22)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.5;
 
-    Path curve(double dx) {
-      return Path()
-        ..moveTo(w * 0.02 + dx, h)
-        ..cubicTo(w * 0.40 + dx, h * 0.86, w * 0.02 + dx, h * 0.42,
-            w * 0.34 + dx, 0);
-    }
-
-    canvas.drawPath(
-      curve(-3),
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 14
-        ..strokeCap = StrokeCap.round
-        ..color = const Color(0xFF7A45DA).withValues(alpha: 0.55),
+    final path = Path();
+    path.moveTo(size.width * 0.23, 0);
+    path.quadraticBezierTo(
+      -2,
+      size.height * 0.5,
+      size.width * 0.33,
+      size.height,
     );
 
-    canvas.drawPath(
-      curve(-6),
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 8
-        ..strokeCap = StrokeCap.round
-        ..shader = const LinearGradient(
-          begin: Alignment.bottomCenter,
-          end: Alignment.topCenter,
-          colors: [Color(0xFFFF9F1C), Color(0xFFFFC93C)],
-        ).createShader(Offset.zero & size),
-    );
-
-    canvas.drawPath(
-      curve(-17),
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.6
-        ..color = Colors.white.withValues(alpha: 0.35),
-    );
+    canvas.drawPath(path, paint);
   }
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-// شرارات صغيرة حول زر "أضف إعلان".
 class _SparklesPainter extends CustomPainter {
   const _SparklesPainter();
 
