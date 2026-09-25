@@ -399,7 +399,7 @@ class HomeDrawer extends StatelessWidget {
     );
   }
 
-  Future<void> _closeAndRun(Future<void> Function() action) async {
+  Future<void> _closeAndRun(BuildContext context, Future<void> Function() action) async {
     Navigator.of(context).pop();
     await action();
   }
@@ -433,14 +433,14 @@ class HomeDrawer extends StatelessWidget {
                         : Icons.person_outline_rounded,
                     title: user == null ? 'تسجيل الدخول' : 'الملف الشخصي',
                     subtitle: user == null ? 'ادخل إلى حسابك' : 'إدارة حسابك',
-                    onTap: () => _closeAndRun(onProfile),
+                    onTap: () => _closeAndRun(context, onProfile),
                   ),
                   _buildItem(context,
                     icon: Icons.add_circle_outline_rounded,
                     title: 'إضافة إعلان',
                     subtitle: 'اعرض ما تريد بيعه في شبشة',
                     emphasized: true,
-                    onTap: () => _closeAndRun(onAddListing),
+                    onTap: () => _closeAndRun(context, onAddListing),
                   ),
                   if (isAdmin) ...[
                     _buildSectionTitle(
@@ -452,7 +452,7 @@ class HomeDrawer extends StatelessWidget {
                       title: 'لوحة تحكم الإدارة',
                       subtitle: 'إدارة ومراجعة الإعلانات',
                       emphasized: true,
-                      onTap: () => _closeAndRun(onAdminPanel),
+                      onTap: () => _closeAndRun(context, onAdminPanel),
                     ),
                   ],
                   _buildSectionTitle('الأقسام', Icons.grid_view_rounded),
@@ -530,7 +530,7 @@ class HomeDrawer extends StatelessWidget {
                       title: 'تسجيل الخروج',
                       subtitle: 'الخروج من الحساب الحالي',
                       isDestructive: true,
-                      onTap: () => _closeAndRun(onSignOut),
+                      onTap: () => _closeAndRun(context, onSignOut),
                     ),
                 ],
               ),
