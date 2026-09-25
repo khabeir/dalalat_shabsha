@@ -1,194 +1,255 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
-import 'home_decorative_painters.dart';
+
 import '../theme/app_colors.dart';
 
-class HomeBanner extends StatefulWidget {
+class HomeBanner extends StatelessWidget {
+  final VoidCallback onAddListing;
+  final VoidCallback onBrowseCategories;
+
   const HomeBanner({
     super.key,
     required this.onAddListing,
     required this.onBrowseCategories,
   });
 
-  final VoidCallback onAddListing;
-  final VoidCallback onBrowseCategories;
-
   @override
-  State<HomeBanner> createState() => _HomeBannerState();
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(
+        horizontal: 16,
+        vertical: 8,
+      ),
+      height: 172,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.brand.withValues(alpha: 0.16),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topRight,
+                end: Alignment.bottomLeft,
+                colors: isDark
+                    ? [
+                        AppColors.brandDark,
+                        AppColors.brandDark.withValues(alpha: 0.82),
+                      ]
+                    : [
+                        AppColors.brand,
+                        AppColors.brandDark,
+                      ],
+              ),
+            ),
+          ),
+
+          Positioned(
+            top: -45,
+            left: -30,
+            child: _DecorativeCircle(
+              size: 150,
+              opacity: 0.10,
+            ),
+          ),
+
+          Positioned(
+            bottom: -55,
+            right: -25,
+            child: _DecorativeCircle(
+              size: 160,
+              opacity: 0.09,
+            ),
+          ),
+
+          Positioned(
+            top: 18,
+            right: 18,
+            child: Icon(
+              Icons.storefront_rounded,
+              size: 58,
+              color: Colors.white.withValues(alpha: 0.16),
+            ),
+          ),
+
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              20,
+              18,
+              20,
+              16,
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment:
+                        CrossAxisAlignment.start,
+                    mainAxisAlignment:
+                        MainAxisAlignment.center,
+                    children: [
+                      const Text(
+                        'دلالة شبشة',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w900,
+                          height: 1.1,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'اعرض منتجك أو ابحث عما تحتاجه',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white.withValues(
+                            alpha: 0.92,
+                          ),
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w600,
+                          height: 1.35,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          _BannerButton(
+                            icon: Icons.add_rounded,
+                            label: 'أضف إعلانك',
+                            onTap: onAddListing,
+                          ),
+                          const SizedBox(width: 8),
+                          _BannerButton(
+                            icon: Icons.grid_view_rounded,
+                            label: 'التصنيفات',
+                            outlined: true,
+                            onTap: onBrowseCategories,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const SizedBox(
+                  width: 76,
+                  child: Icon(
+                    Icons.shopping_bag_rounded,
+                    size: 72,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-enum _BannerAction { addListing, browseCategories }
+class _BannerButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool outlined;
 
-class _BannerSlide {
-  const _BannerSlide(
-    this.line1,
-    this.line2,
-    this.bullets,
-    this.cta,
-    this.action,
-  );
-
-  final String line1;
-  final String line2;
-  final List<String> bullets;
-  final String cta;
-  final _BannerAction action;
-}
-
-class _HomeBannerState extends State<HomeBanner> {
-  static const _asset = 'assets/images/home_banner.jpg';
-  static const _slides = <_BannerSlide>[
-    _BannerSlide('كل ما تحتاجه', 'في مكان واحد', ['إعلانات مميزة', 'بيع وشراء محلي', 'انتشار واسع'], 'أضف إعلانك الآن', _BannerAction.addListing),
-    _BannerSlide('بيع أسرع', 'بصور واضحة', ['صوّر بالكاميرا', 'حتى 6 صور', 'سعر واضح'], 'أضف إعلانك الآن', _BannerAction.addListing),
-    _BannerSlide('تسوق بثقة', 'من أهل شبشة', ['عاين قبل الدفع', 'قابل البائع في مكان عام'], 'تصفح الأقسام', _BannerAction.browseCategories),
-    _BannerSlide('ابحث بسهولة', 'عن أي شيء', ['أقسام منظمة', 'بحث سريع', 'الأحدث أولاً'], 'تصفح الأقسام', _BannerAction.browseCategories),
-  ];
-
-  final _controller = PageController();
-  int _index = 0;
-  Timer? _timer;
-
-  @override
-  void initState() {
-    super.initState();
-    _timer = Timer.periodic(const Duration(seconds: 5), (_) {
-      if (!mounted || !_controller.hasClients) return;
-      _controller.animateToPage(
-        (_index + 1) % _slides.length,
-        duration: const Duration(milliseconds: 500),
-        curve: Curves.easeInOut,
-      );
-    });
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _onAction(_BannerAction action) {
-    if (action == _BannerAction.addListing) {
-      widget.onAddListing();
-    } else {
-      widget.onBrowseCategories();
-    }
-  }
+  const _BannerButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.outlined = false,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        SizedBox(
-          height: 170,
-          child: PageView.builder(
-            controller: _controller,
-            itemCount: _slides.length,
-            onPageChanged: (index) => setState(() => _index = index),
-            itemBuilder: (context, index) => Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: _buildSlide(_slides[index]),
-            ),
+    return Material(
+      color: outlined
+          ? Colors.white.withValues(alpha: 0.12)
+          : Colors.white,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          constraints: const BoxConstraints(
+            minHeight: 38,
           ),
-        ),
-        const SizedBox(height: 10),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: List.generate(_slides.length, (index) {
-            final active = index == _index;
-            return AnimatedContainer(
-              duration: const Duration(milliseconds: 250),
-              margin: const EdgeInsets.symmetric(horizontal: 3),
-              width: active ? 20 : 7,
-              height: 7,
-              decoration: BoxDecoration(
-                color: active ? AppColors.brand : AppColors.brand.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(4),
-              ),
-            );
-          }),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSlide(_BannerSlide slide) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(24),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final photoWidth = constraints.maxWidth * 0.48;
-          return Stack(
+          padding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 7,
+          ),
+          decoration: outlined
+              ? BoxDecoration(
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: Colors.white.withValues(
+                      alpha: 0.55,
+                    ),
+                  ),
+                )
+              : null,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              const Positioned.fill(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.centerRight, end: Alignment.centerLeft,
-                      colors: [AppColors.brandDark, AppColors.brand, Color(0xFF7A45DA)],
-                    ),
-                  ),
-                ),
+              Icon(
+                icon,
+                size: 18,
+                color: outlined
+                    ? Colors.white
+                    : AppColors.brandDark,
               ),
-              Positioned(
-                right: 0, top: 0, bottom: 0, width: photoWidth,
-                child: ClipPath(
-                  clipper: const HomePhotoClipper(),
-                  child: Image.asset(
-                    _asset, fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
-                      color: Colors.white24,
-                      child: const Icon(Icons.directions_car, color: Colors.white, size: 48),
-                    ),
-                  ),
-                ),
-              ),
-              Positioned(
-                right: 0, top: 0, bottom: 0, width: photoWidth,
-                child: const IgnorePointer(child: CustomPaint(painter: HomeSwooshPainter())),
-              ),
-              Positioned(
-                left: 16, top: 12, bottom: 12, right: photoWidth - 10,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(slide.line1, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900, height: 1.1)),
-                    Text(slide.line2, style: const TextStyle(color: AppColors.gold, fontSize: 20, fontWeight: FontWeight.w900, height: 1.1)),
-                    const SizedBox(height: 6),
-                    ...slide.bullets.map((bullet) => Padding(
-                      padding: const EdgeInsets.only(bottom: 2),
-                      child: Row(mainAxisSize: MainAxisSize.min, children: [
-                        Container(width: 5, height: 5, decoration: const BoxDecoration(color: AppColors.gold, shape: BoxShape.circle)),
-                        const SizedBox(width: 5),
-                        Text(bullet, style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w600)),
-                      ]),
-                    )),
-                    const SizedBox(height: 8),
-                    GestureDetector(
-                      onTap: () => _onAction(slide.action),
-                      child: Container(
-                        height: 34,
-                        padding: const EdgeInsets.symmetric(horizontal: 14),
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(colors: [Color(0xFFFFB02E), Color(0xFFFF8A00)]),
-                          borderRadius: BorderRadius.circular(18),
-                          boxShadow: [BoxShadow(color: AppColors.orange.withValues(alpha: 0.35), blurRadius: 8, offset: const Offset(0, 3))],
-                        ),
-                        child: Row(mainAxisSize: MainAxisSize.min, children: [
-                          Icon(slide.action == _BannerAction.addListing ? Icons.add_circle_outline_rounded : Icons.grid_view_rounded, color: Colors.white, size: 16),
-                          const SizedBox(width: 5),
-                          Text(slide.cta, style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w800)),
-                        ]),
-                      ),
-                    ),
-                  ],
+              const SizedBox(width: 5),
+              Text(
+                label,
+                style: TextStyle(
+                  color: outlined
+                      ? Colors.white
+                      : AppColors.brandDark,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
             ],
-          );
-        },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DecorativeCircle extends StatelessWidget {
+  final double size;
+  final double opacity;
+
+  const _DecorativeCircle({
+    required this.size,
+    required this.opacity,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.white.withValues(
+          alpha: opacity,
+        ),
       ),
     );
   }
