@@ -26,6 +26,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart' show NumberFormat;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../core/widgets/home_bottom_navigation.dart';
 import '../core/widgets/categories_section.dart';
 import '../core/widgets/listing_section.dart';
 import '../core/theme/app_colors.dart';
@@ -1737,282 +1738,6 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   // =========================
-  // شريط التنقل السفلي العائم
-  // =========================
-  Widget _buildBottomNavigation() {
-    final colorScheme =
-        Theme.of(context).colorScheme;
-
-    Widget navItem({
-      required IconData icon,
-      required String label,
-      required VoidCallback onTap,
-      bool selected = false,
-    }) {
-      final color = selected
-          ? AppColors.brand
-          : colorScheme.onSurfaceVariant;
-
-      return Expanded(
-        child: InkWell(
-          borderRadius:
-              BorderRadius.circular(24),
-          onTap: onTap,
-          child: Column(
-            mainAxisAlignment:
-                MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                size: 26,
-                color: color,
-              ),
-              const SizedBox(height: 3),
-              FittedBox(
-                fit:
-                    BoxFit.scaleDown,
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: selected
-                        ? FontWeight.w800
-                        : FontWeight.w600,
-                    color: color,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 4),
-              selected
-                  ? Container(
-                      width: 30,
-                      height: 3,
-                      decoration:
-                          BoxDecoration(
-                        color:
-                            AppColors.brand,
-                        borderRadius:
-                            BorderRadius.circular(
-                          2,
-                        ),
-                      ),
-                    )
-                  : const SizedBox(
-                      height: 3,
-                    ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return SafeArea(
-      top: false,
-      child: SizedBox(
-        height: 104,
-        child: Stack(
-          clipBehavior:
-              Clip.none,
-          children: [
-            Positioned(
-              left: 14,
-              right: 14,
-              bottom: 8,
-              height: 68,
-              child: Container(
-                decoration:
-                    BoxDecoration(
-                  color: _cardColor,
-                  borderRadius:
-                      BorderRadius.circular(
-                    30,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors
-                          .brand
-                          .withValues(
-                        alpha: 0.20,
-                      ),
-                      blurRadius: 24,
-                      offset:
-                          const Offset(
-                        0,
-                        8,
-                      ),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  textDirection:
-                      TextDirection.rtl,
-                  children: [
-                    navItem(
-                      icon: Icons
-                          .home_rounded,
-                      label: 'الرئيسية',
-                      selected: true,
-                      onTap:
-                          _clearFilters,
-                    ),
-                    navItem(
-                      icon: Icons
-                          .list_alt_rounded,
-                      label: 'إعلاناتي',
-                      onTap:
-                          _openMyListings,
-                    ),
-                    Expanded(
-                      child:
-                          GestureDetector(
-                        behavior:
-                            HitTestBehavior
-                                .opaque,
-                        onTap:
-                            _openAddListing,
-                        child: const Align(
-                          alignment:
-                              Alignment
-                                  .bottomCenter,
-                          child:
-                              Padding(
-                            padding:
-                                EdgeInsets.only(
-                              bottom: 9,
-                            ),
-                            child: Text(
-                              'أضف إعلان',
-                              style:
-                                  TextStyle(
-                                fontSize:
-                                    11.5,
-                                fontWeight:
-                                    FontWeight
-                                        .w800,
-                                color:
-                                    AppColors
-                                        .brand,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    navItem(
-                      icon: Icons
-                          .favorite_border_rounded,
-                      label: 'المفضلة',
-                      onTap:
-                          _openFavorites,
-                    ),
-                    navItem(
-                      icon: Icons
-                          .person_outline_rounded,
-                      label:
-                          'الملف الشخصي',
-                      onTap:
-                          _openProfile,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            Positioned(
-              top: 6,
-              left: 0,
-              right: 0,
-              child: Center(
-                child:
-                    GestureDetector(
-                  onTap:
-                      _openAddListing,
-                  child: SizedBox(
-                    width: 84,
-                    height: 66,
-                    child: Stack(
-                      alignment:
-                          Alignment.center,
-                      clipBehavior:
-                          Clip.none,
-                      children: [
-                        const CustomPaint(
-                          size: Size(
-                            84,
-                            66,
-                          ),
-                          painter:
-                              HomeSparklesPainter(),
-                        ),
-                        Container(
-                          width: 60,
-                          height: 60,
-                          decoration:
-                              BoxDecoration(
-                            shape:
-                                BoxShape.circle,
-                            gradient:
-                                const LinearGradient(
-                              begin:
-                                  Alignment
-                                      .topLeft,
-                              end:
-                                  Alignment
-                                      .bottomRight,
-                              colors: [
-                                Color(
-                                  0xFF8A5CE6,
-                                ),
-                                AppColors
-                                    .brand,
-                              ],
-                            ),
-                            border:
-                                Border.all(
-                              color:
-                                  Colors.white,
-                              width: 3,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppColors
-                                    .brand
-                                    .withValues(
-                                  alpha:
-                                      0.40,
-                                ),
-                                blurRadius:
-                                    14,
-                                offset:
-                                    const Offset(
-                                  0,
-                                  6,
-                                ),
-                              ),
-                            ],
-                          ),
-                          child:
-                              const Icon(
-                            Icons
-                                .add_rounded,
-                            size: 36,
-                            color:
-                                Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // =========================
   // البناء
   // =========================
   @override
@@ -2102,7 +1827,15 @@ class _HomeScreenState extends State<HomeScreen>
               topPadding,
             ),
             bottomNavigationBar:
-                _buildBottomNavigation(),
+    HomeBottomNavigation(
+  isDark: _isDark,
+  cardColor: _cardColor,
+  onHome: _clearFilters,
+  onMyListings: _openMyListings,
+  onAddListing: _openAddListing,
+  onFavorites: _openFavorites,
+  onProfile: _openProfile,
+),
           ),
         ),
       ),
