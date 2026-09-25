@@ -237,6 +237,19 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
+void _scrollToCategories() {
+  final context = _categoriesKey.currentContext;
+
+  if (context == null) return;
+
+  Scrollable.ensureVisible(
+    context,
+    duration: const Duration(milliseconds: 500),
+    curve: Curves.easeInOut,
+    alignment: 0.08,
+  );
+}
+
   void _showSnack(String message) {
     if (!mounted) return;
 
