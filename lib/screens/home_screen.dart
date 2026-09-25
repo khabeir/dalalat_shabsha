@@ -26,6 +26,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart' show NumberFormat;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../core/widgets/categories_section.dart';
 import '../core/widgets/listing_section.dart';
 import '../core/theme/app_colors.dart';
 import '../core/widgets/home_banner.dart';
@@ -1333,238 +1334,6 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   // =========================
-  // عناوين الأقسام
-  // =========================
-  Widget _sectionHeader(
-    String title, {
-    IconData? icon,
-    Color? iconColor,
-    VoidCallback? onViewAll,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
-        children: [
-          if (icon != null) ...[
-            Icon(icon, size: 24, color: iconColor ?? AppColors.brand),
-            const SizedBox(width: 8),
-          ],
-          Expanded(
-            child: Text(
-              title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 19,
-                fontWeight: FontWeight.w900,
-                color: _titleColor,
-              ),
-            ),
-          ),
-          if (onViewAll != null)
-            InkWell(
-              borderRadius: BorderRadius.circular(12),
-              onTap: onViewAll,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'عرض الكل',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: _isDark
-                            ? Theme.of(context).colorScheme.primary
-                            : AppColors.brand,
-                      ),
-                    ),
-                    Icon(
-                      Icons.chevron_left_rounded,
-                      size: 22,
-                      color: _isDark
-                          ? Theme.of(context).colorScheme.primary
-                          : AppColors.brand,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  // =========================
-  // الأقسام
-  // =========================
-  Widget _buildCategoryTile(
-    Map<String, dynamic> category,
-    int index, {
-    required bool selected,
-    required VoidCallback onTap,
-  }) {
-    final name = category['name']?.toString() ?? 'بدون اسم';
-    final tone = _toneFor(name, index);
-
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-        decoration: BoxDecoration(
-          color: _isDark ? tone.fg.withValues(alpha: 0.16) : tone.bg,
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(
-            color: selected ? tone.fg : Colors.transparent,
-            width: 2,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: tone.fg.withValues(alpha: selected ? 0.28 : 0.12),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(_filledCategoryIcon(name), size: 34, color: tone.fg),
-            const SizedBox(height: 8),
-            Text(
-              name,
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 12,
-                height: 1.2,
-                fontWeight: FontWeight.w700,
-                color: _titleColor,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCategoriesSection() {
-    return Column(
-      key: _categoriesKey,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _sectionHeader(
-          'الأقسام',
-          icon: Icons.grid_view_rounded,
-          onViewAll: _categories.isEmpty ? null : _showAllCategories,
-        ),
-
-        const SizedBox(height: 10),
-
-        if (_categories.isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 14),
-            child: Center(child: Text('لا توجد أقسام متاحة حالياً')),
-          )
-        else
-          SizedBox(
-            height: 118,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: _categories.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 10),
-              itemBuilder: (context, index) {
-                final category = _categories[index];
-                final categoryId = category['id'] as int?;
-                final selected = _selectedCategoryId == categoryId;
-
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 14),
-                  child: SizedBox(
-                    width: 88,
-                    child: _buildCategoryTile(
-                      category,
-                      index,
-                      selected: selected,
-                      onTap: () {
-                        if (categoryId == null) return;
-
-                        _selectCategory(selected ? null : categoryId);
-                      },
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-      ],
-    );
-  }
-
-  // كل الأقسام في نافذة سفلية.
-  void _showAllCategories() {
-    showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (sheetContext) {
-        return Directionality(
-          textDirection: TextDirection.rtl,
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    'كل الأقسام',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
-                  ),
-                  const SizedBox(height: 14),
-                  Flexible(
-                    child: GridView.builder(
-                      shrinkWrap: true,
-                      itemCount: _categories.length,
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 3,
-                        mainAxisSpacing: 12,
-                        crossAxisSpacing: 12,
-                        childAspectRatio: 1.05,
-                      ),
-                      itemBuilder: (context, index) {
-                        final category = _categories[index];
-                        final categoryId = category['id'] as int?;
-
-                        return _buildCategoryTile(
-                          category,
-                          index,
-                          selected: _selectedCategoryId == categoryId,
-                          onTap: () {
-                            Navigator.pop(sheetContext);
-
-                            if (categoryId != null) {
-                              _selectCategory(categoryId, clearSearch: true);
-                            }
-                          },
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  // =========================
   // بطاقة الإعلان
   // =========================
   Widget _buildListingCard(
@@ -1771,7 +1540,32 @@ class _HomeScreenState extends State<HomeScreen>
             const SizedBox(height: 16),
           ],
 
-          _buildCategoriesSection(),
+          CategoriesSection(
+  sectionKey: _categoriesKey,
+  categories: _categories,
+  selectedCategoryId: _selectedCategoryId,
+  isDark: _isDark,
+  titleColor: _titleColor,
+  categoryIcon: _filledCategoryIcon,
+  categoryColor: (name, index) {
+    return _toneFor(name, index).fg;
+  },
+  onViewAll: _categories.isEmpty
+      ? null
+      : () {
+          // سيتم فتح نافذة كل الأقسام من داخل CategoriesSection.
+        },
+  onSelectCategory: (categoryId) {
+    if (categoryId < 0) {
+      _selectCategory(null);
+    } else {
+      _selectCategory(
+        categoryId,
+        clearSearch: true,
+      );
+    }
+  },
+),
 
           const SizedBox(height: 8),
 
