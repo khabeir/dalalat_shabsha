@@ -17,60 +17,39 @@ class SupportContactCard extends StatelessWidget {
     this.phoneNumber = '',
   });
 
-  Future<void> _openWhatsApp(BuildContext context) async {
+  Future<void> _openWhatsApp() async {
     final number = whatsappNumber.replaceAll(RegExp(r'[^0-9]'), '');
 
-    if (number.isEmpty) {
-      _message(context, 'Ù„Ù… ÙŠØªÙ… Ø¥Ø¹Ø¯Ø§Ø¯ Ø±Ù‚Ù… ÙˆØ§ØªØ³Ø§Ø¨ Ø§Ù„Ø¯Ø¹Ù… Ø¨Ø¹Ø¯.');
-      return;
-    }
+    if (number.isEmpty) return;
 
     final uri = Uri.parse('https://wa.me/$number');
 
     try {
-      if (!await launchUrl(
+      await launchUrl(
         uri,
         mode: LaunchMode.externalApplication,
-      )) {
-        _message(context, 'ØªØ¹Ø°Ø± ÙØªØ­ ÙˆØ§ØªØ³Ø§Ø¨.');
-      }
+      );
     } catch (_) {
-      _message(context, 'ØªØ¹Ø°Ø± ÙØªØ­ ÙˆØ§ØªØ³Ø§Ø¨.');
+      // áÇ ÍÇÌÉ áÅÙåÇÑ ÑÓÇáÉ åäÇ.
+      // İÔá İÊÍ æÇÊÓÇÈ áÇ íÄËÑ Úáì ÇáÊØÈíŞ.
     }
   }
 
-  Future<void> _call(BuildContext context) async {
-    if (phoneNumber.trim().isEmpty) {
-      _message(context, 'Ù„Ù… ÙŠØªÙ… Ø¥Ø¹Ø¯Ø§Ø¯ Ø±Ù‚Ù… Ù‡Ø§ØªÙ Ø§Ù„Ø¯Ø¹Ù… Ø¨Ø¹Ø¯.');
-      return;
-    }
+  Future<void> _call() async {
+    final phone = phoneNumber.trim();
+
+    if (phone.isEmpty) return;
 
     final uri = Uri(
       scheme: 'tel',
-      path: phoneNumber.trim(),
+      path: phone,
     );
 
     try {
-      if (!await launchUrl(uri)) {
-        _message(context, 'ØªØ¹Ø°Ø± ÙØªØ­ ØªØ·Ø¨ÙŠÙ‚ Ø§Ù„Ø§ØªØµØ§Ù„.');
-      }
+      await launchUrl(uri);
     } catch (_) {
-      _message(context, 'ØªØ¹Ø°Ø± Ø¥Ø¬Ø±Ø§Ø¡ Ø§Ù„Ø§ØªØµØ§Ù„.');
+      // áÇ ÍÇÌÉ áÅÙåÇÑ ÑÓÇáÉ åäÇ.
     }
-  }
-
-  void _message(BuildContext context, String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(
-            message,
-            textDirection: TextDirection.rtl,
-          ),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
   }
 
   @override
@@ -105,6 +84,9 @@ class SupportContactCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // ======================================================
+          // ÑÃÓ ÈØÇŞÉ ÇáÏÚã
+          // ======================================================
           Row(
             children: [
               Container(
@@ -113,6 +95,13 @@ class SupportContactCard extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: Brand.primary,
                   borderRadius: BorderRadius.circular(17),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Brand.primary.withValues(alpha: 0.20),
+                      blurRadius: 12,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
                 ),
                 child: const Icon(
                   Icons.support_agent_rounded,
@@ -120,7 +109,9 @@ class SupportContactCard extends StatelessWidget {
                   size: 29,
                 ),
               ),
+
               const SizedBox(width: 13),
+
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -131,14 +122,18 @@ class SupportContactCard extends StatelessWidget {
                         color: Brand.ink,
                         fontSize: 15.5,
                         fontWeight: FontWeight.w900,
+                        height: 1.3,
                       ),
                     ),
+
                     const SizedBox(height: 4),
+
                     Text(
                       subtitle,
                       style: TextStyle(
                         color: Brand.ink.withValues(alpha: 0.62),
                         fontSize: 12.5,
+                        fontWeight: FontWeight.w500,
                         height: 1.5,
                       ),
                     ),
@@ -150,6 +145,9 @@ class SupportContactCard extends StatelessWidget {
 
           const SizedBox(height: 16),
 
+          // ======================================================
+          // ÇáİÇÕá
+          // ======================================================
           Container(
             height: 1,
             color: Brand.primary.withValues(alpha: 0.08),
@@ -157,15 +155,18 @@ class SupportContactCard extends StatelessWidget {
 
           const SizedBox(height: 15),
 
+          // ======================================================
+          // ÃÒÑÇÑ ÇáÊæÇÕá
+          // ======================================================
           Row(
             children: [
               if (hasWhatsApp)
                 Expanded(
                   child: _SupportButton(
                     icon: Icons.chat_rounded,
-                    label: 'ÙˆØ§ØªØ³Ø§Ø¨',
+                    label: 'æÇÊÓÇÈ',
                     filled: true,
-                    onTap: () => _openWhatsApp(context),
+                    onTap: _openWhatsApp,
                   ),
                 ),
 
@@ -176,18 +177,35 @@ class SupportContactCard extends StatelessWidget {
                 Expanded(
                   child: _SupportButton(
                     icon: Icons.phone_rounded,
-                    label: 'Ø§ØªØµØ§Ù„',
+                    label: 'ÇÊÕÇá',
                     filled: false,
-                    onTap: () => _call(context),
+                    onTap: _call,
                   ),
                 ),
             ],
           ),
+
+          // ======================================================
+          // áÇ ÊæÌÏ ÃÑŞÇã
+          // ======================================================
+          if (!hasWhatsApp && !hasPhone)
+            Text(
+              'ÓíÊã ÊæİíÑ æÓÇÆá ÇáÊæÇÕá ãÚ ÇáÏÚã ŞÑíÈÇğ.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Brand.ink.withValues(alpha: 0.55),
+                fontSize: 12,
+              ),
+            ),
         ],
       ),
     );
   }
 }
+
+// ================================================================
+// ÒÑ ÇáÏÚã
+// ================================================================
 
 class _SupportButton extends StatelessWidget {
   final IconData icon;
