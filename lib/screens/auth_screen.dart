@@ -14,10 +14,32 @@ class AuthScreen extends StatefulWidget {
 }
 
 class _AuthScreenState extends State<AuthScreen> {
-  // ضع هنا رابط سياسة الخصوصية وشروط الاستخدام (تطلبها Google Play).
+  // ============================================================
+  // روابط التطبيق
+  // ============================================================
+
+  // ضع هنا رابط سياسة الخصوصية وشروط الاستخدام.
   // إن تركتها فارغة لا يظهر الرابط.
   static const _privacyPolicyUrl = '';
   static const _termsUrl = '';
+
+  // ============================================================
+  // بيانات الدعم
+  // ============================================================
+
+  // رقم واتساب بصيغة دولية بدون + أو مسافات.
+  // مثال:
+  // static const _supportWhatsAppNumber = '249912345678';
+  static const _supportWhatsAppNumber = '0914111214';
+
+  // رقم الاتصال.
+  // مثال:
+  // static const _supportPhoneNumber = '+249912345678';
+  static const _supportPhoneNumber = '0113339644';
+
+  // ============================================================
+  // النموذج
+  // ============================================================
 
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
@@ -45,12 +67,17 @@ class _AuthScreenState extends State<AuthScreen> {
   // ============================================================
   // أدوات مساعدة
   // ============================================================
+
   void _showMessage(String message) {
     if (!mounted) return;
 
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+        ),
+      );
   }
 
   // تحويل الأرقام العربية (٠١٢) إلى غربية (012).
@@ -69,20 +96,32 @@ class _AuthScreenState extends State<AuthScreen> {
 
   // ============================================================
   // تطبيع رقم الهاتف السوداني
-  // يقبل: 0912345678 و 912345678 و +249912345678 و 00249912345678
-  // strict: عند إنشاء حساب جديد نتأكد أن الرقم السوداني 9 أرقام بعد الرمز.
-  // عند الدخول نكون متساهلين حتى لا نمنع حسابات مسجلة سابقاً.
+  //
+  // يقبل:
+  // 0912345678
+  // 912345678
+  // +249912345678
+  // 00249912345678
+  //
+  // strict:
+  // عند إنشاء حساب جديد نتأكد أن الرقم السوداني
+  // يحتوي على 9 أرقام بعد 249.
   // ============================================================
-  String? _normalizePhone(String value, {bool strict = false}) {
-    var phone =
-        _toWesternDigits(value).replaceAll(RegExp(r'[\s\-().]'), '').trim();
+
+  String? _normalizePhone(
+    String value, {
+    bool strict = false,
+  }) {
+    var phone = _toWesternDigits(value)
+        .replaceAll(RegExp(r'[\s\-().]'), '')
+        .trim();
 
     if (phone.isEmpty) return null;
 
     if (phone.startsWith('00')) {
       phone = '+${phone.substring(2)}';
     } else if (phone.startsWith('+')) {
-      // كما هو
+      // كما هو.
     } else if (phone.startsWith('0')) {
       phone = '+249${phone.substring(1)}';
     } else if (phone.startsWith('249')) {
@@ -95,7 +134,9 @@ class _AuthScreenState extends State<AuthScreen> {
 
     final digits = phone.substring(1);
 
-    if (!RegExp(r'^\d{8,15}$').hasMatch(digits)) return null;
+    if (!RegExp(r'^\d{8,15}$').hasMatch(digits)) {
+      return null;
+    }
 
     if (strict && phone.startsWith('+249') && digits.length != 12) {
       return null;
@@ -105,29 +146,43 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   bool _isValidEmail(String value) {
-    return RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(value.trim());
+    return RegExp(
+      r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
+    ).hasMatch(value.trim());
   }
 
   String? _validateIdentifier(String? value) {
     final text = value?.trim() ?? '';
 
     if (text.isEmpty) {
-      return _usePhone ? 'أدخل رقم الهاتف' : 'أدخل البريد الإلكتروني';
+      return _usePhone
+          ? 'أدخل رقم الهاتف'
+          : 'أدخل البريد الإلكتروني';
     }
 
     if (_usePhone) {
-      return _normalizePhone(text, strict: !_isLogin) == null
+      return _normalizePhone(
+                text,
+                strict: !_isLogin,
+              ) ==
+              null
           ? 'أدخل رقم هاتف صحيح'
           : null;
     }
 
-    return _isValidEmail(text) ? null : 'أدخل بريداً إلكترونياً صحيحاً';
+    return _isValidEmail(text)
+        ? null
+        : 'أدخل بريداً إلكترونياً صحيحاً';
   }
 
   String? _validatePassword(String? value) {
-    if (value == null || value.isEmpty) return 'أدخل كلمة المرور';
+    if (value == null || value.isEmpty) {
+      return 'أدخل كلمة المرور';
+    }
 
-    if (value.length < 6) return 'كلمة المرور يجب أن تكون 6 أحرف على الأقل';
+    if (value.length < 6) {
+      return 'كلمة المرور يجب أن تكون 6 أحرف على الأقل';
+    }
 
     return null;
   }
@@ -135,15 +190,21 @@ class _AuthScreenState extends State<AuthScreen> {
   String? _validateName(String? value) {
     final text = value?.trim() ?? '';
 
-    if (text.isEmpty) return 'أدخل الاسم الكامل';
-    if (text.length < 2) return 'الاسم قصير جداً';
+    if (text.isEmpty) {
+      return 'أدخل الاسم الكامل';
+    }
+
+    if (text.length < 2) {
+      return 'الاسم قصير جداً';
+    }
 
     return null;
   }
 
   // ============================================================
-  // تبديل الوضع مع الاحتفاظ بالبريد/الهاتف المكتوب
+  // تبديل الوضع
   // ============================================================
+
   void _setMode(bool isLogin) {
     if (_loading || isLogin == _isLogin) return;
 
@@ -173,17 +234,22 @@ class _AuthScreenState extends State<AuthScreen> {
   // ============================================================
   // الإرسال
   // ============================================================
+
   Future<void> _submit() async {
     if (_loading) return;
 
-    if (!(_formKey.currentState?.validate() ?? false)) return;
+    if (!(_formKey.currentState?.validate() ?? false)) {
+      return;
+    }
 
     FocusScope.of(context).unfocus();
 
     setState(() => _loading = true);
 
     try {
-      final signedIn = _isLogin ? await _login() : await _register();
+      final signedIn = _isLogin
+          ? await _login()
+          : await _register();
 
       if (signedIn && mounted) {
         // يحفظ مدير كلمات المرور في الهاتف بيانات الدخول.
@@ -196,11 +262,16 @@ class _AuthScreenState extends State<AuthScreen> {
 
       _showMessage(_errorMessage(e));
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _loading = false);
+      }
     }
   }
 
-  // يرجع true إذا تم تسجيل الدخول.
+  // ============================================================
+  // تسجيل الدخول
+  // ============================================================
+
   Future<bool> _login() async {
     final identifier = _identifierController.text.trim();
     final password = _passwordController.text;
@@ -247,17 +318,26 @@ class _AuthScreenState extends State<AuthScreen> {
     return true;
   }
 
+  // ============================================================
+  // إنشاء الحساب
+  // ============================================================
+
   Future<bool> _register() async {
     final identifier = _identifierController.text.trim();
     final password = _passwordController.text;
     final fullName = _nameController.text.trim();
 
-    // ---------- بالبريد ----------
+    // ------------------------------------------------------------
+    // بالبريد الإلكتروني
+    // ------------------------------------------------------------
+
     if (!_usePhone) {
       final response = await _supabase.auth.signUp(
         email: identifier.toLowerCase(),
         password: password,
-        data: {'full_name': fullName},
+        data: {
+          'full_name': fullName,
+        },
       );
 
       if (response.user == null) {
@@ -266,14 +346,16 @@ class _AuthScreenState extends State<AuthScreen> {
       }
 
       if (response.session != null) {
-        _showMessage('تم إنشاء الحساب وتسجيل الدخول بنجاح');
+        _showMessage(
+          'تم إنشاء الحساب وتسجيل الدخول بنجاح',
+        );
         return true;
       }
 
       // لا توجد جلسة: التأكيد عبر البريد مطلوب.
       _showMessage(
-        'تم إنشاء الحساب. أكّد بريدك الإلكتروني من الرسالة التي وصلتك، '
-        'ثم سجّل الدخول.',
+        'تم إنشاء الحساب. أكّد بريدك الإلكتروني من الرسالة '
+        'التي وصلتك، ثم سجّل الدخول.',
       );
 
       if (mounted) {
@@ -287,8 +369,14 @@ class _AuthScreenState extends State<AuthScreen> {
       return false;
     }
 
-    // ---------- بالهاتف ----------
-    final phone = _normalizePhone(identifier, strict: true);
+    // ------------------------------------------------------------
+    // بالهاتف
+    // ------------------------------------------------------------
+
+    final phone = _normalizePhone(
+      identifier,
+      strict: true,
+    );
 
     if (phone == null) {
       _showMessage('رقم الهاتف غير صحيح');
@@ -303,27 +391,35 @@ class _AuthScreenState extends State<AuthScreen> {
     );
 
     if (response['success'] != true) {
-      _showMessage(response['message']?.toString() ?? 'تعذر إنشاء الحساب');
+      _showMessage(
+        response['message']?.toString() ??
+            'تعذر إنشاء الحساب',
+      );
       return false;
     }
 
     final session = _readSession(response);
 
     if (session == null) {
-      _showMessage('تم إنشاء الحساب ولكن تعذر تسجيل الدخول');
+      _showMessage(
+        'تم إنشاء الحساب ولكن تعذر تسجيل الدخول',
+      );
       return false;
     }
 
     await _setSupabaseSession(session);
 
-    _showMessage('تم إنشاء الحساب وتسجيل الدخول بنجاح');
+    _showMessage(
+      'تم إنشاء الحساب وتسجيل الدخول بنجاح',
+    );
 
     return true;
   }
 
   // ============================================================
-  // Edge Function الخاصة بالهاتف (phone-auth)
+  // Edge Function الخاصة بالهاتف
   // ============================================================
+
   Future<Map<String, dynamic>> _phoneAuthRequest({
     required String action,
     required String phone,
@@ -336,28 +432,42 @@ class _AuthScreenState extends State<AuthScreen> {
         'action': action,
         'phone': phone,
         'password': password,
-        if (fullName.trim().isNotEmpty) 'full_name': fullName.trim(),
+        if (fullName.trim().isNotEmpty)
+          'full_name': fullName.trim(),
       },
     );
 
     final data = response.data;
 
-    if (data is Map) return Map<String, dynamic>.from(data);
+    if (data is Map) {
+      return Map<String, dynamic>.from(data);
+    }
 
-    throw Exception('استجابة غير صحيحة من خادم تسجيل الهاتف');
+    throw Exception(
+      'استجابة غير صحيحة من خادم تسجيل الهاتف',
+    );
   }
 
-  Map<String, dynamic>? _readSession(Map<String, dynamic> response) {
+  Map<String, dynamic>? _readSession(
+    Map<String, dynamic> response,
+  ) {
     final value = response['session'];
 
-    return value is Map ? Map<String, dynamic>.from(value) : null;
+    return value is Map
+        ? Map<String, dynamic>.from(value)
+        : null;
   }
 
-  Future<void> _setSupabaseSession(Map<String, dynamic> session) async {
-    final refreshToken = session['refresh_token']?.toString();
+  Future<void> _setSupabaseSession(
+    Map<String, dynamic> session,
+  ) async {
+    final refreshToken =
+        session['refresh_token']?.toString();
 
     if (refreshToken == null || refreshToken.isEmpty) {
-      throw Exception('بيانات جلسة تسجيل الدخول ناقصة');
+      throw Exception(
+        'بيانات جلسة تسجيل الدخول ناقصة',
+      );
     }
 
     await _supabase.auth.setSession(refreshToken);
@@ -366,8 +476,11 @@ class _AuthScreenState extends State<AuthScreen> {
   // ============================================================
   // رسائل الأخطاء
   // ============================================================
+
   bool _isNetworkError(Object error) {
-    if (error is AuthRetryableFetchException) return true;
+    if (error is AuthRetryableFetchException) {
+      return true;
+    }
 
     final text = error.toString().toLowerCase();
 
@@ -380,30 +493,42 @@ class _AuthScreenState extends State<AuthScreen> {
 
   String _errorMessage(Object error) {
     if (_isNetworkError(error)) {
-      return 'تعذر الاتصال بالإنترنت. تحقق من اتصالك وحاول مرة أخرى.';
+      return 'تعذر الاتصال بالإنترنت. '
+          'تحقق من اتصالك وحاول مرة أخرى.';
     }
 
-    if (error is AuthException) return _translateAuthError(error.message);
+    if (error is AuthException) {
+      return _translateAuthError(error.message);
+    }
 
-    if (error is FunctionException) return _extractFunctionError(error);
+    if (error is FunctionException) {
+      return _extractFunctionError(error);
+    }
 
-    if (error.toString().contains('رقم الهاتف أو كلمة المرور')) {
+    if (error.toString().contains(
+          'رقم الهاتف أو كلمة المرور',
+        )) {
       return 'رقم الهاتف أو كلمة المرور غير صحيحة';
     }
 
     return 'حدث خطأ غير متوقع. حاول مرة أخرى.';
   }
 
-  String _extractFunctionError(FunctionException error) {
+  String _extractFunctionError(
+    FunctionException error,
+  ) {
     final details = error.details;
 
     if (details is Map) {
       final message = details['message']?.toString();
 
-      if (message != null && message.isNotEmpty) return message;
+      if (message != null && message.isNotEmpty) {
+        return message;
+      }
     }
 
-    if (details != null && details.toString().contains('رقم الهاتف')) {
+    if (details != null &&
+        details.toString().contains('رقم الهاتف')) {
       return 'رقم الهاتف أو كلمة المرور غير صحيحة';
     }
 
@@ -431,7 +556,8 @@ class _AuthScreenState extends State<AuthScreen> {
       return 'هذا البريد الإلكتروني مسجل بالفعل';
     }
 
-    if (text.contains('email address') && text.contains('invalid')) {
+    if (text.contains('email address') &&
+        text.contains('invalid')) {
       return 'أدخل بريداً إلكترونياً صحيحاً';
     }
 
@@ -447,41 +573,54 @@ class _AuthScreenState extends State<AuthScreen> {
       return 'يرجى تأكيد البريد الإلكتروني أولاً';
     }
 
-    if (text.contains('too many requests') || text.contains('rate limit')) {
+    if (text.contains('too many requests') ||
+        text.contains('rate limit')) {
       return 'تم تجاوز عدد المحاولات. حاول مرة أخرى لاحقاً';
     }
 
-    // لا نعرض نصاً إنجليزياً خاماً للمستخدم.
     return 'تعذر إكمال العملية. حاول مرة أخرى.';
   }
 
   // ============================================================
   // الدعم والروابط
   // ============================================================
-  Future<void> _launch(Uri uri, String errorMessage) async {
+
+  Future<void> _launch(
+    Uri uri,
+    String errorMessage,
+  ) async {
     try {
       final launched = await launchUrl(
         uri,
         mode: LaunchMode.externalApplication,
       );
 
-      if (!launched) _showMessage(errorMessage);
+      if (!launched) {
+        _showMessage(errorMessage);
+      }
     } catch (_) {
       _showMessage(errorMessage);
     }
   }
 
   Future<void> _openLink(String url) {
-    return _launch(Uri.parse(url), 'تعذر فتح الرابط');
+    return _launch(
+      Uri.parse(url),
+      'تعذر فتح الرابط',
+    );
   }
 
   // ============================================================
-  // مكوّنات الواجهة
+  // الترويسة
   // ============================================================
+
   Widget _buildHeader() {
     return Column(
       children: [
-        const BrandWordmark(logoSize: 62, titleSize: 26),
+        const BrandWordmark(
+          logoSize: 62,
+          titleSize: 26,
+        ),
         const SizedBox(height: 10),
         Text(
           _isLogin
@@ -498,9 +637,13 @@ class _AuthScreenState extends State<AuthScreen> {
     );
   }
 
-  // مبدّل مقسّم بلون العلامة التجارية (بديل SegmentedButton الافتراضي).
+  // ============================================================
+  // المبدّل المقسّم
+  // ============================================================
+
   Widget _buildPillSwitch<T>({
-    required List<(T value, IconData? icon, String label)> options,
+    required List<
+        (T value, IconData? icon, String label)> options,
     required T selected,
     required ValueChanged<T> onChanged,
   }) {
@@ -515,17 +658,26 @@ class _AuthScreenState extends State<AuthScreen> {
           for (final option in options)
             Expanded(
               child: GestureDetector(
-                onTap: _loading ? null : () => onChanged(option.$1),
+                onTap: _loading
+                    ? null
+                    : () => onChanged(option.$1),
                 child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  padding: const EdgeInsets.symmetric(vertical: 11),
+                  duration:
+                      const Duration(milliseconds: 180),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 11,
+                  ),
                   decoration: BoxDecoration(
-                    color: option.$1 == selected ? Brand.primary : null,
-                    borderRadius: BorderRadius.circular(13),
+                    color: option.$1 == selected
+                        ? Brand.primary
+                        : null,
+                    borderRadius:
+                        BorderRadius.circular(13),
                     boxShadow: option.$1 == selected
                         ? [
                             BoxShadow(
-                              color: Brand.primary.withValues(alpha: 0.35),
+                              color: Brand.primary
+                                  .withValues(alpha: 0.35),
                               blurRadius: 10,
                               offset: const Offset(0, 4),
                             ),
@@ -533,7 +685,8 @@ class _AuthScreenState extends State<AuthScreen> {
                         : null,
                   ),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisAlignment:
+                        MainAxisAlignment.center,
                     children: [
                       if (option.$2 != null) ...[
                         Icon(
@@ -549,13 +702,15 @@ class _AuthScreenState extends State<AuthScreen> {
                         child: Text(
                           option.$3,
                           maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                          overflow:
+                              TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 13.5,
                             fontWeight: FontWeight.w800,
-                            color: option.$1 == selected
-                                ? Colors.white
-                                : Brand.ink,
+                            color:
+                                option.$1 == selected
+                                    ? Colors.white
+                                    : Brand.ink,
                           ),
                         ),
                       ),
@@ -572,8 +727,16 @@ class _AuthScreenState extends State<AuthScreen> {
   Widget _buildModeSwitch() {
     return _buildPillSwitch<bool>(
       options: const [
-        (true, null, 'تسجيل الدخول'),
-        (false, null, 'حساب جديد'),
+        (
+          true,
+          null,
+          'تسجيل الدخول',
+        ),
+        (
+          false,
+          null,
+          'حساب جديد',
+        ),
       ],
       selected: _isLogin,
       onChanged: _setMode,
@@ -583,15 +746,26 @@ class _AuthScreenState extends State<AuthScreen> {
   Widget _buildMethodSwitch() {
     return _buildPillSwitch<bool>(
       options: const [
-        (true, Icons.phone_outlined, 'رقم الهاتف'),
-        (false, Icons.email_outlined, 'البريد الإلكتروني'),
+        (
+          true,
+          Icons.phone_outlined,
+          'رقم الهاتف',
+        ),
+        (
+          false,
+          Icons.email_outlined,
+          'البريد الإلكتروني',
+        ),
       ],
       selected: _usePhone,
       onChanged: _setMethod,
     );
   }
 
-  // تنسيق موحّد لكل حقول النموذج: تعبئة بنفسجية فاتحة بلا حدود.
+  // ============================================================
+  // تنسيق حقول النموذج
+  // ============================================================
+
   InputDecoration _fieldDecoration({
     required String label,
     required IconData icon,
@@ -604,11 +778,18 @@ class _AuthScreenState extends State<AuthScreen> {
       hintText: hint,
       helperText: helper,
       helperMaxLines: 2,
-      prefixIcon: Icon(icon, color: Brand.primary, size: 22),
+      prefixIcon: Icon(
+        icon,
+        color: Brand.primary,
+        size: 22,
+      ),
       suffixIcon: suffixIcon,
       filled: true,
       fillColor: Brand.soft.withValues(alpha: 0.6),
-      contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 14),
+      contentPadding: const EdgeInsets.symmetric(
+        vertical: 16,
+        horizontal: 14,
+      ),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
         borderSide: BorderSide.none,
@@ -619,14 +800,23 @@ class _AuthScreenState extends State<AuthScreen> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: Brand.primary, width: 1.6),
+        borderSide: const BorderSide(
+          color: Brand.primary,
+          width: 1.6,
+        ),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide(color: Theme.of(context).colorScheme.error),
+        borderSide: BorderSide(
+          color: Theme.of(context).colorScheme.error,
+        ),
       ),
     );
   }
+
+  // ============================================================
+  // حقول النموذج
+  // ============================================================
 
   Widget _buildFields() {
     return Column(
@@ -637,8 +827,11 @@ class _AuthScreenState extends State<AuthScreen> {
             controller: _nameController,
             enabled: !_loading,
             textInputAction: TextInputAction.next,
-            textCapitalization: TextCapitalization.words,
-            autofillHints: const [AutofillHints.name],
+            textCapitalization:
+                TextCapitalization.words,
+            autofillHints: const [
+              AutofillHints.name,
+            ],
             decoration: _fieldDecoration(
               label: 'الاسم الكامل',
               icon: Icons.person_outline_rounded,
@@ -651,19 +844,30 @@ class _AuthScreenState extends State<AuthScreen> {
         TextFormField(
           controller: _identifierController,
           enabled: !_loading,
-          keyboardType:
-              _usePhone ? TextInputType.phone : TextInputType.emailAddress,
+          keyboardType: _usePhone
+              ? TextInputType.phone
+              : TextInputType.emailAddress,
           textInputAction: TextInputAction.next,
           autocorrect: false,
           autofillHints: [
-            _usePhone ? AutofillHints.telephoneNumber : AutofillHints.email,
+            _usePhone
+                ? AutofillHints.telephoneNumber
+                : AutofillHints.email,
           ],
           inputFormatters: _usePhone
-              ? [FilteringTextInputFormatter.allow(RegExp(r'[0-9٠-٩+\s\-]'))]
+              ? [
+                  FilteringTextInputFormatter.allow(
+                    RegExp(r'[0-9٠-٩+\s\-]'),
+                  ),
+                ]
               : null,
           decoration: _fieldDecoration(
-            label: _usePhone ? 'رقم الهاتف' : 'البريد الإلكتروني',
-            hint: _usePhone ? '0912345678' : 'example@email.com',
+            label: _usePhone
+                ? 'رقم الهاتف'
+                : 'البريد الإلكتروني',
+            hint: _usePhone
+                ? '0912345678'
+                : 'example@email.com',
             helper: _usePhone && !_isLogin
                 ? 'رقم سوداني، مثال: 0912345678'
                 : null,
@@ -680,19 +884,28 @@ class _AuthScreenState extends State<AuthScreen> {
           controller: _passwordController,
           enabled: !_loading,
           obscureText: _obscurePassword,
-          textInputAction:
-              _isLogin ? TextInputAction.done : TextInputAction.next,
+          textInputAction: _isLogin
+              ? TextInputAction.done
+              : TextInputAction.next,
           autofillHints: [
-            _isLogin ? AutofillHints.password : AutofillHints.newPassword,
+            _isLogin
+                ? AutofillHints.password
+                : AutofillHints.newPassword,
           ],
           decoration: _fieldDecoration(
             label: 'كلمة المرور',
             icon: Icons.lock_outline_rounded,
-            helper: _isLogin ? null : '6 أحرف على الأقل',
+            helper: _isLogin
+                ? null
+                : '6 أحرف على الأقل',
             suffixIcon: IconButton(
-              tooltip: _obscurePassword ? 'إظهار' : 'إخفاء',
+              tooltip:
+                  _obscurePassword ? 'إظهار' : 'إخفاء',
               onPressed: () {
-                setState(() => _obscurePassword = !_obscurePassword);
+                setState(
+                  () => _obscurePassword =
+                      !_obscurePassword,
+                );
               },
               icon: Icon(
                 _obscurePassword
@@ -704,7 +917,9 @@ class _AuthScreenState extends State<AuthScreen> {
           ),
           validator: _validatePassword,
           onFieldSubmitted: (_) {
-            if (_isLogin) _submit();
+            if (_isLogin) {
+              _submit();
+            }
           },
         ),
 
@@ -715,15 +930,20 @@ class _AuthScreenState extends State<AuthScreen> {
             enabled: !_loading,
             obscureText: _obscureConfirmPassword,
             textInputAction: TextInputAction.done,
-            autofillHints: const [AutofillHints.newPassword],
+            autofillHints: const [
+              AutofillHints.newPassword,
+            ],
             decoration: _fieldDecoration(
               label: 'تأكيد كلمة المرور',
               icon: Icons.lock_reset_rounded,
               suffixIcon: IconButton(
-                tooltip: _obscureConfirmPassword ? 'إظهار' : 'إخفاء',
+                tooltip: _obscureConfirmPassword
+                    ? 'إظهار'
+                    : 'إخفاء',
                 onPressed: () {
                   setState(() {
-                    _obscureConfirmPassword = !_obscureConfirmPassword;
+                    _obscureConfirmPassword =
+                        !_obscureConfirmPassword;
                   });
                 },
                 icon: Icon(
@@ -735,7 +955,9 @@ class _AuthScreenState extends State<AuthScreen> {
               ),
             ),
             validator: (value) {
-              if (value == null || value.isEmpty) return 'أكد كلمة المرور';
+              if (value == null || value.isEmpty) {
+                return 'أكد كلمة المرور';
+              }
 
               if (value != _passwordController.text) {
                 return 'كلمتا المرور غير متطابقتين';
@@ -750,22 +972,35 @@ class _AuthScreenState extends State<AuthScreen> {
     );
   }
 
+  // ============================================================
+  // زر التسجيل
+  // ============================================================
+
   Widget _buildSubmitButton() {
     return BrandGoldButton(
-      label: _isLogin ? 'تسجيل الدخول' : 'إنشاء الحساب',
+      label: _isLogin
+          ? 'تسجيل الدخول'
+          : 'إنشاء الحساب',
       icon: Icons.arrow_back_rounded,
       loading: _loading,
       onTap: _loading ? null : _submit,
     );
   }
 
+  // ============================================================
+  // الشروط والخصوصية
+  // ============================================================
+
   Widget _buildLegalNote() {
-    final hasLinks = _privacyPolicyUrl.isNotEmpty || _termsUrl.isNotEmpty;
+    final hasLinks =
+        _privacyPolicyUrl.isNotEmpty ||
+            _termsUrl.isNotEmpty;
 
     return Column(
       children: [
         Text(
-          'بإنشاء الحساب فإنك توافق على شروط الاستخدام وسياسة الخصوصية.',
+          'بإنشاء الحساب فإنك توافق على شروط الاستخدام '
+          'وسياسة الخصوصية.',
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 12.5,
@@ -780,12 +1015,17 @@ class _AuthScreenState extends State<AuthScreen> {
               if (_termsUrl.isNotEmpty)
                 TextButton(
                   onPressed: () => _openLink(_termsUrl),
-                  child: const Text('شروط الاستخدام'),
+                  child: const Text(
+                    'شروط الاستخدام',
+                  ),
                 ),
               if (_privacyPolicyUrl.isNotEmpty)
                 TextButton(
-                  onPressed: () => _openLink(_privacyPolicyUrl),
-                  child: const Text('سياسة الخصوصية'),
+                  onPressed: () =>
+                      _openLink(_privacyPolicyUrl),
+                  child: const Text(
+                    'سياسة الخصوصية',
+                  ),
                 ),
             ],
           ),
@@ -796,14 +1036,17 @@ class _AuthScreenState extends State<AuthScreen> {
   // ============================================================
   // البناء
   // ============================================================
+
   @override
   Widget build(BuildContext context) {
-    final topPadding = MediaQuery.of(context).padding.top;
+    final topPadding =
+        MediaQuery.of(context).padding.top;
 
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        backgroundColor:
+            Theme.of(context).scaffoldBackgroundColor,
         body: Stack(
           children: [
             // زر الرجوع فوق الترويسة مباشرة.
@@ -813,7 +1056,8 @@ class _AuthScreenState extends State<AuthScreen> {
               child: SafeArea(
                 bottom: false,
                 child: IconButton(
-                  onPressed: () => Navigator.maybePop(context),
+                  onPressed: () =>
+                      Navigator.maybePop(context),
                   icon: const Icon(
                     Icons.arrow_forward_rounded,
                     color: Colors.white,
@@ -827,31 +1071,58 @@ class _AuthScreenState extends State<AuthScreen> {
                   ScrollViewKeyboardDismissBehavior.onDrag,
               child: Column(
                 children: [
+                  // ------------------------------------------------
+                  // الترويسة
+                  // ------------------------------------------------
+
                   BrandHeaderBackground(
                     height: topPadding + 210,
                     child: Padding(
-                      padding: EdgeInsets.only(top: topPadding + 26),
+                      padding: EdgeInsets.only(
+                        top: topPadding + 26,
+                      ),
                       child: _buildHeader(),
                     ),
                   ),
 
-                  // بطاقة النموذج، ترتفع فوق حافة الترويسة المنحنية.
+                  // ------------------------------------------------
+                  // بطاقة تسجيل الدخول
+                  // ------------------------------------------------
+
                   Transform.translate(
                     offset: const Offset(0, -18),
                     child: Center(
                       child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 460),
+                        constraints:
+                            const BoxConstraints(
+                          maxWidth: 460,
+                        ),
                         child: Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 18),
-                          padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+                          margin:
+                              const EdgeInsets.symmetric(
+                            horizontal: 18,
+                          ),
+                          padding:
+                              const EdgeInsets.fromLTRB(
+                            20,
+                            24,
+                            20,
+                            24,
+                          ),
                           decoration: BoxDecoration(
-                            color: Theme.of(context).cardColor,
-                            borderRadius: BorderRadius.circular(28),
+                            color: Theme.of(context)
+                                .cardColor,
+                            borderRadius:
+                                BorderRadius.circular(28),
                             boxShadow: [
                               BoxShadow(
-                                color: Brand.primary.withValues(alpha: 0.14),
+                                color: Brand.primary
+                                    .withValues(
+                                  alpha: 0.14,
+                                ),
                                 blurRadius: 24,
-                                offset: const Offset(0, 10),
+                                offset:
+                                    const Offset(0, 10),
                               ),
                             ],
                           ),
@@ -859,7 +1130,9 @@ class _AuthScreenState extends State<AuthScreen> {
                             child: Form(
                               key: _formKey,
                               child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                crossAxisAlignment:
+                                    CrossAxisAlignment
+                                        .stretch,
                                 children: [
                                   _buildModeSwitch(),
 
@@ -876,7 +1149,9 @@ class _AuthScreenState extends State<AuthScreen> {
                                   _buildSubmitButton(),
 
                                   if (!_isLogin) ...[
-                                    const SizedBox(height: 12),
+                                    const SizedBox(
+                                      height: 12,
+                                    ),
                                     _buildLegalNote(),
                                   ],
                                 ],
@@ -888,18 +1163,35 @@ class _AuthScreenState extends State<AuthScreen> {
                     ),
                   ),
 
+                  // ------------------------------------------------
+                  // بطاقة الدعم
+                  // ------------------------------------------------
+
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(18, 0, 18, 24),
+                    padding:
+                        const EdgeInsets.fromLTRB(
+                      18,
+                      0,
+                      18,
+                      24,
+                    ),
                     child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 460),
+                      constraints:
+                          const BoxConstraints(
+                        maxWidth: 460,
+                      ),
                       child: const SupportContactCard(
-  title: 'تحتاج إلى مساعدة؟',
-  subtitle:
-      'تواصل معنا وسنساعدك في التسجيل أو إضافة إعلانك، '
-      'ويمكننا مساعدتك أيضاً إذا نسيت كلمة المرور.',
-  whatsappNumber: '249914111214',
-  phoneNumber: '+249113339644',
-),
+                        title:
+                            'لا تستطيع التسجيل أو إضافة إعلانك؟',
+                        subtitle:
+                            'تواصل معنا وسنساعدك، أو نضيف إعلانك '
+                            'بدلاً عنك. وإن نسيت كلمة المرور '
+                            'فنعيد تعيينها لك.',
+                        whatsappNumber:
+                            _supportWhatsAppNumber,
+                        phoneNumber:
+                            _supportPhoneNumber,
+                      ),
                     ),
                   ),
                 ],
