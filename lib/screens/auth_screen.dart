@@ -3,6 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'brand_theme.dart';
+import 'support_card.dart';
+
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
 
@@ -11,10 +14,6 @@ class AuthScreen extends StatefulWidget {
 }
 
 class _AuthScreenState extends State<AuthScreen> {
-  // بيانات الدعم.
-  static const _supportPhone = '0914111214';
-  static const _supportWhatsApp = '249914111214';
-
   // ضع هنا رابط سياسة الخصوصية وشروط الاستخدام (تطلبها Google Play).
   // إن تركتها فارغة لا يظهر الرابط.
   static const _privacyPolicyUrl = '';
@@ -472,20 +471,6 @@ class _AuthScreenState extends State<AuthScreen> {
     }
   }
 
-  Future<void> _callSupport() {
-    return _launch(
-      Uri(scheme: 'tel', path: _supportPhone),
-      'تعذر فتح تطبيق الاتصال',
-    );
-  }
-
-  Future<void> _openSupportWhatsApp() {
-    return _launch(
-      Uri.parse('https://wa.me/$_supportWhatsApp'),
-      'تعذر فتح WhatsApp',
-    );
-  }
-
   Future<void> _openLink(String url) {
     return _launch(Uri.parse(url), 'تعذر فتح الرابط');
   }
@@ -494,83 +479,151 @@ class _AuthScreenState extends State<AuthScreen> {
   // مكوّنات الواجهة
   // ============================================================
   Widget _buildHeader() {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return Column(
       children: [
-        Container(
-          width: 78,
-          height: 78,
-          decoration: BoxDecoration(
-            color: colorScheme.primaryContainer,
-            borderRadius: BorderRadius.circular(24),
-          ),
-          child: Icon(
-            Icons.storefront_rounded,
-            size: 42,
-            color: colorScheme.onPrimaryContainer,
-          ),
-        ),
-        const SizedBox(height: 14),
-        Text(
-          'دلالة شبشة',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.w900,
-            color: colorScheme.primary,
-          ),
-        ),
-        const SizedBox(height: 6),
+        const BrandWordmark(logoSize: 62, titleSize: 26),
+        const SizedBox(height: 10),
         Text(
           _isLogin
               ? 'مرحباً بك، سجّل الدخول للمتابعة'
               : 'أنشئ حسابك وابدأ البيع والشراء',
           textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 15,
-            color: colorScheme.onSurfaceVariant,
+          style: const TextStyle(
+            fontSize: 14.5,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
           ),
         ),
       ],
     );
   }
 
-  Widget _buildModeSwitch() {
-    return SizedBox(
-      width: double.infinity,
-      child: SegmentedButton<bool>(
-        segments: const [
-          ButtonSegment<bool>(value: true, label: Text('تسجيل الدخول')),
-          ButtonSegment<bool>(value: false, label: Text('حساب جديد')),
+  // مبدّل مقسّم بلون العلامة التجارية (بديل SegmentedButton الافتراضي).
+  Widget _buildPillSwitch<T>({
+    required List<(T value, IconData? icon, String label)> options,
+    required T selected,
+    required ValueChanged<T> onChanged,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: Brand.soft,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          for (final option in options)
+            Expanded(
+              child: GestureDetector(
+                onTap: _loading ? null : () => onChanged(option.$1),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  padding: const EdgeInsets.symmetric(vertical: 11),
+                  decoration: BoxDecoration(
+                    color: option.$1 == selected ? Brand.primary : null,
+                    borderRadius: BorderRadius.circular(13),
+                    boxShadow: option.$1 == selected
+                        ? [
+                            BoxShadow(
+                              color: Brand.primary.withValues(alpha: 0.35),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (option.$2 != null) ...[
+                        Icon(
+                          option.$2,
+                          size: 17,
+                          color: option.$1 == selected
+                              ? Colors.white
+                              : Brand.ink,
+                        ),
+                        const SizedBox(width: 6),
+                      ],
+                      Flexible(
+                        child: Text(
+                          option.$3,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w800,
+                            color: option.$1 == selected
+                                ? Colors.white
+                                : Brand.ink,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
         ],
-        selected: {_isLogin},
-        showSelectedIcon: false,
-        onSelectionChanged: _loading ? null : (value) => _setMode(value.first),
       ),
     );
   }
 
+  Widget _buildModeSwitch() {
+    return _buildPillSwitch<bool>(
+      options: const [
+        (true, null, 'تسجيل الدخول'),
+        (false, null, 'حساب جديد'),
+      ],
+      selected: _isLogin,
+      onChanged: _setMode,
+    );
+  }
+
   Widget _buildMethodSwitch() {
-    return SizedBox(
-      width: double.infinity,
-      child: SegmentedButton<bool>(
-        segments: const [
-          ButtonSegment<bool>(
-            value: true,
-            icon: Icon(Icons.phone_outlined),
-            label: Text('رقم الهاتف'),
-          ),
-          ButtonSegment<bool>(
-            value: false,
-            icon: Icon(Icons.email_outlined),
-            label: Text('البريد الإلكتروني'),
-          ),
-        ],
-        selected: {_usePhone},
-        showSelectedIcon: false,
-        onSelectionChanged:
-            _loading ? null : (value) => _setMethod(value.first),
+    return _buildPillSwitch<bool>(
+      options: const [
+        (true, Icons.phone_outlined, 'رقم الهاتف'),
+        (false, Icons.email_outlined, 'البريد الإلكتروني'),
+      ],
+      selected: _usePhone,
+      onChanged: _setMethod,
+    );
+  }
+
+  // تنسيق موحّد لكل حقول النموذج: تعبئة بنفسجية فاتحة بلا حدود.
+  InputDecoration _fieldDecoration({
+    required String label,
+    required IconData icon,
+    String? hint,
+    String? helper,
+    Widget? suffixIcon,
+  }) {
+    return InputDecoration(
+      labelText: label,
+      hintText: hint,
+      helperText: helper,
+      helperMaxLines: 2,
+      prefixIcon: Icon(icon, color: Brand.primary, size: 22),
+      suffixIcon: suffixIcon,
+      filled: true,
+      fillColor: Brand.soft.withValues(alpha: 0.6),
+      contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 14),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide.none,
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide.none,
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: Brand.primary, width: 1.6),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide(color: Theme.of(context).colorScheme.error),
       ),
     );
   }
@@ -586,10 +639,9 @@ class _AuthScreenState extends State<AuthScreen> {
             textInputAction: TextInputAction.next,
             textCapitalization: TextCapitalization.words,
             autofillHints: const [AutofillHints.name],
-            decoration: const InputDecoration(
-              labelText: 'الاسم الكامل',
-              prefixIcon: Icon(Icons.person_outline),
-              border: OutlineInputBorder(),
+            decoration: _fieldDecoration(
+              label: 'الاسم الكامل',
+              icon: Icons.person_outline_rounded,
             ),
             validator: _validateName,
           ),
@@ -609,16 +661,15 @@ class _AuthScreenState extends State<AuthScreen> {
           inputFormatters: _usePhone
               ? [FilteringTextInputFormatter.allow(RegExp(r'[0-9٠-٩+\s\-]'))]
               : null,
-          decoration: InputDecoration(
-            labelText: _usePhone ? 'رقم الهاتف' : 'البريد الإلكتروني',
-            hintText: _usePhone ? '0912345678' : 'example@email.com',
-            helperText: _usePhone && !_isLogin
+          decoration: _fieldDecoration(
+            label: _usePhone ? 'رقم الهاتف' : 'البريد الإلكتروني',
+            hint: _usePhone ? '0912345678' : 'example@email.com',
+            helper: _usePhone && !_isLogin
                 ? 'رقم سوداني، مثال: 0912345678'
                 : null,
-            prefixIcon: Icon(
-              _usePhone ? Icons.phone_outlined : Icons.email_outlined,
-            ),
-            border: const OutlineInputBorder(),
+            icon: _usePhone
+                ? Icons.phone_outlined
+                : Icons.email_outlined,
           ),
           validator: _validateIdentifier,
         ),
@@ -634,11 +685,10 @@ class _AuthScreenState extends State<AuthScreen> {
           autofillHints: [
             _isLogin ? AutofillHints.password : AutofillHints.newPassword,
           ],
-          decoration: InputDecoration(
-            labelText: 'كلمة المرور',
-            helperText: _isLogin ? null : '6 أحرف على الأقل',
-            prefixIcon: const Icon(Icons.lock_outline),
-            border: const OutlineInputBorder(),
+          decoration: _fieldDecoration(
+            label: 'كلمة المرور',
+            icon: Icons.lock_outline_rounded,
+            helper: _isLogin ? null : '6 أحرف على الأقل',
             suffixIcon: IconButton(
               tooltip: _obscurePassword ? 'إظهار' : 'إخفاء',
               onPressed: () {
@@ -648,6 +698,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 _obscurePassword
                     ? Icons.visibility_outlined
                     : Icons.visibility_off_outlined,
+                color: Brand.ink,
               ),
             ),
           ),
@@ -665,10 +716,9 @@ class _AuthScreenState extends State<AuthScreen> {
             obscureText: _obscureConfirmPassword,
             textInputAction: TextInputAction.done,
             autofillHints: const [AutofillHints.newPassword],
-            decoration: InputDecoration(
-              labelText: 'تأكيد كلمة المرور',
-              prefixIcon: const Icon(Icons.lock_reset_outlined),
-              border: const OutlineInputBorder(),
+            decoration: _fieldDecoration(
+              label: 'تأكيد كلمة المرور',
+              icon: Icons.lock_reset_rounded,
               suffixIcon: IconButton(
                 tooltip: _obscureConfirmPassword ? 'إظهار' : 'إخفاء',
                 onPressed: () {
@@ -680,6 +730,7 @@ class _AuthScreenState extends State<AuthScreen> {
                   _obscureConfirmPassword
                       ? Icons.visibility_outlined
                       : Icons.visibility_off_outlined,
+                  color: Brand.ink,
                 ),
               ),
             ),
@@ -700,27 +751,15 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   Widget _buildSubmitButton() {
-    return SizedBox(
-      height: 52,
-      child: FilledButton(
-        onPressed: _loading ? null : _submit,
-        child: _loading
-            ? const SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : Text(
-                _isLogin ? 'تسجيل الدخول' : 'إنشاء الحساب',
-                style: const TextStyle(fontSize: 17),
-              ),
-      ),
+    return BrandGoldButton(
+      label: _isLogin ? 'تسجيل الدخول' : 'إنشاء الحساب',
+      icon: Icons.arrow_back_rounded,
+      loading: _loading,
+      onTap: _loading ? null : _submit,
     );
   }
 
   Widget _buildLegalNote() {
-    final colorScheme = Theme.of(context).colorScheme;
-
     final hasLinks = _privacyPolicyUrl.isNotEmpty || _termsUrl.isNotEmpty;
 
     return Column(
@@ -731,7 +770,7 @@ class _AuthScreenState extends State<AuthScreen> {
           style: TextStyle(
             fontSize: 12.5,
             height: 1.5,
-            color: colorScheme.onSurfaceVariant,
+            color: Brand.ink.withValues(alpha: 0.65),
           ),
         ),
         if (hasLinks)
@@ -754,121 +793,117 @@ class _AuthScreenState extends State<AuthScreen> {
     );
   }
 
-  Widget _buildSupport() {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        children: [
-          const Text(
-            'واجهتك مشكلة أو نسيت كلمة المرور؟',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'تواصل معنا وسنساعدك',
-            style: TextStyle(
-              fontSize: 13,
-              color: colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _loading ? null : _callSupport,
-                  icon: const Icon(Icons.phone_outlined),
-                  label: const Text('اتصال'),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _loading ? null : _openSupportWhatsApp,
-                  icon: const Icon(Icons.chat_outlined),
-                  label: const Text('واتساب'),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          SelectableText(
-            _supportPhone,
-            textDirection: TextDirection.ltr,
-            style: const TextStyle(fontSize: 13),
-          ),
-        ],
-      ),
-    );
-  }
-
   // ============================================================
   // البناء
   // ============================================================
   @override
   Widget build(BuildContext context) {
+    final topPadding = MediaQuery.of(context).padding.top;
+
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          scrolledUnderElevation: 0,
-        ),
-        body: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              keyboardDismissBehavior:
-                  ScrollViewKeyboardDismissBehavior.onDrag,
-              padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 460),
-                child: AutofillGroup(
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _buildHeader(),
-
-                        const SizedBox(height: 26),
-
-                        _buildModeSwitch(),
-
-                        const SizedBox(height: 14),
-
-                        _buildMethodSwitch(),
-
-                        const SizedBox(height: 20),
-
-                        _buildFields(),
-
-                        const SizedBox(height: 22),
-
-                        _buildSubmitButton(),
-
-                        if (!_isLogin) ...[
-                          const SizedBox(height: 10),
-                          _buildLegalNote(),
-                        ],
-
-                        const SizedBox(height: 22),
-
-                        _buildSupport(),
-                      ],
-                    ),
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        body: Stack(
+          children: [
+            // زر الرجوع فوق الترويسة مباشرة.
+            Positioned(
+              top: topPadding + 4,
+              right: 4,
+              child: SafeArea(
+                bottom: false,
+                child: IconButton(
+                  onPressed: () => Navigator.maybePop(context),
+                  icon: const Icon(
+                    Icons.arrow_forward_rounded,
+                    color: Colors.white,
                   ),
                 ),
               ),
             ),
-          ),
+
+            SingleChildScrollView(
+              keyboardDismissBehavior:
+                  ScrollViewKeyboardDismissBehavior.onDrag,
+              child: Column(
+                children: [
+                  BrandHeaderBackground(
+                    height: topPadding + 210,
+                    child: Padding(
+                      padding: EdgeInsets.only(top: topPadding + 26),
+                      child: _buildHeader(),
+                    ),
+                  ),
+
+                  // بطاقة النموذج، ترتفع فوق حافة الترويسة المنحنية.
+                  Transform.translate(
+                    offset: const Offset(0, -18),
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 460),
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 18),
+                          padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).cardColor,
+                            borderRadius: BorderRadius.circular(28),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Brand.primary.withValues(alpha: 0.14),
+                                blurRadius: 24,
+                                offset: const Offset(0, 10),
+                              ),
+                            ],
+                          ),
+                          child: AutofillGroup(
+                            child: Form(
+                              key: _formKey,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  _buildModeSwitch(),
+
+                                  const SizedBox(height: 14),
+
+                                  _buildMethodSwitch(),
+
+                                  const SizedBox(height: 20),
+
+                                  _buildFields(),
+
+                                  const SizedBox(height: 22),
+
+                                  _buildSubmitButton(),
+
+                                  if (!_isLogin) ...[
+                                    const SizedBox(height: 12),
+                                    _buildLegalNote(),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(18, 0, 18, 24),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 460),
+                      child: const SupportContactCard(
+                        title: 'لا تستطيع التسجيل أو إضافة إعلانك؟',
+                        subtitle:
+                            'تواصل معنا وسنساعدك، أو نضيف إعلانك بدلاً عنك. '
+                            'وإن نسيت كلمة المرور فنعيد تعيينها لك.',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
