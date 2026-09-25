@@ -1,23 +1,3 @@
-// ====================================
-// الصفحة الرئيسية لتطبيق دلالة شبشة (التصميم الجديد)
-//
-// الحزم المطلوبة في pubspec.yaml:
-//   intl: ^0.19.0
-//   cached_network_image: ^3.3.1
-//
-// يعتمد الكود على الافتراضات التالية، عدّلها إن اختلفت عندك:
-//   1) جدول المفضلة: أسماؤه في الثوابت _favoritesTable وما بعده.
-//   2) علاقة (foreign key) بين listing_images.listing_id و listings.id.
-//      إن لم توجد يعمل الكود تلقائياً بالطريقة القديمة (طلب منفصل للصور).
-//   3) عمود icon في جدول categories (اختياري): مفاتيح مثل car, home, phone.
-//      إن كان فارغاً تُستخدم الأيقونة حسب اسم القسم كما كان سابقاً.
-//   4) صور الترويسة والبانر اختيارية: ضع صورتك في
-//        assets/images/home_header.jpg   (خلفية الترويسة)
-//        assets/images/home_banner.jpg   (صورة البانر)
-//      وأضف assets/images/ إلى pubspec.yaml. وإن لم توجد يظهر رسم
-//      مشهد شبشة المرسوم بالكود.
-// ====================================
-
 import 'dart:async';
 import 'dart:math' as math;
 
@@ -35,6 +15,32 @@ import 'listing_details_screen.dart';
 import 'my_listings_screen.dart';
 import 'profile_screen.dart';
 
+enum _BannerAction { addListing, browseCategories }
+
+class _BannerSlide {
+  final String line1;
+  final String line2;
+  final List<String> bullets;
+  final String cta;
+  final _BannerAction action;
+
+  const _BannerSlide(
+    this.line1,
+    this.line2,
+    this.bullets,
+    this.cta,
+    this.action,
+  );
+}
+
+enum _ListMode { home, featured, latest }
+
+class _Tone {
+  final Color bg;
+  final Color fg;
+  const _Tone(this.bg, this.fg);
+}
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -42,8 +48,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen>
-    with WidgetsBindingObserver {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   // =========================
   // ثوابت
   // =========================
@@ -65,7 +70,7 @@ class _HomeScreenState extends State<HomeScreen>
   // ارتفاع الترويسة بدون شريط الحالة.
   static const _headerContentHeight = 200.0;
 
-  // صور اختيارية (انظر التعليق في أعلى الملف).
+  // صور اختيارية.
   static const _headerAsset = 'assets/images/home_header.jpg';
   static const _bannerAsset = 'assets/images/home_banner.jpg';
 
@@ -105,7 +110,7 @@ class _HomeScreenState extends State<HomeScreen>
       'id, title, description, price, currency, price_type, '
       'area, category_id, status, created_at';
 
-  // جدول المفضلة (عدّل الأسماء حسب مشروعك).
+  // جدول المفضلة.
   static const _favoritesTable = 'favorites';
   static const _favUserColumn = 'user_id';
   static const _favListingColumn = 'listing_id';
@@ -120,7 +125,7 @@ class _HomeScreenState extends State<HomeScreen>
   final _bannerController = PageController();
   final _bannerIndex = ValueNotifier<int>(0);
 
-  // هل الترويسة ظاهرة (لتغيير لون أيقونات شريط الحالة).
+  // هل الترويسة ظاهرة.
   final _headerVisible = ValueNotifier<bool>(true);
 
   // =========================
@@ -132,8 +137,8 @@ class _HomeScreenState extends State<HomeScreen>
   List<Map<String, dynamic>>? _searchPool;
   Set<int> _favoriteIds = {};
 
-  bool _loading = true; // أول تحميل للصفحة فقط
-  bool _listingsLoading = false; // عند تغيير القسم
+  bool _loading = true;
+  bool _listingsLoading = false;
   bool _loadingMore = false;
   bool _searchPoolLoading = false;
   bool _hasMore = true;
@@ -168,13 +173,11 @@ class _HomeScreenState extends State<HomeScreen>
     _loadAll(showSpinner: false);
     _checkAdminStatus();
 
-    // تحديث الإعلانات التجارية كل 5 دقائق (وتتوقف مع dispose).
     _promotedRefreshTimer = Timer.periodic(
       const Duration(minutes: 5),
       (_) => _loadPromotedListings(),
     );
 
-    // تقليب شرائح البانر كل 5 ثوان.
     _bannerTimer = Timer.periodic(const Duration(seconds: 5), (_) {
       if (!mounted || !_bannerController.hasClients) return;
 
@@ -200,7 +203,6 @@ class _HomeScreenState extends State<HomeScreen>
     super.dispose();
   }
 
-  // عند رجوع المستخدم للتطبيق نحدّث الإعلانات التجارية فقط.
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
@@ -208,7 +210,6 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
-  // التمرير: لون شريط الحالة + التحميل التلقائي للمزيد.
   void _onScroll() {
     if (!_scrollController.hasClients) return;
 
@@ -216,7 +217,6 @@ class _HomeScreenState extends State<HomeScreen>
 
     _headerVisible.value = position.pixels < 110;
 
-    // التحميل التلقائي داخل القسم أو "أحدث الإعلانات" فقط.
     final canLoadMore =
         _selectedCategoryId != null || _mode == _ListMode.latest;
 
@@ -282,10 +282,7 @@ class _HomeScreenState extends State<HomeScreen>
     setState(() => _searchQuery = '');
   }
 
-  // نتائج البحث/القسم. البحث يعمل على مجموعة أكبر (حتى 500 إعلان)
-  // تُحمّل مرة واحدة عند أول بحث، ثم يُبحث فيها محلياً بالتطبيع العربي.
   List<Map<String, dynamic>> get _visibleResults {
-    // "عرض الكل" للإعلانات المميزة.
     if (_mode == _ListMode.featured &&
         _selectedCategoryId == null &&
         !_isSearching) {
@@ -329,12 +326,10 @@ class _HomeScreenState extends State<HomeScreen>
 
       if (!mounted) return;
 
-      // إن فشل التحميل نبحث في الإعلانات المحمّلة حالياً.
       setState(() => _searchPoolLoading = false);
     }
   }
 
-  // الإعلانات التجارية تنتهي محلياً بدون انتظار المؤقّت.
   List<Map<String, dynamic>> get _activePromoted {
     final now = DateTime.now().toUtc();
 
@@ -355,7 +350,6 @@ class _HomeScreenState extends State<HomeScreen>
       });
     }
 
-    // نجعل مجموعة البحث تُحمّل من جديد عند الحاجة.
     _searchPool = null;
 
     try {
@@ -412,7 +406,6 @@ class _HomeScreenState extends State<HomeScreen>
   Future<void> _loadListings({bool reset = true}) async {
     if (!reset && (_loadingMore || !_hasMore || _listingsLoading)) return;
 
-    // رقم الطلب يمنع نتيجة قديمة من الكتابة فوق نتيجة أحدث.
     final requestId = reset ? ++_listingsRequestId : _listingsRequestId;
     final categoryId = _selectedCategoryId;
     final pageSize = _pageSizeFor(categoryId);
@@ -452,8 +445,6 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
-  // جلب الإعلانات مع أول صورة لكل إعلان في طلب واحد.
-  // إن فشل الطلب المدمج نعود للطريقة القديمة (طلب منفصل للصور).
   Future<List<Map<String, dynamic>>> _fetchListings({
     required int from,
     required int to,
@@ -504,7 +495,6 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
-  // استخراج غلاف الإعلان وتجهيز نص البحث المطبّع مرة واحدة.
   Map<String, dynamic> _prepareListing(Map<String, dynamic> row) {
     final images = row['listing_images'];
 
@@ -521,7 +511,6 @@ class _HomeScreenState extends State<HomeScreen>
     return row;
   }
 
-  // جلب أول صورة لكل إعلان بطلب منفصل (وسيلة احتياطية + الإعلانات التجارية).
   Future<void> _attachCoverImages(List<Map<String, dynamic>> rows) async {
     final ids = rows
         .map((row) => row['id'])
@@ -572,7 +561,6 @@ class _HomeScreenState extends State<HomeScreen>
         return;
       }
 
-      // لا نعرض الإعلان التجاري إلا إذا كان الإعلان نفسه approved.
       final listingsResponse = await _supabase
           .from('listings')
           .select(_listingColumns)
@@ -588,7 +576,6 @@ class _HomeScreenState extends State<HomeScreen>
 
       final result = <Map<String, dynamic>>[];
 
-      // نحافظ على ترتيب start_at القادم من promoted_listings.
       for (final promoted in promotedRows) {
         final listing = listingsById[promoted['listing_id']];
 
@@ -611,7 +598,6 @@ class _HomeScreenState extends State<HomeScreen>
 
       setState(() => _promotedListings = result);
     } catch (e) {
-      // لا نوقف الصفحة الرئيسية إذا فشل تحميل الإعلانات التجارية.
       debugPrint('loadPromoted error: $e');
     }
   }
@@ -692,7 +678,6 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
-  // "عرض الكل" للإعلانات المميزة أو الأحدث.
   void _showAll(_ListMode mode) {
     _debounce?.cancel();
     _searchController.clear();
@@ -712,6 +697,17 @@ class _HomeScreenState extends State<HomeScreen>
       }
     }
     return null;
+  }
+
+  void _scrollToCategories() {
+    final ctx = _categoriesKey.currentContext;
+    if (ctx != null) {
+      Scrollable.ensureVisible(
+        ctx,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOut,
+      );
+    }
   }
 
   // =========================
@@ -755,7 +751,6 @@ class _HomeScreenState extends State<HomeScreen>
 
     final wasFavorite = _favoriteIds.contains(listingId);
 
-    // تحديث فوري للواجهة ثم مزامنة مع الخادم.
     setState(() {
       if (wasFavorite) {
         _favoriteIds.remove(listingId);
@@ -782,7 +777,6 @@ class _HomeScreenState extends State<HomeScreen>
 
       if (!mounted) return;
 
-      // نتراجع عن التحديث الفوري.
       setState(() {
         if (wasFavorite) {
           _favoriteIds.add(listingId);
@@ -937,7 +931,6 @@ class _HomeScreenState extends State<HomeScreen>
 
     if (!mounted) return;
 
-    // قد يكون المستخدم أضاف/أزال المفضلة من صفحة التفاصيل.
     await _loadFavorites();
   }
 
@@ -960,7 +953,6 @@ class _HomeScreenState extends State<HomeScreen>
     'other': Icons.more_horiz_outlined,
   };
 
-  // الأولوية لعمود icon في قاعدة البيانات، ثم اسم القسم.
   IconData _iconForCategory(Map<String, dynamic> category) {
     return _iconMap[category['icon']?.toString().trim()] ??
         _categoryIcon(category['name']?.toString() ?? '');
@@ -1096,12 +1088,12 @@ class _HomeScreenState extends State<HomeScreen>
   // ألوان وأيقونات الأقسام
   // =========================
   static const _tones = <_Tone>[
-    _Tone(Color(0xFFEFE7FF), Color(0xFF5B2DB5)), // بنفسجي
-    _Tone(Color(0xFFFFF1D1), Color(0xFFF59E0B)), // أصفر
-    _Tone(Color(0xFFDDF5EA), Color(0xFF0F9D7A)), // أخضر
-    _Tone(Color(0xFFDFEDFF), Color(0xFF2563EB)), // أزرق
-    _Tone(Color(0xFFFFE3E9), Color(0xFFE11D48)), // وردي
-    _Tone(Color(0xFFE9EEF5), Color(0xFF475569)), // رمادي
+    _Tone(Color(0xFFEFE7FF), Color(0xFF5B2DB5)),
+    _Tone(Color(0xFFFFF1D1), Color(0xFFF59E0B)),
+    _Tone(Color(0xFFDDF5EA), Color(0xFF0F9D7A)),
+    _Tone(Color(0xFFDFEDFF), Color(0xFF2563EB)),
+    _Tone(Color(0xFFFFE3E9), Color(0xFFE11D48)),
+    _Tone(Color(0xFFE9EEF5), Color(0xFF475569)),
   ];
 
   _Tone _toneFor(String name, int index) {
@@ -1188,7 +1180,7 @@ class _HomeScreenState extends State<HomeScreen>
       : Colors.white;
 
   // =========================
-  // الترويسة (صورة شبشة + الشعار + البحث)
+  // الترويسة
   // =========================
   Widget _buildHeader(double topPadding) {
     final height = topPadding + _headerContentHeight;
@@ -1208,8 +1200,6 @@ class _HomeScreenState extends State<HomeScreen>
               ),
             ),
           ),
-
-          // تدرج علوي خفيف لوضوح شريط الحالة.
           Positioned(
             top: 0,
             left: 0,
@@ -1228,22 +1218,18 @@ class _HomeScreenState extends State<HomeScreen>
               ),
             ),
           ),
-
           Positioned(
             top: topPadding + 10,
             left: 16,
             right: 16,
             child: _buildTopRow(),
           ),
-
           Positioned(
             left: 16,
             right: 16,
             bottom: 36,
             child: _buildSearchField(),
           ),
-
-          // حافة الصفحة المنحنية أسفل الترويسة.
           Positioned(
             left: 0,
             right: 0,
@@ -1274,7 +1260,6 @@ class _HomeScreenState extends State<HomeScreen>
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        // (يمين) زر القائمة
         Tooltip(
           message: 'القائمة',
           child: InkWell(
@@ -1286,13 +1271,9 @@ class _HomeScreenState extends State<HomeScreen>
             ),
           ),
         ),
-
         const SizedBox(width: 2),
-
         _buildLogo(),
-
         const SizedBox(width: 8),
-
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1326,8 +1307,6 @@ class _HomeScreenState extends State<HomeScreen>
             ],
           ),
         ),
-
-        // (يسار) حساب المستخدم
         Tooltip(
           message: user == null ? 'تسجيل الدخول' : 'الملف الشخصي',
           child: GestureDetector(
@@ -1457,99 +1436,20 @@ class _HomeScreenState extends State<HomeScreen>
   // =========================
   // بانر العروض المتحرك
   // =========================
-
-
-// ==================================
-// الألوان الأساسية المستخدمة في التصميم
-// ===================================
-const Color _brand = Color(0xFF5B2DB5);
-const Color _gold = Color(0xFFFFD700);
-const Color _orange = Color(0xFFFF8A00);
-
-// ===================================
-// النماذج والأنواع
-// ====================================
-enum _BannerAction { addListing, browseCategories }
-
-class _BannerSlide {
-  final String line1;
-  final String line2;
-  final List<String> bullets;
-  final String cta;
-  final _BannerAction action;
-
-  const _BannerSlide({
-    required this.line1,
-    required this.line2,
-    required this.bullets,
-    required this.cta,
-    required this.action,
-  });
-}
-
-// ===================================
-// المكون الرئيسي للبنر المتحرك
-// ===================================
-class BannerCarouselWidget extends StatefulWidget {
-  const BannerCarouselWidget({super.key});
-
-  @override
-  State<BannerCarouselWidget> createState() => _BannerCarouselWidgetState();
-}
-
-class _BannerCarouselWidgetState extends State<BannerCarouselWidget> {
-  final PageController _bannerController = PageController();
-  final ValueNotifier<int> _bannerIndex = ValueNotifier<int>(0);
-
-  // قائمة الشرائح (بيانات للعرض)
-  final List<_BannerSlide> _slides = const [
-    _BannerSlide(
-      line1: 'اعرض سيارتك',
-      line2: 'للبيع الآن!',
-      bullets: [
-        'إدراج سهل وسريع',
-        'وصول لآلاف المشترين',
-        'مجاني تماماً!',
-      ],
-      cta: 'اعرض إعلانك',
-      action: _BannerAction.addListing,
-    ),
-    _BannerSlide(
-      line1: 'تصفح أحدث',
-      line2: 'العروض اليوم',
-      bullets: [
-        'تصفح الأقسام',
-        'عروض حصريّة',
-        'تواصل مباشر',
-      ],
-      cta: 'تصفح الآن',
-      action: _BannerAction.browseCategories,
-    ),
-  ];
-
-  @override
-  void dispose() {
-    _bannerController.dispose();
-    _bannerIndex.dispose();
-    super.dispose();
-  }
-
   void _onBannerAction(_BannerAction action) {
     switch (action) {
       case _BannerAction.addListing:
-        // إضافة إعلان جديد
+        _openAddListing();
         break;
       case _BannerAction.browseCategories:
-        // التمرير للأقسام
+        _scrollToCategories();
         break;
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildBannerCarousel() {
     return Column(
       children: [
-        // سلايدر البنر
         SizedBox(
           height: 175,
           child: PageView.builder(
@@ -1564,10 +1464,7 @@ class _BannerCarouselWidgetState extends State<BannerCarouselWidget> {
             },
           ),
         ),
-
         const SizedBox(height: 12),
-
-        // مؤشرات الصفحات (Page Indicators)
         ValueListenableBuilder<int>(
           valueListenable: _bannerIndex,
           builder: (context, current, _) {
@@ -1582,7 +1479,7 @@ class _BannerCarouselWidgetState extends State<BannerCarouselWidget> {
                   width: active ? 22 : 8,
                   height: 8,
                   decoration: BoxDecoration(
-                    color: active ? _brand : _brand.withOpacity(0.22),
+                    color: active ? _brand : _brand.withValues(alpha: 0.22),
                     borderRadius: BorderRadius.circular(4),
                   ),
                 );
@@ -1594,9 +1491,6 @@ class _BannerCarouselWidgetState extends State<BannerCarouselWidget> {
     );
   }
 
-  // ====================================
-  // تصميم شريحة البنر الواحدة
-  // ===================================
   Widget _buildBannerSlide(_BannerSlide slide) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(26),
@@ -1607,7 +1501,6 @@ class _BannerCarouselWidgetState extends State<BannerCarouselWidget> {
 
           return Stack(
             children: [
-              // 1. الخلفية المتدرجة البنفسجية
               const Positioned.fill(
                 child: DecoratedBox(
                   decoration: BoxDecoration(
@@ -1623,8 +1516,6 @@ class _BannerCarouselWidgetState extends State<BannerCarouselWidget> {
                   ),
                 ),
               ),
-
-              // 2. الصورة على اليمين مع حافة منحنية مخصصة
               Positioned(
                 right: 0,
                 top: 0,
@@ -1632,18 +1523,20 @@ class _BannerCarouselWidgetState extends State<BannerCarouselWidget> {
                 width: photoWidth,
                 child: ClipPath(
                   clipper: const _PhotoClipper(),
-                  child: Image.network(
-                    'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?q=80&w=800', // استبدلها بـ AssetImage عند الاستخدام
+                  child: Image.asset(
+                    _bannerAsset,
                     fit: BoxFit.cover,
                     errorBuilder: (_, __, ___) => Container(
                       color: Colors.white24,
-                      child: const Icon(Icons.directions_car, color: Colors.white, size: 50),
+                      child: const Icon(
+                        Icons.directions_car,
+                        color: Colors.white,
+                        size: 50,
+                      ),
                     ),
                   ),
                 ),
               ),
-
-              // 3. الخط الموجي المزين فوق الصورة
               Positioned(
                 right: 0,
                 top: 0,
@@ -1653,8 +1546,6 @@ class _BannerCarouselWidgetState extends State<BannerCarouselWidget> {
                   child: CustomPaint(painter: _SwooshPainter()),
                 ),
               ),
-
-              // 4. النصوص والأزرار (على اليسار في الواجهة العربية RTL)
               Positioned(
                 left: 18,
                 top: 12,
@@ -1691,8 +1582,6 @@ class _BannerCarouselWidgetState extends State<BannerCarouselWidget> {
                       ),
                     ),
                     const SizedBox(height: 6),
-
-                    // النقاط الرئيسية (Bullets)
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: slide.bullets.map((bullet) {
@@ -1723,10 +1612,7 @@ class _BannerCarouselWidgetState extends State<BannerCarouselWidget> {
                         );
                       }).toList(),
                     ),
-
                     const SizedBox(height: 8),
-
-                    // زر اتخاذ الإجراء (CTA Button)
                     GestureDetector(
                       onTap: () => _onBannerAction(slide.action),
                       child: Container(
@@ -1739,7 +1625,7 @@ class _BannerCarouselWidgetState extends State<BannerCarouselWidget> {
                           borderRadius: BorderRadius.circular(20),
                           boxShadow: [
                             BoxShadow(
-                              color: _orange.withOpacity(0.4),
+                              color: _orange.withValues(alpha: 0.4),
                               blurRadius: 8,
                               offset: const Offset(0, 3),
                             ),
@@ -1777,63 +1663,6 @@ class _BannerCarouselWidgetState extends State<BannerCarouselWidget> {
       ),
     );
   }
-}
-
-// ==========================================
-// 1. Clipper لقص الصورة بحافة منحنية انسيابية
-// ==========================================
-class _PhotoClipper extends CustomClipper<Path> {
-  const _PhotoClipper();
-
-  @override
-  Path getClip(Size size) {
-    final path = Path();
-    path.moveTo(size.width * 0.25, 0);
-    path.quadraticBezierTo(
-      0,
-      size.height * 0.5,
-      size.width * 0.35,
-      size.height,
-    );
-    path.lineTo(size.width, size.height);
-    path.lineTo(size.width, 0);
-    path.close();
-    return path;
-  }
-
-  @override
-  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
-}
-
-// ==========================================
-// 2. CustomPainter لرسم المنحنى الأبيض المزين
-// ==========================================
-class _SwooshPainter extends CustomPainter {
-  const _SwooshPainter();
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      color = Colors.white.withOpacity(0.25)
-      style = PaintingStyle.stroke
-      strokeWidth = 3.0;
-
-    final path = Path();
-    path.moveTo(size.width * 0.23, 0);
-    path.quadraticBezierTo(
-      -2,
-      size.height * 0.5,
-      size.width * 0.33,
-      size.height,
-    );
-
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
 
   // =========================
   // عناوين الأقسام
@@ -1869,7 +1698,8 @@ class _SwooshPainter extends CustomPainter {
               borderRadius: BorderRadius.circular(12),
               onTap: onViewAll,
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -1964,9 +1794,7 @@ class _SwooshPainter extends CustomPainter {
           icon: Icons.grid_view_rounded,
           onViewAll: _categories.isEmpty ? null : _showAllCategories,
         ),
-
         const SizedBox(height: 10),
-
         if (_categories.isEmpty)
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 14),
@@ -2008,7 +1836,6 @@ class _SwooshPainter extends CustomPainter {
     );
   }
 
-  // كل الأقسام في نافذة سفلية.
   void _showAllCategories() {
     showModalBottomSheet<void>(
       context: context,
@@ -2025,7 +1852,8 @@ class _SwooshPainter extends CustomPainter {
                 children: [
                   const Text(
                     'كل الأقسام',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+                    style:
+                        TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
                   ),
                   const SizedBox(height: 14),
                   Flexible(
@@ -2122,12 +1950,10 @@ class _SwooshPainter extends CustomPainter {
                 Stack(
                   children: [
                     _buildListingImage(listing, height: 122),
-
                     if (categoryName.isNotEmpty)
                       Positioned(
                         top: 9,
                         right: 9,
-                        // نترك مكاناً لزر المفضلة على اليسار.
                         left: 48,
                         child: Align(
                           alignment: AlignmentDirectional.centerStart,
@@ -2166,7 +1992,6 @@ class _SwooshPainter extends CustomPainter {
                           ),
                         ),
                       ),
-
                     if (id != null)
                       Positioned(
                         top: 3,
@@ -2200,7 +2025,6 @@ class _SwooshPainter extends CustomPainter {
                           ),
                         ),
                       ),
-
                     if (isCommercial)
                       Positioned(
                         bottom: 8,
@@ -2237,7 +2061,6 @@ class _SwooshPainter extends CustomPainter {
                       ),
                   ],
                 ),
-
                 Padding(
                   padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
                   child: Column(
@@ -2254,9 +2077,7 @@ class _SwooshPainter extends CustomPainter {
                           color: _titleColor,
                         ),
                       ),
-
                       const SizedBox(height: 7),
-
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 10,
@@ -2279,7 +2100,6 @@ class _SwooshPainter extends CustomPainter {
                           ),
                         ),
                       ),
-
                       if (meta.isNotEmpty) ...[
                         const SizedBox(height: 8),
                         Row(
@@ -2304,7 +2124,6 @@ class _SwooshPainter extends CustomPainter {
                           ],
                         ),
                       ],
-
                       if (isNegotiable) ...[
                         const SizedBox(height: 7),
                         Container(
@@ -2364,7 +2183,7 @@ class _SwooshPainter extends CustomPainter {
   }
 
   // =========================
-  // نتائج البحث / القسم / عرض الكل
+  // نتائج البحث / القسم
   // =========================
   Widget _buildSearchResults() {
     final colorScheme = Theme.of(context).colorScheme;
@@ -2429,9 +2248,7 @@ class _SwooshPainter extends CustomPainter {
             ],
           ),
         ),
-
         const SizedBox(height: 12),
-
         if (showSpinner && results.isEmpty)
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 40),
@@ -2476,7 +2293,6 @@ class _SwooshPainter extends CustomPainter {
               },
             ),
           ),
-
         if (_loadingMore)
           const Padding(
             padding: EdgeInsets.all(16),
@@ -2521,7 +2337,6 @@ class _SwooshPainter extends CustomPainter {
         .take(10)
         .toList();
 
-    // صفوف الأقسام التي فيها إعلانات.
     final categoryRows = <Widget>[];
 
     for (var i = 0; i < _categories.length; i++) {
@@ -2573,7 +2388,6 @@ class _SwooshPainter extends CustomPainter {
           _buildHorizontalListings(promoted),
           const SizedBox(height: 14),
         ],
-
         if (latestListings.isNotEmpty) ...[
           _sectionHeader(
             'أحدث الإعلانات',
@@ -2584,7 +2398,6 @@ class _SwooshPainter extends CustomPainter {
           _buildHorizontalListings(latestListings),
           const SizedBox(height: 14),
         ],
-
         ...categoryRows,
       ],
     );
@@ -2641,11 +2454,8 @@ class _SwooshPainter extends CustomPainter {
             _buildBannerCarousel(),
             const SizedBox(height: 16),
           ],
-
           _buildCategoriesSection(),
-
           const SizedBox(height: 8),
-
           if (_isFiltering) _buildSearchResults() else _buildHomeSections(),
         ],
       );
@@ -2658,7 +2468,6 @@ class _SwooshPainter extends CustomPainter {
         controller: _scrollController,
         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         physics: const AlwaysScrollableScrollPhysics(),
-        // نحدد الحشوة صراحة حتى تبدأ الترويسة من أعلى الشاشة.
         padding: EdgeInsets.only(bottom: 112 + bottomInset),
         children: [
           _buildHeader(topPadding),
@@ -2750,7 +2559,6 @@ class _SwooshPainter extends CustomPainter {
                       icon: Icons.home_rounded,
                       label: 'الرئيسية',
                       selected: true,
-                      // يصعد لأعلى الصفحة ويمسح الفلاتر.
                       onTap: _clearFilters,
                     ),
                     navItem(
@@ -2792,7 +2600,6 @@ class _SwooshPainter extends CustomPainter {
                 ),
               ),
             ),
-
             Positioned(
               top: 6,
               left: 0,
@@ -2860,17 +2667,11 @@ class _SwooshPainter extends CustomPainter {
             ? 'مرحباً بك'
             : 'مستخدم دلالة شبشة';
 
-    // رقم الهاتف الحقيقي لحسابات الهاتف.
     final authPhone = user?.phone?.trim() ?? '';
-
-    // البريد الإلكتروني لحسابات البريد.
     final email = user?.email?.trim() ?? '';
-
-    // رقم الهاتف المحفوظ في metadata كخيار احتياطي.
     final metadataPhone =
         user?.userMetadata?['phone']?.toString().trim() ?? '';
 
-    // إذا كان الحساب مرتبطاً برقم هاتف نعرضه أولاً.
     final phone = authPhone.isNotEmpty ? authPhone : metadataPhone;
 
     final contact = phone.isNotEmpty
@@ -2905,9 +2706,7 @@ class _SwooshPainter extends CustomPainter {
               color: primary,
             ),
           ),
-
           const SizedBox(width: 12),
-
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -2922,9 +2721,7 @@ class _SwooshPainter extends CustomPainter {
                     fontWeight: FontWeight.w800,
                   ),
                 ),
-
                 const SizedBox(height: 4),
-
                 Text(
                   contact,
                   maxLines: 1,
@@ -3017,9 +2814,7 @@ class _SwooshPainter extends CustomPainter {
                     color: itemColor,
                   ),
                 ),
-
                 const SizedBox(width: 9),
-
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -3034,7 +2829,6 @@ class _SwooshPainter extends CustomPainter {
                           color: itemColor,
                         ),
                       ),
-
                       if (subtitle != null) ...[
                         const SizedBox(height: 1),
                         Text(
@@ -3042,7 +2836,7 @@ class _SwooshPainter extends CustomPainter {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 11.5,
                             color: colorScheme.onSurfaceVariant,
                           ),
                         ),
@@ -3050,13 +2844,6 @@ class _SwooshPainter extends CustomPainter {
                     ],
                   ),
                 ),
-
-                if (selected)
-                  Icon(
-                    Icons.chevron_left_rounded,
-                    size: 19,
-                    color: colorScheme.primary,
-                  ),
               ],
             ),
           ),
@@ -3065,145 +2852,80 @@ class _SwooshPainter extends CustomPainter {
     );
   }
 
-  Widget _buildDrawer(User? user, String? name) {
-    final colorScheme = Theme.of(context).colorScheme;
+  Widget _buildDrawer() {
+    final user = _supabase.auth.currentUser;
+    final name = (user?.userMetadata?['full_name'] as String?)?.trim();
 
     return Drawer(
-      width: 220,
-      elevation: 3,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.only(
-          topRight: Radius.circular(18),
-          bottomRight: Radius.circular(18),
-        ),
-      ),
       child: SafeArea(
         child: Column(
           children: [
             _buildDrawerHeader(user, name),
-
-            const SizedBox(height: 5),
-
             Expanded(
               child: ListView(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 9,
-                  vertical: 2,
-                ),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 children: [
-                  _buildDrawerItem(
-                    icon: user == null
-                        ? Icons.login_outlined
-                        : Icons.person_outline,
-                    title: user == null ? 'تسجيل الدخول' : 'الملف الشخصي',
-                    onTap: () async {
-                      Navigator.pop(context);
-                      await _openProfile();
-                    },
-                  ),
-
-                  _buildDrawerItem(
-                    icon: Icons.add_circle_outline,
-                    title: 'إضافة إعلان',
-                    onTap: () async {
-                      Navigator.pop(context);
-                      await _openAddListing();
-                    },
-                  ),
-
-                  const SizedBox(height: 5),
-
-                  if (_isAdmin) ...[
-                    _buildDrawerItem(
-                      icon: Icons.admin_panel_settings_outlined,
-                      title: 'لوحة تحكم الإدارة',
-                      subtitle: 'إدارة ومراجعة الإعلانات',
-                      onTap: () async {
-                        Navigator.pop(context);
-                        await _openAdminPanel();
-                      },
-                    ),
-
-                    const Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 6,
-                      ),
-                      child: Divider(height: 1),
-                    ),
-                  ],
-
                   _buildDrawerSectionTitle(
-                    'الأقسام',
-                    Icons.grid_view_rounded,
-                  ),
-
-                  if (_categories.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.all(12),
-                      child: Text(
-                        'لا توجد أقسام حالياً',
-                        style: TextStyle(fontSize: 13),
-                      ),
-                    )
-                  else
-                    ..._categories.map((category) {
-                      final categoryId = category['id'] as int?;
-                      final categoryName =
-                          category['name']?.toString() ?? 'بدون اسم';
-
-                      final selected = _selectedCategoryId == categoryId;
-
-                      return _buildDrawerItem(
-                        icon: _iconForCategory(category),
-                        title: categoryName,
-                        selected: selected,
-                        onTap: () {
-                          Navigator.pop(context);
-
-                          if (categoryId == null) return;
-
-                          _selectCategory(categoryId, clearSearch: true);
-                        },
-                      );
-                    }),
-
-                  const Padding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 6,
-                    ),
-                    child: Divider(height: 1),
-                  ),
-
-                  _buildDrawerSectionTitle(
-                    'حسابي',
-                    Icons.account_circle_outlined,
-                  ),
-
+                      'التنقل السريع', Icons.explore_outlined),
                   _buildDrawerItem(
-                    icon: Icons.favorite_border,
-                    title: 'المفضلة',
+                    icon: Icons.home_outlined,
+                    title: 'الرئيسية',
+                    selected: !_isFiltering,
                     onTap: () {
                       Navigator.pop(context);
-                      _openFavorites();
+                      _clearFilters();
                     },
                   ),
-
                   _buildDrawerItem(
-                    icon: Icons.inventory_2_outlined,
+                    icon: Icons.add_circle_outline,
+                    title: 'إضافة إعلان جديد',
+                    onTap: () {
+                      Navigator.pop(context);
+                      _openAddListing();
+                    },
+                  ),
+                  _buildDrawerItem(
+                    icon: Icons.list_alt_outlined,
                     title: 'إعلاناتي',
                     onTap: () {
                       Navigator.pop(context);
                       _openMyListings();
                     },
                   ),
-
-                  const SizedBox(height: 6),
-
-                  if (user != null)
+                  _buildDrawerItem(
+                    icon: Icons.favorite_border_outlined,
+                    title: 'المفضلة',
+                    onTap: () {
+                      Navigator.pop(context);
+                      _openFavorites();
+                    },
+                  ),
+                  const Divider(height: 20),
+                  _buildDrawerSectionTitle(
+                      'الحساب والضبط', Icons.person_outline),
+                  _buildDrawerItem(
+                    icon: Icons.account_circle_outlined,
+                    title: 'الملف الشخصي',
+                    onTap: () {
+                      Navigator.pop(context);
+                      _openProfile();
+                    },
+                  ),
+                  if (_isAdmin)
                     _buildDrawerItem(
-                      icon: Icons.logout,
+                      icon: Icons.admin_panel_settings_outlined,
+                      title: 'لوحة الإدارة',
+                      subtitle: 'إدارة الإعلانات الموقوفة والموافقة',
+                      onTap: () {
+                        Navigator.pop(context);
+                        _openAdminPanel();
+                      },
+                    ),
+                  if (user != null) ...[
+                    const Divider(height: 20),
+                    _buildDrawerItem(
+                      icon: Icons.logout_rounded,
                       title: 'تسجيل الخروج',
                       isDestructive: true,
                       onTap: () {
@@ -3211,29 +2933,8 @@ class _SwooshPainter extends CustomPainter {
                         _signOut();
                       },
                     ),
+                  ],
                 ],
-              ),
-            ),
-
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-              decoration: BoxDecoration(
-                border: Border(
-                  top: BorderSide(
-                    color: colorScheme.outlineVariant,
-                    width: 0.6,
-                  ),
-                ),
-              ),
-              child: Text(
-                'دلالة شبشة',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: colorScheme.onSurfaceVariant,
-                ),
               ),
             ),
           ],
@@ -3242,42 +2943,48 @@ class _SwooshPainter extends CustomPainter {
     );
   }
 
-  // =========================
-  // البناء
-  // =========================
   @override
   Widget build(BuildContext context) {
-    final user = _supabase.auth.currentUser;
-    final name = user?.userMetadata?['full_name'] as String?;
     final topPadding = MediaQuery.of(context).padding.top;
 
     return Directionality(
       textDirection: TextDirection.rtl,
       child: ValueListenableBuilder<bool>(
         valueListenable: _headerVisible,
-        // أيقونات شريط الحالة بيضاء فوق الصورة، وداكنة بعد التمرير.
         builder: (context, headerVisible, child) {
+          final isDark = Theme.of(context).brightness == Brightness.dark;
+          final overlayStyle = headerVisible
+              ? SystemUiOverlayStyle.dark.copyWith(
+                  statusBarColor: Colors.transparent,
+                  statusBarIconBrightness: Brightness.dark,
+                )
+              : (isDark
+                  ? SystemUiOverlayStyle.light.copyWith(
+                      statusBarColor: Colors.transparent,
+                    )
+                  : SystemUiOverlayStyle.dark.copyWith(
+                      statusBarColor: Colors.transparent,
+                    ));
+
           return AnnotatedRegion<SystemUiOverlayStyle>(
-            value: (headerVisible
-                    ? SystemUiOverlayStyle.light
-                    : SystemUiOverlayStyle.dark)
-                .copyWith(statusBarColor: Colors.transparent),
+            value: overlayStyle,
             child: child!,
           );
         },
-        child: PopScope(
-          // زر الرجوع يلغي التصفية أولاً قبل الخروج من التطبيق.
-          canPop: !_isFiltering,
-          onPopInvokedWithResult: (didPop, _) {
-            if (!didPop) _clearFilters();
-          },
-          child: Scaffold(
-            key: _scaffoldKey,
-            backgroundColor: _pageBackground,
-            extendBody: true,
-            drawer: _buildDrawer(user, name),
-            body: _buildBody(topPadding),
-            bottomNavigationBar: _buildBottomNavigation(),
+        child: Scaffold(
+          key: _scaffoldKey,
+          backgroundColor: _pageBackground,
+          drawer: _buildDrawer(),
+          body: Stack(
+            children: [
+              _buildBody(topPadding),
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: _buildBottomNavigation(),
+              ),
+            ],
           ),
         ),
       ),
@@ -3285,440 +2992,102 @@ class _SwooshPainter extends CustomPainter {
   }
 }
 
-// =============================================================
-// أنواع مساعدة للتصميم
-// =============================================================
-
-// وضع عرض القائمة الكاملة (عرض الكل).
-enum _ListMode { home, featured, latest }
-
-// ألوان بطاقة القسم.
-class _Tone {
-  final Color bg;
-  final Color fg;
-
-  const _Tone(this.bg, this.fg);
-}
-
-enum _BannerAction { addListing, browseCategories }
-
-// شريحة في بانر العروض.
-class _BannerSlide {
-  final String line1;
-  final String line2;
-  final List<String> bullets;
-  final String cta;
-  final _BannerAction action;
-
-  const _BannerSlide(
-    this.line1,
-    this.line2,
-    this.bullets,
-    this.cta,
-    this.action,
-  );
-}
-
-// قص الصورة داخل البانر بحافة منحنية من جهة النص.
+// =========================
+// الرسومات والتصميم الخارجي
+// =========================
 class _PhotoClipper extends CustomClipper<Path> {
   const _PhotoClipper();
 
   @override
   Path getClip(Size size) {
-    final w = size.width;
-    final h = size.height;
-
-    return Path()
-      ..moveTo(w * 0.34, 0)
-      ..lineTo(w, 0)
-      ..lineTo(w, h)
-      ..lineTo(w * 0.02, h)
-      ..cubicTo(w * 0.40, h * 0.86, w * 0.02, h * 0.42, w * 0.34, 0)
-      ..close();
+    final path = Path();
+    path.moveTo(size.width * 0.25, 0);
+    path.quadraticBezierTo(
+      0,
+      size.height * 0.5,
+      size.width * 0.35,
+      size.height,
+    );
+    path.lineTo(size.width, size.height);
+    path.lineTo(size.width, 0);
+    path.close();
+    return path;
   }
 
   @override
   bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
 }
 
-// الخط البرتقالي المنحني على حافة الصورة.
 class _SwooshPainter extends CustomPainter {
   const _SwooshPainter();
 
   @override
   void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-
-    Path curve(double dx) {
-      return Path()
-        ..moveTo(w * 0.02 + dx, h)
-        ..cubicTo(w * 0.40 + dx, h * 0.86, w * 0.02 + dx, h * 0.42,
-            w * 0.34 + dx, 0);
-    }
-
-    canvas.drawPath(
-      curve(-3),
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 14
-        ..strokeCap = StrokeCap.round
-        ..color = const Color(0xFF7A45DA).withValues(alpha: 0.55),
-    );
-
-    canvas.drawPath(
-      curve(-6),
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 8
-        ..strokeCap = StrokeCap.round
-        ..shader = const LinearGradient(
-          begin: Alignment.bottomCenter,
-          end: Alignment.topCenter,
-          colors: [Color(0xFFFF9F1C), Color(0xFFFFC93C)],
-        ).createShader(Offset.zero & size),
-    );
-
-    canvas.drawPath(
-      curve(-17),
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.6
-        ..color = Colors.white.withValues(alpha: 0.35),
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-// شرارات صغيرة حول زر "أضف إعلان".
-class _SparklesPainter extends CustomPainter {
-  const _SparklesPainter();
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-
     final paint = Paint()
-      ..color = const Color(0xFFFFB02E)
-      ..strokeWidth = 2.6
-      ..strokeCap = StrokeCap.round;
+      ..color = Colors.white.withValues(alpha: 0.25)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3.0;
 
-    for (final degrees in const [-150.0, -90.0, -30.0]) {
-      final angle = degrees * math.pi / 180;
-      final direction = Offset(math.cos(angle), math.sin(angle));
+    final path = Path();
+    path.moveTo(size.width * 0.23, 0);
+    path.quadraticBezierTo(
+      -2,
+      size.height * 0.5,
+      size.width * 0.33,
+      size.height,
+    );
 
-      canvas.drawLine(
-        center + direction * 34,
-        center + direction * 41,
-        paint,
-      );
-    }
+    canvas.drawPath(path, paint);
   }
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-// رسم احتياطي لمشهد شبشة عند الغروب (مباني طينية ونخيل ونهر).
-// يظهر إذا لم تضف صورة حقيقية في assets/images.
 class _ShabshaScenePainter extends CustomPainter {
   const _ShabshaScenePainter();
 
   @override
   void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-    final horizon = h * 0.64;
+    final bgPaint = Paint()..color = const Color(0xFFEFE9FF);
+    canvas.drawRect(Offset.zero & size, bgPaint);
 
-    // السماء
-    final skyRect = Rect.fromLTWH(0, 0, w, horizon + 1);
-
-    canvas.drawRect(
-      skyRect,
-      Paint()
-        ..shader = const LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Color(0xFF7C9CEB),
-            Color(0xFFB6A4E8),
-            Color(0xFFF5B5A6),
-            Color(0xFFFFCB90),
-          ],
-          stops: [0.0, 0.38, 0.72, 1.0],
-        ).createShader(skyRect),
-    );
-
-    // سحب ناعمة
-    void cloud(double cx, double cy, double cw, double ch, Color color) {
-      canvas.drawOval(
-        Rect.fromCenter(
-          center: Offset(w * cx, h * cy),
-          width: w * cw,
-          height: h * ch,
-        ),
-        Paint()
-          ..color = color
-          ..maskFilter = MaskFilter.blur(BlurStyle.normal, h * 0.03),
-      );
-    }
-
-    cloud(0.20, 0.15, 0.50, 0.10, Colors.white.withValues(alpha: 0.30));
-    cloud(0.68, 0.10, 0.44, 0.09, const Color(0xFFFFC2C8).withValues(alpha: 0.45));
-    cloud(0.90, 0.26, 0.40, 0.08, Colors.white.withValues(alpha: 0.28));
-    cloud(0.42, 0.34, 0.60, 0.08, const Color(0xFFFFB27A).withValues(alpha: 0.40));
-
-    // وهج الشمس عند الأفق
-    canvas.drawRect(
-      skyRect,
-      Paint()
-        ..shader = const RadialGradient(
-          colors: [Color(0x99FFE3AA), Color(0x00FFE3AA)],
-        ).createShader(
-          Rect.fromCircle(center: Offset(w * 0.72, horizon), radius: w * 0.5),
-        ),
-    );
-
-    // تلال بعيدة
-    final hills = Path()
-      ..moveTo(0, horizon)
-      ..quadraticBezierTo(w * 0.2, horizon - h * 0.10, w * 0.42, horizon - h * 0.03)
-      ..quadraticBezierTo(w * 0.7, horizon - h * 0.12, w, horizon - h * 0.04)
-      ..lineTo(w, horizon)
+    final hillPaint = Paint()..color = const Color(0xFFDCD2F9);
+    final path = Path()
+      ..moveTo(0, size.height)
+      ..quadraticBezierTo(
+        size.width * 0.3,
+        size.height * 0.6,
+        size.width * 0.7,
+        size.height * 0.8,
+      )
+      ..quadraticBezierTo(
+        size.width * 0.85,
+        size.height * 0.9,
+        size.width,
+        size.height * 0.7,
+      )
+      ..lineTo(size.width, size.height)
       ..close();
+    canvas.drawPath(path, hillPaint);
+  }
 
-    canvas.drawPath(
-      hills,
-      Paint()..color = const Color(0xFFD59A78).withValues(alpha: 0.55),
-    );
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
 
-    // المباني الطينية: [x, العرض, الارتفاع] كنسب من الأبعاد.
-    const buildings = <List<double>>[
-      [0.00, 0.11, 0.20],
-      [0.09, 0.10, 0.31],
-      [0.18, 0.13, 0.23],
-      [0.30, 0.10, 0.34],
-      [0.39, 0.10, 0.26],
-      [0.49, 0.13, 0.30],
-      [0.61, 0.11, 0.22],
-      [0.71, 0.12, 0.33],
-      [0.82, 0.10, 0.24],
-      [0.91, 0.10, 0.30],
-    ];
+class _SparklesPainter extends CustomPainter {
+  const _SparklesPainter();
 
-    for (var i = 0; i < buildings.length; i++) {
-      final b = buildings[i];
-      final bx = w * b[0];
-      final bw = w * b[1];
-      final bh = h * b[2];
-      final top = horizon - bh;
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xFFFFC93C).withValues(alpha: 0.6)
+      ..style = PaintingStyle.fill;
 
-      final tone = i.isEven ? const Color(0xFFB9744A) : const Color(0xFFA5613C);
-      final shade = Color.lerp(tone, const Color(0xFF6B3A25), 0.35)!;
-      final rect = Rect.fromLTWH(bx, top, bw + 1, bh + 1);
-
-      canvas.drawRect(
-        rect,
-        Paint()
-          ..shader = LinearGradient(
-            begin: Alignment.centerLeft,
-            end: Alignment.centerRight,
-            colors: [tone, shade],
-          ).createShader(rect),
-      );
-
-      // شرفات علوية
-      final teeth = math.max(3, (bw / (h * 0.045)).floor());
-      final toothWidth = bw / (teeth * 2 - 1);
-      final toothHeight = h * 0.022;
-
-      for (var t = 0; t < teeth; t++) {
-        canvas.drawRect(
-          Rect.fromLTWH(
-            bx + t * toothWidth * 2,
-            top - toothHeight,
-            toothWidth,
-            toothHeight + 1,
-          ),
-          Paint()..color = tone,
-        );
-      }
-
-      // نوافذ صغيرة
-      final windowPaint = Paint()
-        ..color = const Color(0xFF4A2A1B).withValues(alpha: 0.75);
-
-      final cols = math.max(2, (bw / (h * 0.09)).floor());
-      final rows = math.max(1, (bh / (h * 0.12)).floor() - 1);
-
-      for (var r = 0; r < rows; r++) {
-        for (var c = 0; c < cols; c++) {
-          final cx = bx + bw * (c + 0.5) / cols;
-          final cy = top + bh * 0.20 + r * (bh * 0.66 / rows);
-
-          canvas.drawRect(
-            Rect.fromCenter(
-              center: Offset(cx, cy),
-              width: h * 0.026,
-              height: h * 0.042,
-            ),
-            windowPaint,
-          );
-        }
-      }
-    }
-
-    // البرج
-    final towerWidth = w * 0.05;
-    final towerX = w * 0.45;
-    final towerHeight = h * 0.46;
-    final towerTop = horizon - towerHeight;
-
-    canvas.drawRect(
-      Rect.fromLTWH(towerX, towerTop, towerWidth, towerHeight + 1),
-      Paint()..color = const Color(0xFFB06A42),
-    );
-
-    canvas.drawRect(
-      Rect.fromLTWH(
-        towerX - towerWidth * 0.12,
-        towerTop,
-        towerWidth * 1.24,
-        h * 0.03,
-      ),
-      Paint()..color = const Color(0xFF8E512F),
-    );
-
-    canvas.drawArc(
-      Rect.fromLTWH(
-        towerX + towerWidth * 0.1,
-        towerTop - towerWidth * 0.5,
-        towerWidth * 0.8,
-        towerWidth,
-      ),
-      math.pi,
-      math.pi,
-      true,
-      Paint()..color = const Color(0xFF7A4326),
-    );
-
-    canvas.drawCircle(
-      Offset(towerX + towerWidth / 2, towerTop + h * 0.09),
-      towerWidth * 0.22,
-      Paint()..color = const Color(0xFFFFE8B0),
-    );
-
-    // النهر
-    final riverRect = Rect.fromLTWH(0, horizon, w, h - horizon);
-
-    canvas.drawRect(
-      riverRect,
-      Paint()
-        ..shader = const LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Color(0xFFFFBE85),
-            Color(0xFFC99AB6),
-            Color(0xFF5E6FB0),
-            Color(0xFF3A3F86),
-          ],
-          stops: [0.0, 0.35, 0.75, 1.0],
-        ).createShader(riverRect),
-    );
-
-    // ضفة خضراء
-    final bank = Path()
-      ..moveTo(0, horizon + h * 0.01)
-      ..cubicTo(w * 0.15, horizon - h * 0.05, w * 0.30, horizon + h * 0.02,
-          w * 0.50, horizon - h * 0.02)
-      ..cubicTo(w * 0.70, horizon - h * 0.06, w * 0.85, horizon, w,
-          horizon - h * 0.02)
-      ..lineTo(w, horizon + h * 0.05)
-      ..lineTo(0, horizon + h * 0.05)
-      ..close();
-
-    canvas.drawPath(bank, Paint()..color = const Color(0xFF2E5B34));
-
-    // انعكاسات على الماء
-    final streak = Paint()..color = Colors.white.withValues(alpha: 0.22);
-
-    for (var i = 0; i < 6; i++) {
-      final y = horizon + h * (0.09 + i * 0.05);
-      final streakWidth = w * (0.22 + (i % 3) * 0.10);
-      final cx = w * (0.20 + ((i * 0.17) % 0.62));
-
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromCenter(
-            center: Offset(cx, y),
-            width: streakWidth,
-            height: h * 0.008,
-          ),
-          const Radius.circular(4),
-        ),
-        streak,
-      );
-    }
-
-    // النخيل
-    void palm(double bxFraction, double baseY, double height, double lean) {
-      final base = Offset(w * bxFraction, baseY);
-      final top = Offset(base.dx + lean * w, baseY - height);
-
-      final trunk = Path()
-        ..moveTo(base.dx, base.dy)
-        ..quadraticBezierTo(
-          base.dx + lean * w * 0.2,
-          baseY - height * 0.5,
-          top.dx,
-          top.dy,
-        );
-
-      canvas.drawPath(
-        trunk,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = math.max(2.0, h * 0.022)
-          ..strokeCap = StrokeCap.round
-          ..color = const Color(0xFF3F2A1A),
-      );
-
-      const angles = [-172.0, -150.0, -125.0, -100.0, -80.0, -55.0, -30.0, -8.0];
-
-      for (var i = 0; i < angles.length; i++) {
-        final angle = angles[i] * math.pi / 180;
-        final direction = Offset(math.cos(angle), math.sin(angle));
-        final length = height * 0.55;
-
-        final end = top + direction * length + Offset(0, length * 0.30);
-        final control =
-            top + direction * length * 0.55 + Offset(0, -length * 0.30);
-
-        final frond = Path()
-          ..moveTo(top.dx, top.dy)
-          ..quadraticBezierTo(control.dx, control.dy, end.dx, end.dy);
-
-        canvas.drawPath(
-          frond,
-          Paint()
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = math.max(1.6, h * 0.016)
-            ..strokeCap = StrokeCap.round
-            ..color = i.isEven
-                ? const Color(0xFF1F5A2E)
-                : const Color(0xFF2E7A3E),
-        );
-      }
-    }
-
-    palm(0.10, horizon + h * 0.03, h * 0.46, 0.015);
-    palm(0.27, horizon, h * 0.36, -0.010);
-    palm(0.60, horizon + h * 0.02, h * 0.42, 0.010);
-    palm(0.78, horizon, h * 0.34, -0.012);
-    palm(0.94, horizon + h * 0.03, h * 0.50, -0.020);
+    canvas.drawCircle(Offset(size.width * 0.15, size.height * 0.3), 3, paint);
+    canvas.drawCircle(Offset(size.width * 0.85, size.height * 0.25), 4, paint);
+    canvas.drawCircle(Offset(size.width * 0.78, size.height * 0.7), 2.5, paint);
   }
 
   @override
