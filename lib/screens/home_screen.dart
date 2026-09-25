@@ -19,7 +19,6 @@
 // =============================================================
 
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -63,7 +62,6 @@ class _HomeScreenState extends State<HomeScreen>
 
   // صور اختيارية (انظر التعليق في أعلى الملف).
   static const _headerAsset = 'assets/images/home_header.jpg';
-  static const _bannerAsset = 'assets/images/home_banner.jpg';
 
   static const _listingColumns =
       'id, title, description, price, currency, price_type, '
