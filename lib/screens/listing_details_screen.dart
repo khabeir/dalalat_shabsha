@@ -746,9 +746,9 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
                   vertical: 4,
                 ),
                 decoration: BoxDecoration(
-                  Colors.black.withValues(alpha: 0.6),
-                  borderRadius: BorderRadius.circular(12),
-                ),
+  color: Colors.black.withValues(alpha: 0.6),
+  borderRadius: BorderRadius.circular(12),
+),
                 child: Text(
                   '${_currentImageIndex + 1} / ${urls.length}',
                   style: const TextStyle(
