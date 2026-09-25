@@ -1,265 +1,97 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import 'brand_theme.dart';
+// Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ø¯Ø¹Ù… ÙÙŠ Ù…ÙƒØ§Ù† ÙˆØ§Ø­Ø¯: Ø¹Ø¯Ù‘Ù„Ù‡Ø§ Ù‡Ù†Ø§ ÙØªØªØºÙŠØ± ÙÙŠ ÙƒÙ„ Ø§Ù„Ø´Ø§Ø´Ø§Øª.
+const String kSupportPhone = '0914111214';
+const String kSupportWhatsApp = '249914111214';
 
+// Ø¨Ø·Ø§Ù‚Ø© "ØªÙˆØ§ØµÙ„ Ù…Ø¹Ù†Ø§" (Ø§ØªØµØ§Ù„ + ÙˆØ§ØªØ³Ø§Ø¨) ØªÙØ³ØªØ®Ø¯Ù… ÙÙŠ Ø§Ù„ØªØ³Ø¬ÙŠÙ„ ÙˆØ¥Ø¶Ø§ÙØ© Ø§Ù„Ø¥Ø¹Ù„Ø§Ù†.
 class SupportContactCard extends StatelessWidget {
   final String title;
   final String subtitle;
-  final String whatsappNumber;
-  final String phoneNumber;
 
   const SupportContactCard({
     super.key,
     required this.title,
     required this.subtitle,
-    this.whatsappNumber = '',
-    this.phoneNumber = '',
   });
 
-  Future<void> _openWhatsApp() async {
-    final number = whatsappNumber.replaceAll(RegExp(r'[^0-9]'), '');
-
-    if (number.isEmpty) return;
-
-    final uri = Uri.parse('https://wa.me/$number');
+  Future<void> _launch(BuildContext context, Uri uri, String error) async {
+    var ok = false;
 
     try {
-      await launchUrl(
-        uri,
-        mode: LaunchMode.externalApplication,
-      );
-    } catch (_) {
-      // áÇ ÍÇÌÉ áÅÙåÇÑ ÑÓÇáÉ åäÇ.
-      // İÔá İÊÍ æÇÊÓÇÈ áÇ íÄËÑ Úáì ÇáÊØÈíŞ.
-    }
-  }
+      ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {}
 
-  Future<void> _call() async {
-    final phone = phoneNumber.trim();
-
-    if (phone.isEmpty) return;
-
-    final uri = Uri(
-      scheme: 'tel',
-      path: phone,
-    );
-
-    try {
-      await launchUrl(uri);
-    } catch (_) {
-      // áÇ ÍÇÌÉ áÅÙåÇÑ ÑÓÇáÉ åäÇ.
+    if (!ok && context.mounted) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(error)));
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final hasWhatsApp = whatsappNumber.trim().isNotEmpty;
-    final hasPhone = phoneNumber.trim().isNotEmpty;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topRight,
-          end: Alignment.bottomLeft,
-          colors: [
-            Brand.soft,
-            Theme.of(context).cardColor,
-          ],
-        ),
-        borderRadius: BorderRadius.circular(26),
-        border: Border.all(
-          color: Brand.primary.withValues(alpha: 0.10),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Brand.primary.withValues(alpha: 0.10),
-            blurRadius: 22,
-            offset: const Offset(0, 8),
-          ),
-        ],
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // ======================================================
-          // ÑÃÓ ÈØÇŞÉ ÇáÏÚã
-          // ======================================================
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 13,
+              height: 1.5,
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 12),
           Row(
             children: [
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  color: Brand.primary,
-                  borderRadius: BorderRadius.circular(17),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Brand.primary.withValues(alpha: 0.20),
-                      blurRadius: 12,
-                      offset: const Offset(0, 5),
-                    ),
-                  ],
-                ),
-                child: const Icon(
-                  Icons.support_agent_rounded,
-                  color: Colors.white,
-                  size: 29,
-                ),
-              ),
-
-              const SizedBox(width: 13),
-
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        color: Brand.ink,
-                        fontSize: 15.5,
-                        fontWeight: FontWeight.w900,
-                        height: 1.3,
-                      ),
-                    ),
-
-                    const SizedBox(height: 4),
-
-                    Text(
-                      subtitle,
-                      style: TextStyle(
-                        color: Brand.ink.withValues(alpha: 0.62),
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w500,
-                        height: 1.5,
-                      ),
-                    ),
-                  ],
+                child: OutlinedButton.icon(
+                  onPressed: () => _launch(
+                    context,
+                    Uri(scheme: 'tel', path: kSupportPhone),
+                    'ØªØ¹Ø°Ø± ÙØªØ­ ØªØ·Ø¨ÙŠÙ‚ Ø§Ù„Ø§ØªØµØ§Ù„',
+                  ),
+                  icon: const Icon(Icons.phone_outlined),
+                  label: const Text('Ø§ØªØµØ§Ù„'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => _launch(
+                    context,
+                    Uri.parse('https://wa.me/$kSupportWhatsApp'),
+                    'ØªØ¹Ø°Ø± ÙØªØ­ ÙˆØ§ØªØ³Ø§Ø¨',
+                  ),
+                  icon: const Icon(Icons.chat_outlined),
+                  label: const Text('ÙˆØ§ØªØ³Ø§Ø¨'),
                 ),
               ),
             ],
           ),
-
-          const SizedBox(height: 16),
-
-          // ======================================================
-          // ÇáİÇÕá
-          // ======================================================
-          Container(
-            height: 1,
-            color: Brand.primary.withValues(alpha: 0.08),
+          const SizedBox(height: 8),
+          SelectableText(
+            kSupportPhone,
+            textDirection: TextDirection.ltr,
+            style: const TextStyle(fontSize: 13),
           ),
-
-          const SizedBox(height: 15),
-
-          // ======================================================
-          // ÃÒÑÇÑ ÇáÊæÇÕá
-          // ======================================================
-          Row(
-            children: [
-              if (hasWhatsApp)
-                Expanded(
-                  child: _SupportButton(
-                    icon: Icons.chat_rounded,
-                    label: 'æÇÊÓÇÈ',
-                    filled: true,
-                    onTap: _openWhatsApp,
-                  ),
-                ),
-
-              if (hasWhatsApp && hasPhone)
-                const SizedBox(width: 10),
-
-              if (hasPhone)
-                Expanded(
-                  child: _SupportButton(
-                    icon: Icons.phone_rounded,
-                    label: 'ÇÊÕÇá',
-                    filled: false,
-                    onTap: _call,
-                  ),
-                ),
-            ],
-          ),
-
-          // ======================================================
-          // áÇ ÊæÌÏ ÃÑŞÇã
-          // ======================================================
-          if (!hasWhatsApp && !hasPhone)
-            Text(
-              'ÓíÊã ÊæİíÑ æÓÇÆá ÇáÊæÇÕá ãÚ ÇáÏÚã ŞÑíÈÇğ.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Brand.ink.withValues(alpha: 0.55),
-                fontSize: 12,
-              ),
-            ),
         ],
-      ),
-    );
-  }
-}
-
-// ================================================================
-// ÒÑ ÇáÏÚã
-// ================================================================
-
-class _SupportButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool filled;
-  final VoidCallback onTap;
-
-  const _SupportButton({
-    required this.icon,
-    required this.label,
-    required this.filled,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 48,
-      child: Material(
-        color: filled ? Brand.primary : Colors.transparent,
-        borderRadius: BorderRadius.circular(15),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(15),
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(15),
-              border: filled
-                  ? null
-                  : Border.all(
-                      color: Brand.primary.withValues(alpha: 0.25),
-                    ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  icon,
-                  size: 20,
-                  color: filled ? Colors.white : Brand.primary,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: filled ? Colors.white : Brand.primary,
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
       ),
     );
   }
