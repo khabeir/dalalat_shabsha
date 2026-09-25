@@ -1,4 +1,5 @@
-// =============================================================
+//home screen 
+//==================================
 // الصفحة الرئيسية لتطبيق دلالة شبشة (التصميم الجديد)
 //
 // الحزم المطلوبة في pubspec.yaml:
@@ -25,6 +26,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart' show NumberFormat;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../core/widgets/listing_section.dart';
 import '../core/theme/app_colors.dart';
 import '../core/widgets/home_banner.dart';
 import '../core/widgets/home_drawer.dart';
@@ -1592,30 +1594,6 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  Widget _buildHorizontalListings(
-    List<Map<String, dynamic>> listings, {
-    bool commercial = false,
-  }) {
-    return SizedBox(
-      height: _cardHeight + 16,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: listings.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 12),
-        itemBuilder: (context, index) {
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: _buildListingCard(
-              listings[index],
-              isCommercial: commercial,
-            ),
-          );
-        },
-      ),
-    );
-  }
-
   // =========================
   // نتائج البحث / القسم / عرض الكل
   // =========================
@@ -1742,108 +1720,6 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   // =========================
-  // أقسام الصفحة الرئيسية
-  // =========================
-  Widget _buildHomeSections() {
-    if (_listingsLoading) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 40),
-        child: Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    final promoted = _activePromoted;
-
-    if (_listings.isEmpty && promoted.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 32),
-        child: Column(
-          children: [
-            Icon(Icons.inventory_2_outlined, size: 48),
-            SizedBox(height: 10),
-            Text('لا توجد إعلانات متاحة حالياً'),
-          ],
-        ),
-      );
-    }
-
-    final promotedIds = promoted.map((listing) => listing['id']).toSet();
-
-    final latestListings = _listings
-        .where((listing) => !promotedIds.contains(listing['id']))
-        .take(10)
-        .toList();
-
-    // صفوف الأقسام التي فيها إعلانات.
-    final categoryRows = <Widget>[];
-
-    for (var i = 0; i < _categories.length; i++) {
-      final category = _categories[i];
-      final categoryId = category['id'] as int?;
-
-      if (categoryId == null) continue;
-
-      final items = _listings
-          .where((listing) => listing['category_id'] == categoryId)
-          .take(8)
-          .toList();
-
-      if (items.isEmpty) continue;
-
-      final name = category['name']?.toString() ?? 'بدون اسم';
-
-      categoryRows.add(
-        Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _sectionHeader(
-                name,
-                icon: _filledCategoryIcon(name),
-                iconColor: _toneFor(name, i).fg,
-                onViewAll: () => _selectCategory(categoryId),
-              ),
-              const SizedBox(height: 12),
-              _buildHorizontalListings(items),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (promoted.isNotEmpty) ...[
-          _sectionHeader(
-            'إعلانات مميزة',
-            icon: Icons.local_fire_department_rounded,
-            iconColor: const Color(0xFFFF6A1A),
-            onViewAll: () => _showAll(_ListMode.featured),
-          ),
-          const SizedBox(height: 12),
-          _buildHorizontalListings(promoted),
-          const SizedBox(height: 14),
-        ],
-
-        if (latestListings.isNotEmpty) ...[
-          _sectionHeader(
-            'أحدث الإعلانات',
-            icon: Icons.schedule_rounded,
-            onViewAll: () => _showAll(_ListMode.latest),
-          ),
-          const SizedBox(height: 12),
-          _buildHorizontalListings(latestListings),
-          const SizedBox(height: 14),
-        ],
-
-        ...categoryRows,
-      ],
-    );
-  }
-
-  // =========================
   // جسم الصفحة
   // =========================
   Widget _buildBody(double topPadding) {
@@ -1899,7 +1775,40 @@ class _HomeScreenState extends State<HomeScreen>
 
           const SizedBox(height: 8),
 
-          if (_isFiltering) _buildSearchResults() else _buildHomeSections(),
+          if (_isFiltering)
+  _buildSearchResults()
+else
+  ListingSection(
+    loading: _listingsLoading,
+    promotedListings: _activePromoted,
+    listings: _listings,
+    categories: _categories,
+    isDark: _isDark,
+    titleColor: _titleColor,
+    cardHeight: _cardHeight,
+    buildListingCard: (
+      listing, {
+      bool isCommercial = false,
+    }) {
+      return _buildListingCard(
+        listing,
+        isCommercial: isCommercial,
+      );
+    },
+    categoryIcon: _filledCategoryIcon,
+    categoryColor: (name, index) {
+      return _toneFor(name, index).fg;
+    },
+    onShowFeatured: () {
+      _showAll(_ListMode.featured);
+    },
+    onShowLatest: () {
+      _showAll(_ListMode.latest);
+    },
+    onSelectCategory: (categoryId) {
+      _selectCategory(categoryId);
+    },
+  ),
         ],
       );
     }

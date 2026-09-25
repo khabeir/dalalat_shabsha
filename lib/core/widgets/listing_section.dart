@@ -1,0 +1,224 @@
+import 'package:flutter/material.dart';
+
+import '../theme/app_colors.dart';
+
+class ListingSection extends StatelessWidget {
+  final List<Map<String, dynamic>> promotedListings;
+  final List<Map<String, dynamic>> latestListings;
+  final List<Map<String, dynamic>> categories;
+  final List<Map<String, dynamic>> allListings;
+
+  final bool isDark;
+  final Color titleColor;
+
+  final double cardHeight;
+
+  final Widget Function(
+    Map<String, dynamic> listing, {
+    bool isCommercial,
+  }) buildListingCard;
+
+  final IconData Function(String name) categoryIcon;
+  final Color Function(String name, int index) categoryColor;
+
+  final VoidCallback onShowFeatured;
+  final VoidCallback onShowLatest;
+  final void Function(int categoryId) onSelectCategory;
+
+  const ListingSection({
+    super.key,
+    required this.promotedListings,
+    required this.latestListings,
+    required this.categories,
+    required this.allListings,
+    required this.isDark,
+    required this.titleColor,
+    required this.cardHeight,
+    required this.buildListingCard,
+    required this.categoryIcon,
+    required this.categoryColor,
+    required this.onShowFeatured,
+    required this.onShowLatest,
+    required this.onSelectCategory,
+  });
+
+  Widget _sectionHeader(
+    BuildContext context,
+    String title, {
+    IconData? icon,
+    Color? iconColor,
+    VoidCallback? onViewAll,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        children: [
+          if (icon != null) ...[
+            Icon(
+              icon,
+              size: 24,
+              color: iconColor ?? AppColors.brand,
+            ),
+            const SizedBox(width: 8),
+          ],
+          Expanded(
+            child: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 19,
+                fontWeight: FontWeight.w900,
+                color: titleColor,
+              ),
+            ),
+          ),
+          if (onViewAll != null)
+            InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: onViewAll,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 4,
+                  vertical: 6,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'عرض الكل',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: isDark
+                            ? Theme.of(context).colorScheme.primary
+                            : AppColors.brand,
+                      ),
+                    ),
+                    Icon(
+                      Icons.chevron_left_rounded,
+                      size: 22,
+                      color: isDark
+                          ? Theme.of(context).colorScheme.primary
+                          : AppColors.brand,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHorizontalListings(
+    List<Map<String, dynamic>> listings, {
+    bool commercial = false,
+  }) {
+    return SizedBox(
+      height: cardHeight + 16,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: listings.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 12),
+        itemBuilder: (context, index) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: buildListingCard(
+              listings[index],
+              isCommercial: commercial,
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final promotedIds = promotedListings
+        .map((listing) => listing['id'])
+        .toSet();
+
+    final filteredLatest = latestListings
+        .where((listing) => !promotedIds.contains(listing['id']))
+        .take(10)
+        .toList();
+
+    final categoryRows = <Widget>[];
+
+    for (var i = 0; i < categories.length; i++) {
+      final category = categories[i];
+      final categoryId = category['id'] as int?;
+
+      if (categoryId == null) continue;
+
+      final items = allListings
+          .where(
+            (listing) => listing['category_id'] == categoryId,
+          )
+          .take(8)
+          .toList();
+
+      if (items.isEmpty) continue;
+
+      final name = category['name']?.toString() ?? 'بدون اسم';
+
+      categoryRows.add(
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _sectionHeader(
+                context,
+                name,
+                icon: categoryIcon(name),
+                iconColor: categoryColor(name, i),
+                onViewAll: () => onSelectCategory(categoryId),
+              ),
+              const SizedBox(height: 12),
+              _buildHorizontalListings(items),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (promotedListings.isNotEmpty) ...[
+          _sectionHeader(
+            context,
+            'إعلانات مميزة',
+            icon: Icons.local_fire_department_rounded,
+            iconColor: const Color(0xFFFF6A1A),
+            onViewAll: onShowFeatured,
+          ),
+          const SizedBox(height: 12),
+          _buildHorizontalListings(
+            promotedListings,
+            commercial: true,
+          ),
+          const SizedBox(height: 14),
+        ],
+
+        if (filteredLatest.isNotEmpty) ...[
+          _sectionHeader(
+            context,
+            'أحدث الإعلانات',
+            icon: Icons.schedule_rounded,
+            onViewAll: onShowLatest,
+          ),
+          const SizedBox(height: 12),
+          _buildHorizontalListings(filteredLatest),
+          const SizedBox(height: 14),
+        ],
+
+        ...categoryRows,
+      ],
+    );
+  }
+}
