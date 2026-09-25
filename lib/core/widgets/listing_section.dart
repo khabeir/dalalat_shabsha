@@ -3,14 +3,14 @@ import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 
 class ListingSection extends StatelessWidget {
+  final bool loading;
+
   final List<Map<String, dynamic>> promotedListings;
-  final List<Map<String, dynamic>> latestListings;
+  final List<Map<String, dynamic>> listings;
   final List<Map<String, dynamic>> categories;
-  final List<Map<String, dynamic>> allListings;
 
   final bool isDark;
   final Color titleColor;
-
   final double cardHeight;
 
   final Widget Function(
@@ -27,10 +27,10 @@ class ListingSection extends StatelessWidget {
 
   const ListingSection({
     super.key,
+    required this.loading,
     required this.promotedListings,
-    required this.latestListings,
+    required this.listings,
     required this.categories,
-    required this.allListings,
     required this.isDark,
     required this.titleColor,
     required this.cardHeight,
@@ -49,6 +49,10 @@ class ListingSection extends StatelessWidget {
     Color? iconColor,
     VoidCallback? onViewAll,
   }) {
+    final actionColor = isDark
+        ? Theme.of(context).colorScheme.primary
+        : AppColors.brand;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
@@ -86,21 +90,17 @@ class ListingSection extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      'ÿπÿ±ÿ∂ ÿßŸÑŸÉŸÑ',
+                      '⁄—÷ «·ﬂ·',
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
-                        color: isDark
-                            ? Theme.of(context).colorScheme.primary
-                            : AppColors.brand,
+                        color: actionColor,
                       ),
                     ),
                     Icon(
                       Icons.chevron_left_rounded,
                       size: 22,
-                      color: isDark
-                          ? Theme.of(context).colorScheme.primary
-                          : AppColors.brand,
+                      color: actionColor,
                     ),
                   ],
                 ),
@@ -112,7 +112,7 @@ class ListingSection extends StatelessWidget {
   }
 
   Widget _buildHorizontalListings(
-    List<Map<String, dynamic>> listings, {
+    List<Map<String, dynamic>> items, {
     bool commercial = false,
   }) {
     return SizedBox(
@@ -120,13 +120,13 @@ class ListingSection extends StatelessWidget {
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: listings.length,
+        itemCount: items.length,
         separatorBuilder: (_, __) => const SizedBox(width: 12),
         itemBuilder: (context, index) {
           return Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: buildListingCard(
-              listings[index],
+              items[index],
               isCommercial: commercial,
             ),
           );
@@ -137,12 +137,41 @@ class ListingSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final promotedIds = promotedListings
+    if (loading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 40),
+        child: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    final promoted = promotedListings;
+
+    if (listings.isEmpty && promoted.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 32),
+        child: Column(
+          children: [
+            Icon(
+              Icons.inventory_2_outlined,
+              size: 48,
+            ),
+            SizedBox(height: 10),
+            Text('·«  ÊÃœ ≈⁄·«‰«  „ «Õ… Õ«·Ì«'),
+          ],
+        ),
+      );
+    }
+
+    final promotedIds = promoted
         .map((listing) => listing['id'])
         .toSet();
 
-    final filteredLatest = latestListings
-        .where((listing) => !promotedIds.contains(listing['id']))
+    final latestListings = listings
+        .where(
+          (listing) => !promotedIds.contains(listing['id']),
+        )
         .take(10)
         .toList();
 
@@ -154,7 +183,7 @@ class ListingSection extends StatelessWidget {
 
       if (categoryId == null) continue;
 
-      final items = allListings
+      final items = listings
           .where(
             (listing) => listing['category_id'] == categoryId,
           )
@@ -163,7 +192,8 @@ class ListingSection extends StatelessWidget {
 
       if (items.isEmpty) continue;
 
-      final name = category['name']?.toString() ?? 'ÿ®ÿØŸàŸÜ ÿßÿ≥ŸÖ';
+      final name =
+          category['name']?.toString() ?? '»œÊ‰ «”„';
 
       categoryRows.add(
         Padding(
@@ -189,31 +219,33 @@ class ListingSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (promotedListings.isNotEmpty) ...[
+        if (promoted.isNotEmpty) ...[
           _sectionHeader(
             context,
-            'ÿ•ÿπŸÑÿßŸÜÿßÿ™ ŸÖŸÖŸäÿ≤ÿ©',
+            '≈⁄·«‰«  „„Ì“…',
             icon: Icons.local_fire_department_rounded,
             iconColor: const Color(0xFFFF6A1A),
             onViewAll: onShowFeatured,
           ),
           const SizedBox(height: 12),
-          _buildHorizontalListings(
-            promotedListings,
-            commercial: true,
-          ),
+
+          // ‰Õ«›Ÿ ⁄·Ï «·”·Êﬂ «·”«»ﬁ:
+          // «·≈⁄·«‰ «·„„Ì“ ›Ì «·’›Õ… «·—∆Ì”Ì…
+          // ·« Ìı⁄«„· ﬂ≈⁄·«‰  Ã«—Ì.
+          _buildHorizontalListings(promoted),
+
           const SizedBox(height: 14),
         ],
 
-        if (filteredLatest.isNotEmpty) ...[
+        if (latestListings.isNotEmpty) ...[
           _sectionHeader(
             context,
-            'ÿ£ÿ≠ÿØÿ´ ÿßŸÑÿ•ÿπŸÑÿßŸÜÿßÿ™',
+            '√ÕœÀ «·≈⁄·«‰« ',
             icon: Icons.schedule_rounded,
             onViewAll: onShowLatest,
           ),
           const SizedBox(height: 12),
-          _buildHorizontalListings(filteredLatest),
+          _buildHorizontalListings(latestListings),
           const SizedBox(height: 14),
         ],
 
