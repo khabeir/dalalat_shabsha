@@ -9,11 +9,15 @@ const String kSupportWhatsApp = '249914111214';
 class SupportContactCard extends StatelessWidget {
   final String title;
   final String subtitle;
+  final String phoneNumber;
+  final String whatsappNumber;
 
   const SupportContactCard({
     super.key,
     required this.title,
     required this.subtitle,
+    this.phoneNumber = kSupportPhone,
+    this.whatsappNumber = kSupportWhatsApp,
   });
 
   Future<void> _launch(BuildContext context, Uri uri, String error) async {
@@ -64,7 +68,7 @@ class SupportContactCard extends StatelessWidget {
                 child: OutlinedButton.icon(
                   onPressed: () => _launch(
                     context,
-                    Uri(scheme: 'tel', path: kSupportPhone),
+                    Uri(scheme: 'tel', path: phoneNumber),
                     'تعذر فتح تطبيق الاتصال',
                   ),
                   icon: const Icon(Icons.phone_outlined),
@@ -76,7 +80,7 @@ class SupportContactCard extends StatelessWidget {
                 child: OutlinedButton.icon(
                   onPressed: () => _launch(
                     context,
-                    Uri.parse('https://wa.me/$kSupportWhatsApp'),
+                    Uri.parse('https://wa.me/$whatsappNumber'),
                     'تعذر فتح واتساب',
                   ),
                   icon: const Icon(Icons.chat_outlined),
@@ -87,7 +91,7 @@ class SupportContactCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           SelectableText(
-            kSupportPhone,
+            phoneNumber,
             textDirection: TextDirection.ltr,
             style: const TextStyle(fontSize: 13),
           ),
