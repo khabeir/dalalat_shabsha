@@ -33,7 +33,6 @@ import '../core/theme/app_colors.dart';
 import '../core/widgets/home_banner.dart';
 import '../core/widgets/home_drawer.dart';
 import '../core/widgets/listing_card.dart';
-import '../core/widgets/home_decorative_painters.dart';
 import '../core/widgets/home_header.dart';
 
 import 'add_listing_screen.dart';
