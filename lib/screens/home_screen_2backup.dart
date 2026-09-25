@@ -1,4 +1,4 @@
-// ====================================
+// =============================================================
 // الصفحة الرئيسية لتطبيق دلالة شبشة (التصميم الجديد)
 //
 // الحزم المطلوبة في pubspec.yaml:
@@ -16,7 +16,7 @@
 //        assets/images/home_banner.jpg   (صورة البانر)
 //      وأضف assets/images/ إلى pubspec.yaml. وإن لم توجد يظهر رسم
 //      مشهد شبشة المرسوم بالكود.
-// ====================================
+// =============================================================
 
 import 'dart:async';
 import 'dart:math' as math;
@@ -1457,101 +1457,11 @@ class _HomeScreenState extends State<HomeScreen>
   // =========================
   // بانر العروض المتحرك
   // =========================
-
-
-// ==================================
-// الألوان الأساسية المستخدمة في التصميم
-// ===================================
-const Color _brand = Color(0xFF5B2DB5);
-const Color _gold = Color(0xFFFFD700);
-const Color _orange = Color(0xFFFF8A00);
-
-// ===================================
-// النماذج والأنواع
-// ====================================
-enum _BannerAction { addListing, browseCategories }
-
-class _BannerSlide {
-  final String line1;
-  final String line2;
-  final List<String> bullets;
-  final String cta;
-  final _BannerAction action;
-
-  const _BannerSlide({
-    required this.line1,
-    required this.line2,
-    required this.bullets,
-    required this.cta,
-    required this.action,
-  });
-}
-
-// ===================================
-// المكون الرئيسي للبنر المتحرك
-// ===================================
-class BannerCarouselWidget extends StatefulWidget {
-  const BannerCarouselWidget({super.key});
-
-  @override
-  State<BannerCarouselWidget> createState() => _BannerCarouselWidgetState();
-}
-
-class _BannerCarouselWidgetState extends State<BannerCarouselWidget> {
-  final PageController _bannerController = PageController();
-  final ValueNotifier<int> _bannerIndex = ValueNotifier<int>(0);
-
-  // قائمة الشرائح (بيانات للعرض)
-  final List<_BannerSlide> _slides = const [
-    _BannerSlide(
-      line1: 'اعرض سيارتك',
-      line2: 'للبيع الآن!',
-      bullets: [
-        'إدراج سهل وسريع',
-        'وصول لآلاف المشترين',
-        'مجاني تماماً!',
-      ],
-      cta: 'اعرض إعلانك',
-      action: _BannerAction.addListing,
-    ),
-    _BannerSlide(
-      line1: 'تصفح أحدث',
-      line2: 'العروض اليوم',
-      bullets: [
-        'تصفح الأقسام',
-        'عروض حصريّة',
-        'تواصل مباشر',
-      ],
-      cta: 'تصفح الآن',
-      action: _BannerAction.browseCategories,
-    ),
-  ];
-
-  @override
-  void dispose() {
-    _bannerController.dispose();
-    _bannerIndex.dispose();
-    super.dispose();
-  }
-
-  void _onBannerAction(_BannerAction action) {
-    switch (action) {
-      case _BannerAction.addListing:
-        // إضافة إعلان جديد
-        break;
-      case _BannerAction.browseCategories:
-        // التمرير للأقسام
-        break;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildBannerCarousel() {
     return Column(
       children: [
-        // سلايدر البنر
         SizedBox(
-          height: 175,
+          height: 160,
           child: PageView.builder(
             controller: _bannerController,
             itemCount: _slides.length,
@@ -1565,9 +1475,8 @@ class _BannerCarouselWidgetState extends State<BannerCarouselWidget> {
           ),
         ),
 
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
 
-        // مؤشرات الصفحات (Page Indicators)
         ValueListenableBuilder<int>(
           valueListenable: _bannerIndex,
           builder: (context, current, _) {
@@ -1579,11 +1488,11 @@ class _BannerCarouselWidgetState extends State<BannerCarouselWidget> {
                 return AnimatedContainer(
                   duration: const Duration(milliseconds: 250),
                   margin: const EdgeInsets.symmetric(horizontal: 4),
-                  width: active ? 22 : 8,
-                  height: 8,
+                  width: active ? 12 : 8,
+                  height: active ? 12 : 8,
                   decoration: BoxDecoration(
-                    color: active ? _brand : _brand.withOpacity(0.22),
-                    borderRadius: BorderRadius.circular(4),
+                    color: active ? _brand : _brand.withValues(alpha: 0.22),
+                    shape: BoxShape.circle,
                   ),
                 );
               }),
@@ -1594,26 +1503,46 @@ class _BannerCarouselWidgetState extends State<BannerCarouselWidget> {
     );
   }
 
-  // ====================================
-  // تصميم شريحة البنر الواحدة
-  // ===================================
+  void _onBannerAction(_BannerAction action) {
+    switch (action) {
+      case _BannerAction.addListing:
+        _openAddListing();
+        break;
+      case _BannerAction.browseCategories:
+        _scrollToCategories();
+        break;
+    }
+  }
+
+  void _scrollToCategories() {
+    final target = _categoriesKey.currentContext;
+
+    if (target == null) return;
+
+    Scrollable.ensureVisible(
+      target,
+      duration: const Duration(milliseconds: 400),
+      curve: Curves.easeInOut,
+      alignment: 0.05,
+    );
+  }
+
   Widget _buildBannerSlide(_BannerSlide slide) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(26),
       child: LayoutBuilder(
         builder: (context, constraints) {
           final width = constraints.maxWidth;
-          final photoWidth = width * 0.48;
+          final photoWidth = width * 0.56;
 
           return Stack(
             children: [
-              // 1. الخلفية المتدرجة البنفسجية
               const Positioned.fill(
                 child: DecoratedBox(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      begin: Alignment.centerRight,
-                      end: Alignment.centerLeft,
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
                       colors: [
                         Color(0xFF3B1785),
                         Color(0xFF5B2DB5),
@@ -1624,7 +1553,7 @@ class _BannerCarouselWidgetState extends State<BannerCarouselWidget> {
                 ),
               ),
 
-              // 2. الصورة على اليمين مع حافة منحنية مخصصة
+              // الصورة على اليمين بحافة منحنية.
               Positioned(
                 right: 0,
                 top: 0,
@@ -1632,18 +1561,16 @@ class _BannerCarouselWidgetState extends State<BannerCarouselWidget> {
                 width: photoWidth,
                 child: ClipPath(
                   clipper: const _PhotoClipper(),
-                  child: Image.network(
-                    'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?q=80&w=800', // استبدلها بـ AssetImage عند الاستخدام
+                  child: Image.asset(
+                    _bannerAsset,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
-                      color: Colors.white24,
-                      child: const Icon(Icons.directions_car, color: Colors.white, size: 50),
+                    errorBuilder: (_, __, ___) => const RepaintBoundary(
+                      child: CustomPaint(painter: _ShabshaScenePainter()),
                     ),
                   ),
                 ),
               ),
 
-              // 3. الخط الموجي المزين فوق الصورة
               Positioned(
                 right: 0,
                 top: 0,
@@ -1654,12 +1581,11 @@ class _BannerCarouselWidgetState extends State<BannerCarouselWidget> {
                 ),
               ),
 
-              // 4. النصوص والأزرار (على اليسار في الواجهة العربية RTL)
               Positioned(
                 left: 18,
-                top: 12,
-                bottom: 12,
-                right: photoWidth - 10,
+                top: 14,
+                bottom: 14,
+                width: width * 0.58,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -1671,9 +1597,9 @@ class _BannerCarouselWidgetState extends State<BannerCarouselWidget> {
                         slide.line1,
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 22,
+                          fontSize: 25,
                           fontWeight: FontWeight.w900,
-                          height: 1.1,
+                          height: 1.2,
                         ),
                       ),
                     ),
@@ -1684,21 +1610,19 @@ class _BannerCarouselWidgetState extends State<BannerCarouselWidget> {
                         slide.line2,
                         style: const TextStyle(
                           color: _gold,
-                          fontSize: 22,
+                          fontSize: 25,
                           fontWeight: FontWeight.w900,
-                          height: 1.1,
+                          height: 1.2,
                         ),
                       ),
                     ),
-                    const SizedBox(height: 6),
-
-                    // النقاط الرئيسية (Bullets)
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: slide.bullets.map((bullet) {
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 2),
-                          child: Row(
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 3,
+                      children: [
+                        for (final bullet in slide.bullets)
+                          Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Container(
@@ -1709,60 +1633,56 @@ class _BannerCarouselWidgetState extends State<BannerCarouselWidget> {
                                   shape: BoxShape.circle,
                                 ),
                               ),
-                              const SizedBox(width: 5),
+                              const SizedBox(width: 4),
                               Text(
                                 bullet,
                                 style: const TextStyle(
                                   color: Colors.white,
-                                  fontSize: 10.5,
+                                  fontSize: 11.5,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
                             ],
                           ),
-                        );
-                      }).toList(),
+                      ],
                     ),
-
-                    const SizedBox(height: 8),
-
-                    // زر اتخاذ الإجراء (CTA Button)
+                    const SizedBox(height: 10),
                     GestureDetector(
                       onTap: () => _onBannerAction(slide.action),
                       child: Container(
-                        height: 36,
+                        height: 42,
                         padding: const EdgeInsets.symmetric(horizontal: 14),
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
                             colors: [Color(0xFFFFB02E), Color(0xFFFF8A00)],
                           ),
-                          borderRadius: BorderRadius.circular(20),
+                          borderRadius: BorderRadius.circular(22),
                           boxShadow: [
                             BoxShadow(
-                              color: _orange.withOpacity(0.4),
-                              blurRadius: 8,
-                              offset: const Offset(0, 3),
+                              color: _orange.withValues(alpha: 0.45),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
                             ),
                           ],
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
+                            Text(
+                              slide.cta,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
                             Icon(
                               slide.action == _BannerAction.addListing
                                   ? Icons.add_circle_outline_rounded
                                   : Icons.grid_view_rounded,
                               color: Colors.white,
-                              size: 18,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              slide.cta,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w800,
-                              ),
+                              size: 22,
                             ),
                           ],
                         ),
@@ -1777,63 +1697,6 @@ class _BannerCarouselWidgetState extends State<BannerCarouselWidget> {
       ),
     );
   }
-}
-
-// ==========================================
-// 1. Clipper لقص الصورة بحافة منحنية انسيابية
-// ==========================================
-class _PhotoClipper extends CustomClipper<Path> {
-  const _PhotoClipper();
-
-  @override
-  Path getClip(Size size) {
-    final path = Path();
-    path.moveTo(size.width * 0.25, 0);
-    path.quadraticBezierTo(
-      0,
-      size.height * 0.5,
-      size.width * 0.35,
-      size.height,
-    );
-    path.lineTo(size.width, size.height);
-    path.lineTo(size.width, 0);
-    path.close();
-    return path;
-  }
-
-  @override
-  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
-}
-
-// ==========================================
-// 2. CustomPainter لرسم المنحنى الأبيض المزين
-// ==========================================
-class _SwooshPainter extends CustomPainter {
-  const _SwooshPainter();
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      color = Colors.white.withOpacity(0.25)
-      style = PaintingStyle.stroke
-      strokeWidth = 3.0;
-
-    final path = Path();
-    path.moveTo(size.width * 0.23, 0);
-    path.quadraticBezierTo(
-      -2,
-      size.height * 0.5,
-      size.width * 0.33,
-      size.height,
-    );
-
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
 
   // =========================
   // عناوين الأقسام
