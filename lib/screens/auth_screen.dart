@@ -893,11 +893,13 @@ class _AuthScreenState extends State<AuthScreen> {
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 460),
                       child: const SupportContactCard(
-                        title: 'لا تستطيع التسجيل أو إضافة إعلانك؟',
-                        subtitle:
-                            'تواصل معنا وسنساعدك، أو نضيف إعلانك بدلاً عنك. '
-                            'وإن نسيت كلمة المرور فنعيد تعيينها لك.',
-                      ),
+  title: 'تحتاج إلى مساعدة؟',
+  subtitle:
+      'تواصل معنا وسنساعدك في التسجيل أو إضافة إعلانك، '
+      'ويمكننا مساعدتك أيضاً إذا نسيت كلمة المرور.',
+  whatsappNumber: '249914111214',
+  phoneNumber: '+249113339644',
+),
                     ),
                   ),
                 ],
