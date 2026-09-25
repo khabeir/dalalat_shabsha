@@ -1,21 +1,22 @@
+//#home screen
 // =============================================================
 // الصفحة الرئيسية لتطبيق دلالة شبشة (التصميم الجديد)
 //
 // الحزم المطلوبة في pubspec.yaml:
-//   intl: ^0.19.0
-//   cached_network_image: ^3.3.1
+// intl: ^0.19.0
+// cached_network_image: ^3.3.1
 //
 // يعتمد الكود على الافتراضات التالية، عدّلها إن اختلفت عندك:
-//   1) جدول المفضلة: أسماؤه في الثوابت _favoritesTable وما بعده.
-//   2) علاقة (foreign key) بين listing_images.listing_id و listings.id.
-//      إن لم توجد يعمل الكود تلقائياً بالطريقة القديمة (طلب منفصل للصور).
-//   3) عمود icon في جدول categories (اختياري): مفاتيح مثل car, home, phone.
-//      إن كان فارغاً تُستخدم الأيقونة حسب اسم القسم كما كان سابقاً.
-//   4) صور الترويسة والبانر اختيارية: ضع صورتك في
-//        assets/images/home_header.jpg   (خلفية الترويسة)
-//        assets/images/home_banner.jpg   (صورة البانر)
-//      وأضف assets/images/ إلى pubspec.yaml. وإن لم توجد يظهر رسم
-//      مشهد شبشة المرسوم بالكود.
+// 1) جدول المفضلة: أسماؤه في الثوابت _favoritesTable وما بعده.
+// 2) علاقة (foreign key) بين listing_images.listing_id و listings.id.
+// إن لم توجد يعمل الكود تلقائياً بالطريقة القديمة (طلب منفصل للصور).
+// 3) عمود icon في جدول categories (اختياري): مفاتيح مثل car, home, phone.
+// إن كان فارغاً تُستخدم الأيقونة حسب اسم القسم كما كان سابقاً.
+// 4) صور الترويسة والبانر اختيارية: ضع صورتك في
+// assets/images/home_header.jpg (خلفية الترويسة)
+// assets/images/home_banner.jpg (صورة البانر)
+// وأضف assets/images/ إلى pubspec.yaml. وإن لم توجد يظهر رسم
+// مشهد شبشة المرسوم بالكود.
 // =============================================================
 
 import 'dart:async';
@@ -62,8 +63,8 @@ class _HomeScreenState extends State<HomeScreen>
   static const _orange = Color(0xFFFF9F1C);
   static const _gold = Color(0xFFFFC93C);
 
-  // ارتفاع الترويسة بدون شريط الحالة.
-  static const _headerContentHeight = 200.0;
+  // ارتفاع الترويسة بدون شريط الحالة (تم تقليله لتقريب العناصر).
+  static const _headerContentHeight = 175.0;
 
   // صور اختيارية (انظر التعليق في أعلى الملف).
   static const _headerAsset = 'assets/images/home_header.jpg';
@@ -161,10 +162,8 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   void initState() {
     super.initState();
-
     WidgetsBinding.instance.addObserver(this);
     _scrollController.addListener(_onScroll);
-
     _loadAll(showSpinner: false);
     _checkAdminStatus();
 
@@ -177,7 +176,6 @@ class _HomeScreenState extends State<HomeScreen>
     // تقليب شرائح البانر كل 5 ثوان.
     _bannerTimer = Timer.periodic(const Duration(seconds: 5), (_) {
       if (!mounted || !_bannerController.hasClients) return;
-
       _bannerController.animateToPage(
         (_bannerIndex.value + 1) % _slides.length,
         duration: const Duration(milliseconds: 500),
@@ -213,13 +211,11 @@ class _HomeScreenState extends State<HomeScreen>
     if (!_scrollController.hasClients) return;
 
     final position = _scrollController.position;
-
     _headerVisible.value = position.pixels < 110;
 
     // التحميل التلقائي داخل القسم أو "أحدث الإعلانات" فقط.
     final canLoadMore =
         _selectedCategoryId != null || _mode == _ListMode.latest;
-
     if (!canLoadMore || _isSearching) return;
 
     if (position.pixels >= position.maxScrollExtent - 400) {
@@ -229,7 +225,6 @@ class _HomeScreenState extends State<HomeScreen>
 
   void _scrollToTop() {
     if (!_scrollController.hasClients) return;
-
     _scrollController.animateTo(
       0,
       duration: const Duration(milliseconds: 300),
@@ -239,7 +234,6 @@ class _HomeScreenState extends State<HomeScreen>
 
   void _showSnack(String message) {
     if (!mounted) return;
-
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
     );
@@ -264,12 +258,9 @@ class _HomeScreenState extends State<HomeScreen>
 
   void _onSearchChanged(String value) {
     _debounce?.cancel();
-
     _debounce = Timer(const Duration(milliseconds: 300), () {
       if (!mounted) return;
-
       setState(() => _searchQuery = value);
-
       if (value.trim().isNotEmpty) {
         _ensureSearchPool();
       }
@@ -282,10 +273,8 @@ class _HomeScreenState extends State<HomeScreen>
     setState(() => _searchQuery = '');
   }
 
-  // نتائج البحث/القسم. البحث يعمل على مجموعة أكبر (حتى 500 إعلان)
-  // تُحمّل مرة واحدة عند أول بحث، ثم يُبحث فيها محلياً بالتطبيع العربي.
+  // نتائج البحث/القسم.
   List<Map<String, dynamic>> get _visibleResults {
-    // "عرض الكل" للإعلانات المميزة.
     if (_mode == _ListMode.featured &&
         _selectedCategoryId == null &&
         !_isSearching) {
@@ -300,9 +289,7 @@ class _HomeScreenState extends State<HomeScreen>
           listing['category_id'] != _selectedCategoryId) {
         return false;
       }
-
       if (query.isEmpty) return true;
-
       return (listing['_search'] as String? ?? '').contains(query);
     }).toList();
   }
@@ -311,33 +298,25 @@ class _HomeScreenState extends State<HomeScreen>
     if (_searchPool != null || _searchPoolLoading) return;
 
     setState(() => _searchPoolLoading = true);
-
     try {
       final rows = await _fetchListings(
         from: 0,
         to: _searchPoolSize - 1,
       );
-
       if (!mounted) return;
-
       setState(() {
         _searchPool = rows;
         _searchPoolLoading = false;
       });
     } catch (e) {
       debugPrint('searchPool error: $e');
-
       if (!mounted) return;
-
-      // إن فشل التحميل نبحث في الإعلانات المحمّلة حالياً.
       setState(() => _searchPoolLoading = false);
     }
   }
 
-  // الإعلانات التجارية تنتهي محلياً بدون انتظار المؤقّت.
   List<Map<String, dynamic>> get _activePromoted {
     final now = DateTime.now().toUtc();
-
     return _promotedListings.where((listing) {
       final end = DateTime.tryParse('${listing['promotion_end_at']}');
       return end == null || end.toUtc().isAfter(now);
@@ -355,9 +334,7 @@ class _HomeScreenState extends State<HomeScreen>
       });
     }
 
-    // نجعل مجموعة البحث تُحمّل من جديد عند الحاجة.
     _searchPool = null;
-
     try {
       await Future.wait([
         _loadCategories(),
@@ -365,11 +342,9 @@ class _HomeScreenState extends State<HomeScreen>
         _loadPromotedListings(),
         _loadFavorites(),
       ]);
-
       if (mounted) setState(() => _error = null);
     } catch (e) {
       debugPrint('loadAll error: $e');
-
       if (mounted) {
         if (_listings.isEmpty) {
           setState(() {
@@ -381,11 +356,8 @@ class _HomeScreenState extends State<HomeScreen>
         }
       }
     }
-
     if (!mounted) return;
-
     setState(() => _loading = false);
-
     if (_isSearching) {
       unawaited(_ensureSearchPool());
     }
@@ -399,7 +371,6 @@ class _HomeScreenState extends State<HomeScreen>
         .order('sort_order');
 
     if (!mounted) return;
-
     setState(() {
       _categories = List<Map<String, dynamic>>.from(response);
     });
@@ -412,7 +383,6 @@ class _HomeScreenState extends State<HomeScreen>
   Future<void> _loadListings({bool reset = true}) async {
     if (!reset && (_loadingMore || !_hasMore || _listingsLoading)) return;
 
-    // رقم الطلب يمنع نتيجة قديمة من الكتابة فوق نتيجة أحدث.
     final requestId = reset ? ++_listingsRequestId : _listingsRequestId;
     final categoryId = _selectedCategoryId;
     final pageSize = _pageSizeFor(categoryId);
@@ -428,9 +398,7 @@ class _HomeScreenState extends State<HomeScreen>
         to: page * pageSize + pageSize - 1,
         categoryId: categoryId,
       );
-
       if (!mounted || requestId != _listingsRequestId) return;
-
       setState(() {
         _listings = reset ? rows : [..._listings, ...rows];
         _page = page + 1;
@@ -440,37 +408,28 @@ class _HomeScreenState extends State<HomeScreen>
       });
     } catch (e) {
       debugPrint('loadListings error: $e');
-
       if (!mounted || requestId != _listingsRequestId) return;
-
       setState(() {
         _loadingMore = false;
         _listingsLoading = false;
       });
-
       if (reset) rethrow;
     }
   }
 
-  // جلب الإعلانات مع أول صورة لكل إعلان في طلب واحد.
-  // إن فشل الطلب المدمج نعود للطريقة القديمة (طلب منفصل للصور).
   Future<List<Map<String, dynamic>>> _fetchListings({
     required int from,
     required int to,
     int? categoryId,
   }) async {
     try {
-      var query = _supabase
-          .from('listings')
-          .select(
+      var query = _supabase.from('listings').select(
             '$_listingColumns, listing_images(image_path, sort_order)',
-          )
-          .eq('status', 'approved');
+          ).eq('status', 'approved');
 
       if (categoryId != null) {
         query = query.eq('category_id', categoryId);
       }
-
       final response = await query
           .order('created_at', ascending: false)
           .order('sort_order', referencedTable: 'listing_images')
@@ -482,7 +441,6 @@ class _HomeScreenState extends State<HomeScreen>
           .toList();
     } catch (e) {
       debugPrint('embedded images query failed, using fallback: $e');
-
       var query = _supabase
           .from('listings')
           .select(_listingColumns)
@@ -491,42 +449,32 @@ class _HomeScreenState extends State<HomeScreen>
       if (categoryId != null) {
         query = query.eq('category_id', categoryId);
       }
-
       final response = await query
           .order('created_at', ascending: false)
           .range(from, to);
 
       final rows = List<Map<String, dynamic>>.from(response);
-
       await _attachCoverImages(rows);
-
       return rows.map(_prepareListing).toList();
     }
   }
 
-  // استخراج غلاف الإعلان وتجهيز نص البحث المطبّع مرة واحدة.
   Map<String, dynamic> _prepareListing(Map<String, dynamic> row) {
     final images = row['listing_images'];
-
     if (images is List && images.isNotEmpty && images.first is Map) {
       row['image_path'] = (images.first as Map)['image_path'];
     }
-
     row['_search'] = _normalizeSearchText(
       '${row['title'] ?? ''} '
       '${row['description'] ?? ''} '
       '${row['area'] ?? ''}',
     );
-
     return row;
   }
 
-  // جلب أول صورة لكل إعلان بطلب منفصل (وسيلة احتياطية + الإعلانات التجارية).
   Future<void> _attachCoverImages(List<Map<String, dynamic>> rows) async {
-    final ids = rows
-        .map((row) => row['id'])
-        .where((id) => id != null)
-        .toList();
+    final ids =
+        rows.map((row) => row['id']).where((id) => id != null).toList();
 
     if (ids.isEmpty) return;
 
@@ -537,11 +485,9 @@ class _HomeScreenState extends State<HomeScreen>
         .order('sort_order');
 
     final covers = <dynamic, dynamic>{};
-
     for (final image in List<Map<String, dynamic>>.from(response)) {
       covers.putIfAbsent(image['listing_id'], () => image['image_path']);
     }
-
     for (final row in rows) {
       final path = covers[row['id']];
       if (path != null) row['image_path'] = path;
@@ -554,14 +500,15 @@ class _HomeScreenState extends State<HomeScreen>
 
       final promotedResponse = await _supabase
           .from('promoted_listings')
-          .select('id, listing_id, start_at, end_at, is_active, created_by')
+          .select(
+              'id, listing_id, start_at, end_at, is_active, created_by')
           .eq('is_active', true)
           .lte('start_at', now)
           .gt('end_at', now)
           .order('start_at', ascending: false);
 
-      final promotedRows = List<Map<String, dynamic>>.from(promotedResponse);
-
+      final promotedRows =
+          List<Map<String, dynamic>>.from(promotedResponse);
       final listingIds = promotedRows
           .map((item) => item['listing_id'])
           .where((id) => id != null)
@@ -572,7 +519,6 @@ class _HomeScreenState extends State<HomeScreen>
         return;
       }
 
-      // لا نعرض الإعلان التجاري إلا إذا كان الإعلان نفسه approved.
       final listingsResponse = await _supabase
           .from('listings')
           .select(_listingColumns)
@@ -580,38 +526,28 @@ class _HomeScreenState extends State<HomeScreen>
           .eq('status', 'approved');
 
       final listingsById = <dynamic, Map<String, dynamic>>{};
-
       for (final listing
           in List<Map<String, dynamic>>.from(listingsResponse)) {
         listingsById[listing['id']] = listing;
       }
 
       final result = <Map<String, dynamic>>[];
-
-      // نحافظ على ترتيب start_at القادم من promoted_listings.
       for (final promoted in promotedRows) {
         final listing = listingsById[promoted['listing_id']];
-
         if (listing == null) continue;
-
         final item = Map<String, dynamic>.from(listing);
-
         item['promoted_listing_id'] = promoted['id'];
         item['promotion_start_at'] = promoted['start_at'];
         item['promotion_end_at'] = promoted['end_at'];
         item['promotion_is_active'] = promoted['is_active'];
         item['is_commercial'] = true;
-
         result.add(item);
       }
 
       await _attachCoverImages(result);
-
       if (!mounted) return;
-
       setState(() => _promotedListings = result);
     } catch (e) {
-      // لا نوقف الصفحة الرئيسية إذا فشل تحميل الإعلانات التجارية.
       debugPrint('loadPromoted error: $e');
     }
   }
@@ -619,13 +555,11 @@ class _HomeScreenState extends State<HomeScreen>
   Future<void> _checkAdminStatus() async {
     try {
       final user = _supabase.auth.currentUser;
-
       if (user == null) {
         if (!mounted) return;
         setState(() => _isAdmin = false);
         return;
       }
-
       final profile = await _supabase
           .from('profiles')
           .select('role')
@@ -633,7 +567,6 @@ class _HomeScreenState extends State<HomeScreen>
           .maybeSingle();
 
       if (!mounted) return;
-
       setState(() => _isAdmin = profile?['role'] == 'admin');
     } catch (_) {
       if (!mounted) return;
@@ -649,18 +582,14 @@ class _HomeScreenState extends State<HomeScreen>
     bool clearSearch = false,
   }) async {
     _debounce?.cancel();
-
     if (clearSearch) _searchController.clear();
-
     setState(() {
       _mode = _ListMode.home;
       _selectedCategoryId = id;
       _listingsLoading = true;
       if (clearSearch) _searchQuery = '';
     });
-
     _scrollToTop();
-
     try {
       await _loadListings();
     } catch (_) {
@@ -670,21 +599,16 @@ class _HomeScreenState extends State<HomeScreen>
 
   Future<void> _clearFilters() async {
     final hadCategory = _selectedCategoryId != null;
-
     _debounce?.cancel();
     _searchController.clear();
-
     setState(() {
       _mode = _ListMode.home;
       _searchQuery = '';
       _selectedCategoryId = null;
       if (hadCategory) _listingsLoading = true;
     });
-
     _scrollToTop();
-
     if (!hadCategory) return;
-
     try {
       await _loadListings();
     } catch (_) {
@@ -692,16 +616,13 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
-  // "عرض الكل" للإعلانات المميزة أو الأحدث.
   void _showAll(_ListMode mode) {
     _debounce?.cancel();
     _searchController.clear();
-
     setState(() {
       _mode = mode;
       _searchQuery = '';
     });
-
     _scrollToTop();
   }
 
@@ -720,26 +641,21 @@ class _HomeScreenState extends State<HomeScreen>
   Future<void> _loadFavorites() async {
     try {
       final user = _supabase.auth.currentUser;
-
       if (user == null) {
         if (mounted) setState(() => _favoriteIds = {});
         return;
       }
-
       final rows = await _supabase
           .from(_favoritesTable)
           .select(_favListingColumn)
           .eq(_favUserColumn, user.id);
 
       final ids = <int>{};
-
       for (final row in rows) {
         final value = row[_favListingColumn];
         if (value is num) ids.add(value.toInt());
       }
-
       if (!mounted) return;
-
       setState(() => _favoriteIds = ids);
     } catch (e) {
       debugPrint('loadFavorites error: $e');
@@ -750,12 +666,9 @@ class _HomeScreenState extends State<HomeScreen>
     if (!await _ensureSignedIn()) return;
 
     final user = _supabase.auth.currentUser;
-
     if (user == null) return;
 
     final wasFavorite = _favoriteIds.contains(listingId);
-
-    // تحديث فوري للواجهة ثم مزامنة مع الخادم.
     setState(() {
       if (wasFavorite) {
         _favoriteIds.remove(listingId);
@@ -779,10 +692,7 @@ class _HomeScreenState extends State<HomeScreen>
       }
     } catch (e) {
       debugPrint('toggleFavorite error: $e');
-
       if (!mounted) return;
-
-      // نتراجع عن التحديث الفوري.
       setState(() {
         if (wasFavorite) {
           _favoriteIds.add(listingId);
@@ -790,7 +700,6 @@ class _HomeScreenState extends State<HomeScreen>
           _favoriteIds.remove(listingId);
         }
       });
-
       _showSnack('تعذر تحديث المفضلة، حاول مرة أخرى');
     }
   }
@@ -801,16 +710,12 @@ class _HomeScreenState extends State<HomeScreen>
   Future<void> _signOut() async {
     try {
       await _supabase.auth.signOut();
-
       if (!mounted) return;
-
       setState(() {
         _isAdmin = false;
         _favoriteIds = {};
       });
-
       _showSnack('تم تسجيل الخروج بنجاح');
-
       await _loadAll(showSpinner: false);
     } catch (_) {
       _showSnack('تعذر تسجيل الخروج، حاول مرة أخرى');
@@ -828,13 +733,11 @@ class _HomeScreenState extends State<HomeScreen>
     );
 
     if (!mounted) return false;
-
     if (result == true && _supabase.auth.currentUser != null) {
       await _checkAdminStatus();
       await _loadFavorites();
       return true;
     }
-
     return false;
   }
 
@@ -850,7 +753,6 @@ class _HomeScreenState extends State<HomeScreen>
     );
 
     if (!mounted) return;
-
     setState(() {});
     await _checkAdminStatus();
     await _loadFavorites();
@@ -868,7 +770,6 @@ class _HomeScreenState extends State<HomeScreen>
     );
 
     if (!mounted) return;
-
     await _loadAll(showSpinner: false);
   }
 
@@ -884,7 +785,6 @@ class _HomeScreenState extends State<HomeScreen>
     );
 
     if (!mounted) return;
-
     await _loadAll(showSpinner: false);
   }
 
@@ -900,7 +800,6 @@ class _HomeScreenState extends State<HomeScreen>
     );
 
     if (!mounted) return;
-
     await _loadFavorites();
   }
 
@@ -916,14 +815,12 @@ class _HomeScreenState extends State<HomeScreen>
     );
 
     if (!mounted) return;
-
     await _checkAdminStatus();
     await _loadAll(showSpinner: false);
   }
 
   Future<void> _openListingDetails(Map<String, dynamic> listing) async {
     final listingId = listing['id'];
-
     if (listingId is! int) return;
 
     await Navigator.push(
@@ -936,8 +833,6 @@ class _HomeScreenState extends State<HomeScreen>
     );
 
     if (!mounted) return;
-
-    // قد يكون المستخدم أضاف/أزال المفضلة من صفحة التفاصيل.
     await _loadFavorites();
   }
 
@@ -960,7 +855,6 @@ class _HomeScreenState extends State<HomeScreen>
     'other': Icons.more_horiz_outlined,
   };
 
-  // الأولوية لعمود icon في قاعدة البيانات، ثم اسم القسم.
   IconData _iconForCategory(Map<String, dynamic> category) {
     return _iconMap[category['icon']?.toString().trim()] ??
         _categoryIcon(category['name']?.toString() ?? '');
@@ -1004,37 +898,28 @@ class _HomeScreenState extends State<HomeScreen>
   // =========================
   String _formatPrice(Map<String, dynamic> listing) {
     final price = listing['price'];
-
     final currency =
         (listing['currency']?.toString().trim().isNotEmpty ?? false)
             ? listing['currency'].toString().trim()
             : 'SDG';
-
     final priceType = listing['price_type']?.toString().trim() ?? '';
 
     if (priceType == 'contact' || price == null) {
       return 'السعر عند التواصل';
     }
-
     final number = num.tryParse(price.toString());
-
     if (number == null) return '$price $currency';
-
     return '${_numberFormat.format(number)} $currency';
   }
 
   String _timeAgo(dynamic value) {
     final date = DateTime.tryParse(value?.toString() ?? '')?.toLocal();
-
     if (date == null) return '';
-
     final diff = DateTime.now().difference(date);
-
     if (diff.inMinutes < 1) return 'الآن';
     if (diff.inMinutes < 60) return 'قبل ${diff.inMinutes} د';
     if (diff.inHours < 24) return 'قبل ${diff.inHours} س';
     if (diff.inDays < 30) return 'قبل ${diff.inDays} يوم';
-
     return 'قبل ${diff.inDays ~/ 30} شهر';
   }
 
@@ -1043,15 +928,11 @@ class _HomeScreenState extends State<HomeScreen>
   // =========================
   String? _imageUrl(dynamic imagePath) {
     if (imagePath == null) return null;
-
     final path = imagePath.toString().trim();
-
     if (path.isEmpty) return null;
-
     if (path.startsWith('http://') || path.startsWith('https://')) {
       return path;
     }
-
     return _supabase.storage.from('listing-images').getPublicUrl(path);
   }
 
@@ -1080,7 +961,6 @@ class _HomeScreenState extends State<HomeScreen>
     }
 
     if (imageUrl == null) return placeholder();
-
     return CachedNetworkImage(
       imageUrl: imageUrl,
       height: height,
@@ -1096,12 +976,12 @@ class _HomeScreenState extends State<HomeScreen>
   // ألوان وأيقونات الأقسام
   // =========================
   static const _tones = <_Tone>[
-    _Tone(Color(0xFFEFE7FF), Color(0xFF5B2DB5)), // بنفسجي
-    _Tone(Color(0xFFFFF1D1), Color(0xFFF59E0B)), // أصفر
-    _Tone(Color(0xFFDDF5EA), Color(0xFF0F9D7A)), // أخضر
-    _Tone(Color(0xFFDFEDFF), Color(0xFF2563EB)), // أزرق
-    _Tone(Color(0xFFFFE3E9), Color(0xFFE11D48)), // وردي
-    _Tone(Color(0xFFE9EEF5), Color(0xFF475569)), // رمادي
+    _Tone(Color(0xFFEFE7FF), Color(0xFF5B2DB5)),
+    _Tone(Color(0xFFFFF1D1), Color(0xFFF59E0B)),
+    _Tone(Color(0xFFDDF5EA), Color(0xFF0F9D7A)),
+    _Tone(Color(0xFFDFEDFF), Color(0xFF2563EB)),
+    _Tone(Color(0xFFFFE3E9), Color(0xFFE11D48)),
+    _Tone(Color(0xFFE9EEF5), Color(0xFF475569)),
   ];
 
   _Tone _toneFor(String name, int index) {
@@ -1208,8 +1088,6 @@ class _HomeScreenState extends State<HomeScreen>
               ),
             ),
           ),
-
-          // تدرج علوي خفيف لوضوح شريط الحالة.
           Positioned(
             top: 0,
             left: 0,
@@ -1228,32 +1106,29 @@ class _HomeScreenState extends State<HomeScreen>
               ),
             ),
           ),
-
           Positioned(
-            top: topPadding + 10,
+            top: topPadding + 6,
             left: 16,
             right: 16,
             child: _buildTopRow(),
           ),
-
+          // تم تقليل bottom من 36 إلى 22 لتقريب مربع البحث من الهيدر
           Positioned(
             left: 16,
             right: 16,
-            bottom: 36,
+            bottom: 22,
             child: _buildSearchField(),
           ),
-
-          // حافة الصفحة المنحنية أسفل الترويسة.
           Positioned(
             left: 0,
             right: 0,
             bottom: 0,
-            height: 30,
+            height: 24,
             child: DecoratedBox(
               decoration: BoxDecoration(
                 color: _pageBackground,
                 borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(30),
+                  top: Radius.circular(24),
                 ),
               ),
             ),
@@ -1274,7 +1149,6 @@ class _HomeScreenState extends State<HomeScreen>
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        // (يمين) زر القائمة
         Tooltip(
           message: 'القائمة',
           child: InkWell(
@@ -1286,13 +1160,9 @@ class _HomeScreenState extends State<HomeScreen>
             ),
           ),
         ),
-
         const SizedBox(width: 2),
-
         _buildLogo(),
-
         const SizedBox(width: 8),
-
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1304,7 +1174,7 @@ class _HomeScreenState extends State<HomeScreen>
                 child: Text(
                   'دلالة شبشة',
                   style: TextStyle(
-                    fontSize: 30,
+                    fontSize: 28,
                     fontWeight: FontWeight.w900,
                     height: 1.1,
                     color: _brandDark,
@@ -1317,7 +1187,7 @@ class _HomeScreenState extends State<HomeScreen>
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: 13.5,
+                  fontSize: 12.5,
                   fontWeight: FontWeight.w700,
                   color: _brandDark,
                   shadows: glow,
@@ -1326,15 +1196,13 @@ class _HomeScreenState extends State<HomeScreen>
             ],
           ),
         ),
-
-        // (يسار) حساب المستخدم
         Tooltip(
           message: user == null ? 'تسجيل الدخول' : 'الملف الشخصي',
           child: GestureDetector(
             onTap: _openProfile,
             child: Container(
-              width: 46,
-              height: 46,
+              width: 42,
+              height: 42,
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.94),
                 shape: BoxShape.circle,
@@ -1350,7 +1218,7 @@ class _HomeScreenState extends State<HomeScreen>
                 user == null
                     ? Icons.person_outline_rounded
                     : Icons.person_rounded,
-                size: 26,
+                size: 24,
                 color: _brandDark,
               ),
             ),
@@ -1362,18 +1230,18 @@ class _HomeScreenState extends State<HomeScreen>
 
   Widget _buildLogo() {
     return SizedBox(
-      width: 46,
-      height: 52,
+      width: 42,
+      height: 48,
       child: Stack(
         alignment: Alignment.topCenter,
         clipBehavior: Clip.none,
         children: [
-          const Icon(Icons.location_on_rounded, size: 52, color: _brand),
+          const Icon(Icons.location_on_rounded, size: 48, color: _brand),
           const Positioned(
-            top: 12,
+            top: 11,
             child: Icon(
               Icons.shopping_cart_rounded,
-              size: 17,
+              size: 15,
               color: Colors.white,
             ),
           ),
@@ -1381,15 +1249,15 @@ class _HomeScreenState extends State<HomeScreen>
             top: 0,
             left: 0,
             child: Container(
-              width: 15,
-              height: 15,
+              width: 14,
+              height: 14,
               decoration: const BoxDecoration(
                 color: _gold,
                 shape: BoxShape.circle,
               ),
               child: const Icon(
                 Icons.local_offer_rounded,
-                size: 9,
+                size: 8,
                 color: _brandDark,
               ),
             ),
@@ -1401,44 +1269,44 @@ class _HomeScreenState extends State<HomeScreen>
 
   Widget _buildSearchField() {
     return Container(
-      height: 54,
+      height: 50,
       decoration: BoxDecoration(
         color: _isDark
             ? Theme.of(context).colorScheme.surfaceContainerHigh
             : Colors.white,
-        borderRadius: BorderRadius.circular(30),
+        borderRadius: BorderRadius.circular(25),
         boxShadow: [
           BoxShadow(
-            color: _brand.withValues(alpha: 0.20),
-            blurRadius: 18,
-            offset: const Offset(0, 6),
+            color: _brand.withValues(alpha: 0.18),
+            blurRadius: 14,
+            offset: const Offset(0, 5),
           ),
         ],
       ),
-      child: ValueListenableBuilder<TextEditingValue>(
+      child: ValueListenableBuilder(
         valueListenable: _searchController,
         builder: (context, value, _) {
           return TextField(
             controller: _searchController,
             textInputAction: TextInputAction.search,
             onChanged: _onSearchChanged,
-            style: const TextStyle(fontSize: 15),
+            style: const TextStyle(fontSize: 14.5),
             decoration: InputDecoration(
               hintText: 'ابحث عن إعلان أو منطقة ...',
               hintStyle: TextStyle(
-                fontSize: 14.5,
+                fontSize: 14,
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
               prefixIcon: Icon(
                 Icons.search_rounded,
-                size: 27,
+                size: 24,
                 color: _titleColor,
               ),
               suffixIcon: value.text.isNotEmpty
                   ? IconButton(
                       onPressed: _clearSearch,
                       tooltip: 'مسح البحث',
-                      icon: const Icon(Icons.close_rounded, size: 21),
+                      icon: const Icon(Icons.close_rounded, size: 20),
                     )
                   : null,
               filled: false,
@@ -1446,7 +1314,7 @@ class _HomeScreenState extends State<HomeScreen>
               border: InputBorder.none,
               enabledBorder: InputBorder.none,
               focusedBorder: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(vertical: 17),
+              contentPadding: const EdgeInsets.symmetric(vertical: 15),
             ),
           );
         },
@@ -1461,7 +1329,8 @@ class _HomeScreenState extends State<HomeScreen>
     return Column(
       children: [
         SizedBox(
-          height: 196,
+          // تم تقليل الارتفاع من 196 إلى 155
+          height: 155,
           child: PageView.builder(
             controller: _bannerController,
             itemCount: _slides.length,
@@ -1474,9 +1343,7 @@ class _HomeScreenState extends State<HomeScreen>
             },
           ),
         ),
-
-        const SizedBox(height: 10),
-
+        const SizedBox(height: 8),
         ValueListenableBuilder<int>(
           valueListenable: _bannerIndex,
           builder: (context, current, _) {
@@ -1484,12 +1351,11 @@ class _HomeScreenState extends State<HomeScreen>
               mainAxisAlignment: MainAxisAlignment.center,
               children: List.generate(_slides.length, (index) {
                 final active = index == current;
-
                 return AnimatedContainer(
                   duration: const Duration(milliseconds: 250),
-                  margin: const EdgeInsets.symmetric(horizontal: 4),
-                  width: active ? 12 : 8,
-                  height: active ? 12 : 8,
+                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                  width: active ? 10 : 6,
+                  height: active ? 10 : 6,
                   decoration: BoxDecoration(
                     color: active ? _brand : _brand.withValues(alpha: 0.22),
                     shape: BoxShape.circle,
@@ -1516,9 +1382,7 @@ class _HomeScreenState extends State<HomeScreen>
 
   void _scrollToCategories() {
     final target = _categoriesKey.currentContext;
-
     if (target == null) return;
-
     Scrollable.ensureVisible(
       target,
       duration: const Duration(milliseconds: 400),
@@ -1529,11 +1393,11 @@ class _HomeScreenState extends State<HomeScreen>
 
   Widget _buildBannerSlide(_BannerSlide slide) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(26),
+      borderRadius: BorderRadius.circular(20),
       child: LayoutBuilder(
         builder: (context, constraints) {
           final width = constraints.maxWidth;
-          final photoWidth = width * 0.56;
+          final photoWidth = width * 0.54;
 
           return Stack(
             children: [
@@ -1552,8 +1416,6 @@ class _HomeScreenState extends State<HomeScreen>
                   ),
                 ),
               ),
-
-              // الصورة على اليمين بحافة منحنية.
               Positioned(
                 right: 0,
                 top: 0,
@@ -1570,7 +1432,6 @@ class _HomeScreenState extends State<HomeScreen>
                   ),
                 ),
               ),
-
               Positioned(
                 right: 0,
                 top: 0,
@@ -1580,11 +1441,10 @@ class _HomeScreenState extends State<HomeScreen>
                   child: CustomPaint(painter: _SwooshPainter()),
                 ),
               ),
-
               Positioned(
-                left: 18,
-                top: 14,
-                bottom: 14,
+                left: 14,
+                top: 10,
+                bottom: 10,
                 width: width * 0.58,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1597,9 +1457,9 @@ class _HomeScreenState extends State<HomeScreen>
                         slide.line1,
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 25,
+                          fontSize: 20,
                           fontWeight: FontWeight.w900,
-                          height: 1.2,
+                          height: 1.15,
                         ),
                       ),
                     ),
@@ -1610,35 +1470,35 @@ class _HomeScreenState extends State<HomeScreen>
                         slide.line2,
                         style: const TextStyle(
                           color: _gold,
-                          fontSize: 25,
+                          fontSize: 20,
                           fontWeight: FontWeight.w900,
-                          height: 1.2,
+                          height: 1.15,
                         ),
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 4),
                     Wrap(
-                      spacing: 8,
-                      runSpacing: 3,
+                      spacing: 6,
+                      runSpacing: 2,
                       children: [
                         for (final bullet in slide.bullets)
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Container(
-                                width: 5,
-                                height: 5,
+                                width: 4,
+                                height: 4,
                                 decoration: const BoxDecoration(
                                   color: _gold,
                                   shape: BoxShape.circle,
                                 ),
                               ),
-                              const SizedBox(width: 4),
+                              const SizedBox(width: 3),
                               Text(
                                 bullet,
                                 style: const TextStyle(
                                   color: Colors.white,
-                                  fontSize: 11.5,
+                                  fontSize: 10.5,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
@@ -1646,22 +1506,22 @@ class _HomeScreenState extends State<HomeScreen>
                           ),
                       ],
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 8),
                     GestureDetector(
                       onTap: () => _onBannerAction(slide.action),
                       child: Container(
-                        height: 42,
-                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                        height: 36,
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
                             colors: [Color(0xFFFFB02E), Color(0xFFFF8A00)],
                           ),
-                          borderRadius: BorderRadius.circular(22),
+                          borderRadius: BorderRadius.circular(18),
                           boxShadow: [
                             BoxShadow(
-                              color: _orange.withValues(alpha: 0.45),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
+                              color: _orange.withValues(alpha: 0.40),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
                             ),
                           ],
                         ),
@@ -1672,17 +1532,17 @@ class _HomeScreenState extends State<HomeScreen>
                               slide.cta,
                               style: const TextStyle(
                                 color: Colors.white,
-                                fontSize: 14,
+                                fontSize: 12.5,
                                 fontWeight: FontWeight.w800,
                               ),
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: 6),
                             Icon(
                               slide.action == _BannerAction.addListing
                                   ? Icons.add_circle_outline_rounded
                                   : Icons.grid_view_rounded,
                               color: Colors.white,
-                              size: 22,
+                              size: 18,
                             ),
                           ],
                         ),
@@ -1712,7 +1572,7 @@ class _HomeScreenState extends State<HomeScreen>
       child: Row(
         children: [
           if (icon != null) ...[
-            Icon(icon, size: 24, color: iconColor ?? _brand),
+            Icon(icon, size: 22, color: iconColor ?? _brand),
             const SizedBox(width: 8),
           ],
           Expanded(
@@ -1721,7 +1581,7 @@ class _HomeScreenState extends State<HomeScreen>
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: 19,
+                fontSize: 18,
                 fontWeight: FontWeight.w900,
                 color: _titleColor,
               ),
@@ -1732,14 +1592,15 @@ class _HomeScreenState extends State<HomeScreen>
               borderRadius: BorderRadius.circular(12),
               onTap: onViewAll,
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
                       'عرض الكل',
                       style: TextStyle(
-                        fontSize: 14,
+                        fontSize: 13.5,
                         fontWeight: FontWeight.w700,
                         color: _isDark
                             ? Theme.of(context).colorScheme.primary
@@ -1748,7 +1609,7 @@ class _HomeScreenState extends State<HomeScreen>
                     ),
                     Icon(
                       Icons.chevron_left_rounded,
-                      size: 22,
+                      size: 20,
                       color: _isDark
                           ? Theme.of(context).colorScheme.primary
                           : _brand,
@@ -1827,9 +1688,7 @@ class _HomeScreenState extends State<HomeScreen>
           icon: Icons.grid_view_rounded,
           onViewAll: _categories.isEmpty ? null : _showAllCategories,
         ),
-
         const SizedBox(height: 10),
-
         if (_categories.isEmpty)
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 14),
@@ -1858,7 +1717,6 @@ class _HomeScreenState extends State<HomeScreen>
                       selected: selected,
                       onTap: () {
                         if (categoryId == null) return;
-
                         _selectCategory(selected ? null : categoryId);
                       },
                     ),
@@ -1871,9 +1729,8 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  // كل الأقسام في نافذة سفلية.
   void _showAllCategories() {
-    showModalBottomSheet<void>(
+    showModalBottomSheet(
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
@@ -1888,7 +1745,8 @@ class _HomeScreenState extends State<HomeScreen>
                 children: [
                   const Text(
                     'كل الأقسام',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+                    style:
+                        TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
                   ),
                   const SizedBox(height: 14),
                   Flexible(
@@ -1912,7 +1770,6 @@ class _HomeScreenState extends State<HomeScreen>
                           selected: _selectedCategoryId == categoryId,
                           onTap: () {
                             Navigator.pop(sheetContext);
-
                             if (categoryId != null) {
                               _selectCategory(categoryId, clearSearch: true);
                             }
@@ -1941,12 +1798,9 @@ class _HomeScreenState extends State<HomeScreen>
     final colorScheme = Theme.of(context).colorScheme;
 
     final id = listing['id'] as int?;
-
     final rawTitle = listing['title']?.toString().trim() ?? '';
     final title = rawTitle.isEmpty ? 'إعلان بدون عنوان' : rawTitle;
-
     final area = listing['area']?.toString().trim() ?? '';
-
     final meta = [
       if (area.isNotEmpty) area,
       _timeAgo(listing['created_at']),
@@ -1954,7 +1808,6 @@ class _HomeScreenState extends State<HomeScreen>
 
     final category = _categoryById(listing['category_id']);
     final categoryName = category?['name']?.toString() ?? '';
-
     final isFavorite = id != null && _favoriteIds.contains(id);
     final isNegotiable = listing['price_type'] == 'negotiable';
     final priceText = _formatPrice(listing);
@@ -1985,12 +1838,10 @@ class _HomeScreenState extends State<HomeScreen>
                 Stack(
                   children: [
                     _buildListingImage(listing, height: 122),
-
                     if (categoryName.isNotEmpty)
                       Positioned(
                         top: 9,
                         right: 9,
-                        // نترك مكاناً لزر المفضلة على اليسار.
                         left: 48,
                         child: Align(
                           alignment: AlignmentDirectional.centerStart,
@@ -2029,7 +1880,6 @@ class _HomeScreenState extends State<HomeScreen>
                           ),
                         ),
                       ),
-
                     if (id != null)
                       Positioned(
                         top: 3,
@@ -2047,7 +1897,8 @@ class _HomeScreenState extends State<HomeScreen>
                                 shape: BoxShape.circle,
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.14),
+                                    color:
+                                        Colors.black.withValues(alpha: 0.14),
                                     blurRadius: 6,
                                   ),
                                 ],
@@ -2063,7 +1914,6 @@ class _HomeScreenState extends State<HomeScreen>
                           ),
                         ),
                       ),
-
                     if (isCommercial)
                       Positioned(
                         bottom: 8,
@@ -2100,7 +1950,6 @@ class _HomeScreenState extends State<HomeScreen>
                       ),
                   ],
                 ),
-
                 Padding(
                   padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
                   child: Column(
@@ -2117,9 +1966,7 @@ class _HomeScreenState extends State<HomeScreen>
                           color: _titleColor,
                         ),
                       ),
-
                       const SizedBox(height: 7),
-
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 10,
@@ -2138,11 +1985,11 @@ class _HomeScreenState extends State<HomeScreen>
                           style: TextStyle(
                             fontSize: isContactPrice ? 12.5 : 14.5,
                             fontWeight: FontWeight.w800,
-                            color: _isDark ? colorScheme.primary : _brand,
+                            color:
+                                _isDark ? colorScheme.primary : _brand,
                           ),
                         ),
                       ),
-
                       if (meta.isNotEmpty) ...[
                         const SizedBox(height: 8),
                         Row(
@@ -2167,7 +2014,6 @@ class _HomeScreenState extends State<HomeScreen>
                           ],
                         ),
                       ],
-
                       if (isNegotiable) ...[
                         const SizedBox(height: 7),
                         Container(
@@ -2186,7 +2032,8 @@ class _HomeScreenState extends State<HomeScreen>
                             style: TextStyle(
                               fontSize: 11.5,
                               fontWeight: FontWeight.w700,
-                              color: _isDark ? colorScheme.primary : _brand,
+                              color:
+                                  _isDark ? colorScheme.primary : _brand,
                             ),
                           ),
                         ),
@@ -2239,7 +2086,6 @@ class _HomeScreenState extends State<HomeScreen>
         _listingsLoading || (_isSearching && _searchPoolLoading);
 
     final String title;
-
     if (_isSearching) {
       title = 'نتائج البحث';
     } else if (_selectedCategoryId != null) {
@@ -2292,9 +2138,7 @@ class _HomeScreenState extends State<HomeScreen>
             ],
           ),
         ),
-
         const SizedBox(height: 12),
-
         if (showSpinner && results.isEmpty)
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 40),
@@ -2322,7 +2166,8 @@ class _HomeScreenState extends State<HomeScreen>
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: results.length,
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              gridDelegate:
+                  const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
                 mainAxisSpacing: 14,
                 crossAxisSpacing: 12,
@@ -2330,7 +2175,6 @@ class _HomeScreenState extends State<HomeScreen>
               ),
               itemBuilder: (context, index) {
                 final listing = results[index];
-
                 return _buildListingCard(
                   listing,
                   fillWidth: true,
@@ -2339,7 +2183,6 @@ class _HomeScreenState extends State<HomeScreen>
               },
             ),
           ),
-
         if (_loadingMore)
           const Padding(
             padding: EdgeInsets.all(16),
@@ -2363,7 +2206,6 @@ class _HomeScreenState extends State<HomeScreen>
     }
 
     final promoted = _activePromoted;
-
     if (_listings.isEmpty && promoted.isEmpty) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 32),
@@ -2378,19 +2220,15 @@ class _HomeScreenState extends State<HomeScreen>
     }
 
     final promotedIds = promoted.map((listing) => listing['id']).toSet();
-
     final latestListings = _listings
         .where((listing) => !promotedIds.contains(listing['id']))
         .take(10)
         .toList();
 
-    // صفوف الأقسام التي فيها إعلانات.
     final categoryRows = <Widget>[];
-
     for (var i = 0; i < _categories.length; i++) {
       final category = _categories[i];
       final categoryId = category['id'] as int?;
-
       if (categoryId == null) continue;
 
       final items = _listings
@@ -2401,7 +2239,6 @@ class _HomeScreenState extends State<HomeScreen>
       if (items.isEmpty) continue;
 
       final name = category['name']?.toString() ?? 'بدون اسم';
-
       categoryRows.add(
         Padding(
           padding: const EdgeInsets.only(bottom: 10),
@@ -2436,7 +2273,6 @@ class _HomeScreenState extends State<HomeScreen>
           _buildHorizontalListings(promoted),
           const SizedBox(height: 14),
         ],
-
         if (latestListings.isNotEmpty) ...[
           _sectionHeader(
             'أحدث الإعلانات',
@@ -2447,7 +2283,6 @@ class _HomeScreenState extends State<HomeScreen>
           _buildHorizontalListings(latestListings),
           const SizedBox(height: 14),
         ],
-
         ...categoryRows,
       ],
     );
@@ -2460,7 +2295,6 @@ class _HomeScreenState extends State<HomeScreen>
     final bottomInset = MediaQuery.of(context).padding.bottom;
 
     final Widget content;
-
     if (_loading) {
       content = const Padding(
         padding: EdgeInsets.symmetric(vertical: 90),
@@ -2502,26 +2336,22 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
               ),
             _buildBannerCarousel(),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
           ],
-
           _buildCategoriesSection(),
-
           const SizedBox(height: 8),
-
           if (_isFiltering) _buildSearchResults() else _buildHomeSections(),
         ],
       );
     }
 
     return RefreshIndicator(
-      displacement: topPadding + 50,
+      displacement: topPadding + 40,
       onRefresh: () => _loadAll(showSpinner: false),
       child: ListView(
         controller: _scrollController,
         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         physics: const AlwaysScrollableScrollPhysics(),
-        // نحدد الحشوة صراحة حتى تبدأ الترويسة من أعلى الشاشة.
         padding: EdgeInsets.only(bottom: 112 + bottomInset),
         children: [
           _buildHeader(topPadding),
@@ -2544,7 +2374,6 @@ class _HomeScreenState extends State<HomeScreen>
       bool selected = false,
     }) {
       final color = selected ? _brand : colorScheme.onSurfaceVariant;
-
       return Expanded(
         child: InkWell(
           borderRadius: BorderRadius.circular(24),
@@ -2613,7 +2442,6 @@ class _HomeScreenState extends State<HomeScreen>
                       icon: Icons.home_rounded,
                       label: 'الرئيسية',
                       selected: true,
-                      // يصعد لأعلى الصفحة ويمسح الفلاتر.
                       onTap: _clearFilters,
                     ),
                     navItem(
@@ -2655,7 +2483,6 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
               ),
             ),
-
             Positioned(
               top: 6,
               left: 0,
@@ -2723,19 +2550,11 @@ class _HomeScreenState extends State<HomeScreen>
             ? 'مرحباً بك'
             : 'مستخدم دلالة شبشة';
 
-    // رقم الهاتف الحقيقي لحسابات الهاتف.
     final authPhone = user?.phone?.trim() ?? '';
-
-    // البريد الإلكتروني لحسابات البريد.
     final email = user?.email?.trim() ?? '';
-
-    // رقم الهاتف المحفوظ في metadata كخيار احتياطي.
     final metadataPhone =
         user?.userMetadata?['phone']?.toString().trim() ?? '';
-
-    // إذا كان الحساب مرتبطاً برقم هاتف نعرضه أولاً.
     final phone = authPhone.isNotEmpty ? authPhone : metadataPhone;
-
     final contact = phone.isNotEmpty
         ? phone
         : email.isNotEmpty
@@ -2768,9 +2587,7 @@ class _HomeScreenState extends State<HomeScreen>
               color: primary,
             ),
           ),
-
           const SizedBox(width: 12),
-
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -2785,9 +2602,7 @@ class _HomeScreenState extends State<HomeScreen>
                     fontWeight: FontWeight.w800,
                   ),
                 ),
-
                 const SizedBox(height: 4),
-
                 Text(
                   contact,
                   maxLines: 1,
@@ -2880,9 +2695,7 @@ class _HomeScreenState extends State<HomeScreen>
                     color: itemColor,
                   ),
                 ),
-
                 const SizedBox(width: 9),
-
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -2897,7 +2710,6 @@ class _HomeScreenState extends State<HomeScreen>
                           color: itemColor,
                         ),
                       ),
-
                       if (subtitle != null) ...[
                         const SizedBox(height: 1),
                         Text(
@@ -2913,7 +2725,6 @@ class _HomeScreenState extends State<HomeScreen>
                     ],
                   ),
                 ),
-
                 if (selected)
                   Icon(
                     Icons.chevron_left_rounded,
@@ -2944,9 +2755,7 @@ class _HomeScreenState extends State<HomeScreen>
         child: Column(
           children: [
             _buildDrawerHeader(user, name),
-
             const SizedBox(height: 5),
-
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.symmetric(
@@ -2964,7 +2773,6 @@ class _HomeScreenState extends State<HomeScreen>
                       await _openProfile();
                     },
                   ),
-
                   _buildDrawerItem(
                     icon: Icons.add_circle_outline,
                     title: 'إضافة إعلان',
@@ -2973,9 +2781,7 @@ class _HomeScreenState extends State<HomeScreen>
                       await _openAddListing();
                     },
                   ),
-
                   const SizedBox(height: 5),
-
                   if (_isAdmin) ...[
                     _buildDrawerItem(
                       icon: Icons.admin_panel_settings_outlined,
@@ -2986,7 +2792,6 @@ class _HomeScreenState extends State<HomeScreen>
                         await _openAdminPanel();
                       },
                     ),
-
                     const Padding(
                       padding: EdgeInsets.symmetric(
                         horizontal: 8,
@@ -2995,12 +2800,10 @@ class _HomeScreenState extends State<HomeScreen>
                       child: Divider(height: 1),
                     ),
                   ],
-
                   _buildDrawerSectionTitle(
                     'الأقسام',
                     Icons.grid_view_rounded,
                   ),
-
                   if (_categories.isEmpty)
                     const Padding(
                       padding: EdgeInsets.all(12),
@@ -3014,7 +2817,6 @@ class _HomeScreenState extends State<HomeScreen>
                       final categoryId = category['id'] as int?;
                       final categoryName =
                           category['name']?.toString() ?? 'بدون اسم';
-
                       final selected = _selectedCategoryId == categoryId;
 
                       return _buildDrawerItem(
@@ -3023,14 +2825,11 @@ class _HomeScreenState extends State<HomeScreen>
                         selected: selected,
                         onTap: () {
                           Navigator.pop(context);
-
                           if (categoryId == null) return;
-
                           _selectCategory(categoryId, clearSearch: true);
                         },
                       );
                     }),
-
                   const Padding(
                     padding: EdgeInsets.symmetric(
                       horizontal: 8,
@@ -3038,12 +2837,10 @@ class _HomeScreenState extends State<HomeScreen>
                     ),
                     child: Divider(height: 1),
                   ),
-
                   _buildDrawerSectionTitle(
                     'حسابي',
                     Icons.account_circle_outlined,
                   ),
-
                   _buildDrawerItem(
                     icon: Icons.favorite_border,
                     title: 'المفضلة',
@@ -3052,7 +2849,6 @@ class _HomeScreenState extends State<HomeScreen>
                       _openFavorites();
                     },
                   ),
-
                   _buildDrawerItem(
                     icon: Icons.inventory_2_outlined,
                     title: 'إعلاناتي',
@@ -3061,9 +2857,7 @@ class _HomeScreenState extends State<HomeScreen>
                       _openMyListings();
                     },
                   ),
-
                   const SizedBox(height: 6),
-
                   if (user != null)
                     _buildDrawerItem(
                       icon: Icons.logout,
@@ -3077,7 +2871,6 @@ class _HomeScreenState extends State<HomeScreen>
                 ],
               ),
             ),
-
             Container(
               width: double.infinity,
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
@@ -3118,7 +2911,6 @@ class _HomeScreenState extends State<HomeScreen>
       textDirection: TextDirection.rtl,
       child: ValueListenableBuilder<bool>(
         valueListenable: _headerVisible,
-        // أيقونات شريط الحالة بيضاء فوق الصورة، وداكنة بعد التمرير.
         builder: (context, headerVisible, child) {
           return AnnotatedRegion<SystemUiOverlayStyle>(
             value: (headerVisible
@@ -3129,7 +2921,6 @@ class _HomeScreenState extends State<HomeScreen>
           );
         },
         child: PopScope(
-          // زر الرجوع يلغي التصفية أولاً قبل الخروج من التطبيق.
           canPop: !_isFiltering,
           onPopInvokedWithResult: (didPop, _) {
             if (!didPop) _clearFilters();
@@ -3152,10 +2943,8 @@ class _HomeScreenState extends State<HomeScreen>
 // أنواع مساعدة للتصميم
 // =============================================================
 
-// وضع عرض القائمة الكاملة (عرض الكل).
 enum _ListMode { home, featured, latest }
 
-// ألوان بطاقة القسم.
 class _Tone {
   final Color bg;
   final Color fg;
@@ -3165,7 +2954,6 @@ class _Tone {
 
 enum _BannerAction { addListing, browseCategories }
 
-// شريحة في بانر العروض.
 class _BannerSlide {
   final String line1;
   final String line2;
@@ -3182,7 +2970,6 @@ class _BannerSlide {
   );
 }
 
-// قص الصورة داخل البانر بحافة منحنية من جهة النص.
 class _PhotoClipper extends CustomClipper<Path> {
   const _PhotoClipper();
 
@@ -3204,7 +2991,6 @@ class _PhotoClipper extends CustomClipper<Path> {
   bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
 }
 
-// الخط البرتقالي المنحني على حافة الصورة.
 class _SwooshPainter extends CustomPainter {
   const _SwooshPainter();
 
@@ -3216,8 +3002,8 @@ class _SwooshPainter extends CustomPainter {
     Path curve(double dx) {
       return Path()
         ..moveTo(w * 0.02 + dx, h)
-        ..cubicTo(w * 0.40 + dx, h * 0.86, w * 0.02 + dx, h * 0.42,
-            w * 0.34 + dx, 0);
+        ..cubicTo(
+            w * 0.40 + dx, h * 0.86, w * 0.02 + dx, h * 0.42, w * 0.34 + dx, 0);
     }
 
     canvas.drawPath(
@@ -3228,7 +3014,6 @@ class _SwooshPainter extends CustomPainter {
         ..strokeCap = StrokeCap.round
         ..color = const Color(0xFF7A45DA).withValues(alpha: 0.55),
     );
-
     canvas.drawPath(
       curve(-6),
       Paint()
@@ -3241,7 +3026,6 @@ class _SwooshPainter extends CustomPainter {
           colors: [Color(0xFFFF9F1C), Color(0xFFFFC93C)],
         ).createShader(Offset.zero & size),
     );
-
     canvas.drawPath(
       curve(-17),
       Paint()
@@ -3255,7 +3039,6 @@ class _SwooshPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-// شرارات صغيرة حول زر "أضف إعلان".
 class _SparklesPainter extends CustomPainter {
   const _SparklesPainter();
 
@@ -3271,7 +3054,6 @@ class _SparklesPainter extends CustomPainter {
     for (final degrees in const [-150.0, -90.0, -30.0]) {
       final angle = degrees * math.pi / 180;
       final direction = Offset(math.cos(angle), math.sin(angle));
-
       canvas.drawLine(
         center + direction * 34,
         center + direction * 41,
@@ -3284,8 +3066,6 @@ class _SparklesPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-// رسم احتياطي لمشهد شبشة عند الغروب (مباني طينية ونخيل ونهر).
-// يظهر إذا لم تضف صورة حقيقية في assets/images.
 class _ShabshaScenePainter extends CustomPainter {
   const _ShabshaScenePainter();
 
@@ -3295,9 +3075,7 @@ class _ShabshaScenePainter extends CustomPainter {
     final h = size.height;
     final horizon = h * 0.64;
 
-    // السماء
     final skyRect = Rect.fromLTWH(0, 0, w, horizon + 1);
-
     canvas.drawRect(
       skyRect,
       Paint()
@@ -3314,7 +3092,6 @@ class _ShabshaScenePainter extends CustomPainter {
         ).createShader(skyRect),
     );
 
-    // سحب ناعمة
     void cloud(double cx, double cy, double cw, double ch, Color color) {
       canvas.drawOval(
         Rect.fromCenter(
@@ -3329,26 +3106,29 @@ class _ShabshaScenePainter extends CustomPainter {
     }
 
     cloud(0.20, 0.15, 0.50, 0.10, Colors.white.withValues(alpha: 0.30));
-    cloud(0.68, 0.10, 0.44, 0.09, const Color(0xFFFFC2C8).withValues(alpha: 0.45));
+    cloud(
+        0.68, 0.10, 0.44, 0.09, const Color(0xFFFFC2C8).withValues(alpha: 0.45));
     cloud(0.90, 0.26, 0.40, 0.08, Colors.white.withValues(alpha: 0.28));
-    cloud(0.42, 0.34, 0.60, 0.08, const Color(0xFFFFB27A).withValues(alpha: 0.40));
+    cloud(
+        0.42, 0.34, 0.60, 0.08, const Color(0xFFFFB27A).withValues(alpha: 0.40));
 
-    // وهج الشمس عند الأفق
     canvas.drawRect(
       skyRect,
       Paint()
         ..shader = const RadialGradient(
           colors: [Color(0x99FFE3AA), Color(0x00FFE3AA)],
         ).createShader(
-          Rect.fromCircle(center: Offset(w * 0.72, horizon), radius: w * 0.5),
+          Rect.fromCircle(
+              center: Offset(w * 0.72, horizon), radius: w * 0.5),
         ),
     );
 
-    // تلال بعيدة
     final hills = Path()
       ..moveTo(0, horizon)
-      ..quadraticBezierTo(w * 0.2, horizon - h * 0.10, w * 0.42, horizon - h * 0.03)
-      ..quadraticBezierTo(w * 0.7, horizon - h * 0.12, w, horizon - h * 0.04)
+      ..quadraticBezierTo(
+          w * 0.2, horizon - h * 0.10, w * 0.42, horizon - h * 0.03)
+      ..quadraticBezierTo(
+          w * 0.7, horizon - h * 0.12, w, horizon - h * 0.04)
       ..lineTo(w, horizon)
       ..close();
 
@@ -3357,7 +3137,6 @@ class _ShabshaScenePainter extends CustomPainter {
       Paint()..color = const Color(0xFFD59A78).withValues(alpha: 0.55),
     );
 
-    // المباني الطينية: [x, العرض, الارتفاع] كنسب من الأبعاد.
     const buildings = <List<double>>[
       [0.00, 0.11, 0.20],
       [0.09, 0.10, 0.31],
@@ -3377,8 +3156,8 @@ class _ShabshaScenePainter extends CustomPainter {
       final bw = w * b[1];
       final bh = h * b[2];
       final top = horizon - bh;
-
-      final tone = i.isEven ? const Color(0xFFB9744A) : const Color(0xFFA5613C);
+      final tone =
+          i.isEven ? const Color(0xFFB9744A) : const Color(0xFFA5613C);
       final shade = Color.lerp(tone, const Color(0xFF6B3A25), 0.35)!;
       final rect = Rect.fromLTWH(bx, top, bw + 1, bh + 1);
 
@@ -3392,7 +3171,6 @@ class _ShabshaScenePainter extends CustomPainter {
           ).createShader(rect),
       );
 
-      // شرفات علوية
       final teeth = math.max(3, (bw / (h * 0.045)).floor());
       final toothWidth = bw / (teeth * 2 - 1);
       final toothHeight = h * 0.022;
@@ -3409,10 +3187,8 @@ class _ShabshaScenePainter extends CustomPainter {
         );
       }
 
-      // نوافذ صغيرة
       final windowPaint = Paint()
         ..color = const Color(0xFF4A2A1B).withValues(alpha: 0.75);
-
       final cols = math.max(2, (bw / (h * 0.09)).floor());
       final rows = math.max(1, (bh / (h * 0.12)).floor() - 1);
 
@@ -3420,7 +3196,6 @@ class _ShabshaScenePainter extends CustomPainter {
         for (var c = 0; c < cols; c++) {
           final cx = bx + bw * (c + 0.5) / cols;
           final cy = top + bh * 0.20 + r * (bh * 0.66 / rows);
-
           canvas.drawRect(
             Rect.fromCenter(
               center: Offset(cx, cy),
@@ -3433,7 +3208,6 @@ class _ShabshaScenePainter extends CustomPainter {
       }
     }
 
-    // البرج
     final towerWidth = w * 0.05;
     final towerX = w * 0.45;
     final towerHeight = h * 0.46;
@@ -3443,7 +3217,6 @@ class _ShabshaScenePainter extends CustomPainter {
       Rect.fromLTWH(towerX, towerTop, towerWidth, towerHeight + 1),
       Paint()..color = const Color(0xFFB06A42),
     );
-
     canvas.drawRect(
       Rect.fromLTWH(
         towerX - towerWidth * 0.12,
@@ -3453,7 +3226,6 @@ class _ShabshaScenePainter extends CustomPainter {
       ),
       Paint()..color = const Color(0xFF8E512F),
     );
-
     canvas.drawArc(
       Rect.fromLTWH(
         towerX + towerWidth * 0.1,
@@ -3466,16 +3238,13 @@ class _ShabshaScenePainter extends CustomPainter {
       true,
       Paint()..color = const Color(0xFF7A4326),
     );
-
     canvas.drawCircle(
       Offset(towerX + towerWidth / 2, towerTop + h * 0.09),
       towerWidth * 0.22,
       Paint()..color = const Color(0xFFFFE8B0),
     );
 
-    // النهر
     final riverRect = Rect.fromLTWH(0, horizon, w, h - horizon);
-
     canvas.drawRect(
       riverRect,
       Paint()
@@ -3492,7 +3261,6 @@ class _ShabshaScenePainter extends CustomPainter {
         ).createShader(riverRect),
     );
 
-    // ضفة خضراء
     final bank = Path()
       ..moveTo(0, horizon + h * 0.01)
       ..cubicTo(w * 0.15, horizon - h * 0.05, w * 0.30, horizon + h * 0.02,
@@ -3505,14 +3273,11 @@ class _ShabshaScenePainter extends CustomPainter {
 
     canvas.drawPath(bank, Paint()..color = const Color(0xFF2E5B34));
 
-    // انعكاسات على الماء
     final streak = Paint()..color = Colors.white.withValues(alpha: 0.22);
-
     for (var i = 0; i < 6; i++) {
       final y = horizon + h * (0.09 + i * 0.05);
       final streakWidth = w * (0.22 + (i % 3) * 0.10);
       final cx = w * (0.20 + ((i * 0.17) % 0.62));
-
       canvas.drawRRect(
         RRect.fromRectAndRadius(
           Rect.fromCenter(
@@ -3526,11 +3291,9 @@ class _ShabshaScenePainter extends CustomPainter {
       );
     }
 
-    // النخيل
     void palm(double bxFraction, double baseY, double height, double lean) {
       final base = Offset(w * bxFraction, baseY);
       final top = Offset(base.dx + lean * w, baseY - height);
-
       final trunk = Path()
         ..moveTo(base.dx, base.dy)
         ..quadraticBezierTo(
@@ -3549,17 +3312,23 @@ class _ShabshaScenePainter extends CustomPainter {
           ..color = const Color(0xFF3F2A1A),
       );
 
-      const angles = [-172.0, -150.0, -125.0, -100.0, -80.0, -55.0, -30.0, -8.0];
-
+      const angles = [
+        -172.0,
+        -150.0,
+        -125.0,
+        -100.0,
+        -80.0,
+        -55.0,
+        -30.0,
+        -8.0
+      ];
       for (var i = 0; i < angles.length; i++) {
         final angle = angles[i] * math.pi / 180;
         final direction = Offset(math.cos(angle), math.sin(angle));
         final length = height * 0.55;
-
         final end = top + direction * length + Offset(0, length * 0.30);
         final control =
             top + direction * length * 0.55 + Offset(0, -length * 0.30);
-
         final frond = Path()
           ..moveTo(top.dx, top.dy)
           ..quadraticBezierTo(control.dx, control.dy, end.dx, end.dy);

@@ -866,7 +866,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 ? 'رقم الهاتف'
                 : 'البريد الإلكتروني',
             hint: _usePhone
-                ? '0912345678'
+                ? '0912345678 مثلا '
                 : 'example@email.com',
             helper: _usePhone && !_isLogin
                 ? 'رقم سوداني، مثال: 0912345678'
