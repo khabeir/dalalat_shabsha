@@ -237,18 +237,17 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-void _scrollToCategories() {
-  final context = _categoriesKey.currentContext;
+  void _scrollToCategories() {
+    final targetContext = _categoriesKey.currentContext;
+    if (targetContext == null) return;
 
-  if (context == null) return;
-
-  Scrollable.ensureVisible(
-    context,
-    duration: const Duration(milliseconds: 500),
-    curve: Curves.easeInOut,
-    alignment: 0.08,
-  );
-}
+    Scrollable.ensureVisible(
+      targetContext,
+      duration: const Duration(milliseconds: 500),
+      curve: Curves.easeInOut,
+      alignment: 0.08,
+    );
+  }
 
   void _showSnack(String message) {
     if (!mounted) return;
@@ -2712,28 +2711,19 @@ void _scrollToCategories() {
   }
 
   // =========================
-  // القائمة الجانبية
+  // القائمة الجانبية — تصميم الهوية
   // =========================
   Widget _buildDrawerHeader(User? user, String? name) {
-    final primary = Theme.of(context).colorScheme.primary;
-
     final displayName = name != null && name.trim().isNotEmpty
         ? name.trim()
         : user == null
             ? 'مرحباً بك'
             : 'مستخدم دلالة شبشة';
 
-    // رقم الهاتف الحقيقي لحسابات الهاتف.
     final authPhone = user?.phone?.trim() ?? '';
-
-    // البريد الإلكتروني لحسابات البريد.
     final email = user?.email?.trim() ?? '';
-
-    // رقم الهاتف المحفوظ في metadata كخيار احتياطي.
     final metadataPhone =
         user?.userMetadata?['phone']?.toString().trim() ?? '';
-
-    // إذا كان الحساب مرتبطاً برقم هاتف نعرضه أولاً.
     final phone = authPhone.isNotEmpty ? authPhone : metadataPhone;
 
     final contact = phone.isNotEmpty
@@ -2741,61 +2731,121 @@ void _scrollToCategories() {
         : email.isNotEmpty
             ? email
             : user == null
-                ? 'تصفح الإعلانات بسهولة'
+                ? 'سوقك المحلي في شبشة'
                 : 'حسابك في دلالة شبشة';
 
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+      margin: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: primary,
-        borderRadius: const BorderRadius.only(
-          topRight: Radius.circular(18),
+        gradient: const LinearGradient(
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+          colors: [_brandDark, _brand, Color(0xFF7548D1)],
         ),
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: _brand.withValues(alpha: 0.22),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
-      child: Row(
+      child: Stack(
         children: [
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(15),
-            ),
-            child: Icon(
-              user == null ? Icons.person_outline : Icons.storefront_rounded,
-              size: 28,
-              color: primary,
+          Positioned(
+            left: -22,
+            top: -28,
+            child: Container(
+              width: 92,
+              height: 92,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.07),
+              ),
             ),
           ),
-
-          const SizedBox(width: 12),
-
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          Positioned(
+            right: -32,
+            bottom: -40,
+            child: Container(
+              width: 110,
+              height: 110,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: _gold.withValues(alpha: 0.08),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 15, 14, 14),
+            child: Row(
               children: [
-                Text(
-                  displayName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
                     color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
+                    borderRadius: BorderRadius.circular(17),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.65),
+                      width: 1.2,
+                    ),
+                  ),
+                  child: Icon(
+                    user == null
+                        ? Icons.person_outline_rounded
+                        : Icons.storefront_rounded,
+                    size: 28,
+                    color: _brand,
                   ),
                 ),
-
-                const SizedBox(height: 4),
-
-                Text(
-                  contact,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.82),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
+                const SizedBox(width: 11),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        displayName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 15.5,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        contact,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.82),
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 7),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.13),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Text(
+                          'دلالة شبشة',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -2807,24 +2857,36 @@ void _scrollToCategories() {
   }
 
   Widget _buildDrawerSectionTitle(String title, IconData icon) {
-    final primary = Theme.of(context).colorScheme.primary;
-
     return Padding(
-      padding: const EdgeInsets.fromLTRB(9, 5, 9, 4),
+      padding: const EdgeInsets.fromLTRB(7, 9, 7, 6),
       child: Row(
         children: [
-          Icon(
-            icon,
-            size: 18,
-            color: primary,
+          Container(
+            width: 30,
+            height: 30,
+            decoration: BoxDecoration(
+              color: _brandSoft,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, size: 16, color: _brand),
           ),
-          const SizedBox(width: 7),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w800,
-              color: primary,
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              title,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w900,
+                color: _ink,
+              ),
+            ),
+          ),
+          Container(
+            width: 34,
+            height: 2,
+            decoration: BoxDecoration(
+              color: _gold,
+              borderRadius: BorderRadius.circular(2),
             ),
           ),
         ],
@@ -2839,89 +2901,111 @@ void _scrollToCategories() {
     String? subtitle,
     bool selected = false,
     bool isDestructive = false,
+    bool emphasized = false,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
-
     final itemColor = isDestructive
         ? Colors.red.shade700
-        : selected
-            ? colorScheme.primary
+        : selected || emphasized
+            ? _brand
             : colorScheme.onSurface;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
+      padding: const EdgeInsets.symmetric(vertical: 3),
       child: Material(
         color: selected
-            ? colorScheme.primaryContainer.withValues(alpha: 0.65)
-            : Colors.transparent,
-        borderRadius: BorderRadius.circular(11),
+            ? _brandSoft
+            : emphasized
+                ? _brand.withValues(alpha: 0.055)
+                : Colors.transparent,
+        borderRadius: BorderRadius.circular(15),
         child: InkWell(
-          borderRadius: BorderRadius.circular(11),
+          borderRadius: BorderRadius.circular(15),
           onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 10,
-              vertical: 7,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 8),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(15),
+              border: selected
+                  ? Border.all(
+                      color: _brand.withValues(alpha: 0.14),
+                      width: 1,
+                    )
+                  : emphasized
+                      ? Border.all(
+                          color: _brand.withValues(alpha: 0.08),
+                          width: 1,
+                        )
+                      : null,
             ),
-            child: Row(
-              children: [
-                Container(
-                  width: 34,
-                  height: 34,
-                  decoration: BoxDecoration(
-                    color: selected
-                        ? colorScheme.primary.withValues(alpha: 0.12)
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(9),
-                  ),
-                  child: Icon(
-                    icon,
-                    size: 21,
-                    color: itemColor,
-                  ),
+          child: Row(
+            children: [
+              Container(
+                width: 37,
+                height: 37,
+                decoration: BoxDecoration(
+                  gradient: selected || emphasized
+                      ? const LinearGradient(
+                          begin: Alignment.topRight,
+                          end: Alignment.bottomLeft,
+                          colors: [_brand, _brandDark],
+                        )
+                      : null,
+                  color: selected || emphasized
+                      ? null
+                      : colorScheme.surfaceContainerHighest.withValues(alpha: 0.7),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-
-                const SizedBox(width: 9),
-
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+                child: Icon(
+                  icon,
+                  size: 20,
+                  color: selected || emphasized ? Colors.white : itemColor,
+                ),
+              ),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w800,
+                        color: itemColor,
+                      ),
+                    ),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 2),
                       Text(
-                        title,
+                        subtitle,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: 14.5,
-                          fontWeight: FontWeight.w700,
-                          color: itemColor,
+                          fontSize: 10.5,
+                          color: colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
-
-                      if (subtitle != null) ...[
-                        const SizedBox(height: 1),
-                        Text(
-                          subtitle,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
                     ],
-                  ),
+                  ],
                 ),
-
-                if (selected)
-                  Icon(
-                    Icons.chevron_left_rounded,
-                    size: 19,
-                    color: colorScheme.primary,
-                  ),
-              ],
-            ),
+              ),
+              if (selected)
+                const Icon(
+                  Icons.chevron_left_rounded,
+                  size: 21,
+                  color: _brand,
+                )
+              else if (emphasized)
+                const Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  size: 13,
+                  color: _brand,
+                ),
+            ],
           ),
         ),
       ),
@@ -2932,12 +3016,13 @@ void _scrollToCategories() {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Drawer(
-      width: 220,
-      elevation: 3,
+      width: 300,
+      elevation: 8,
+      backgroundColor: const Color(0xFFFCFAFF),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.only(
-          topRight: Radius.circular(18),
-          bottomRight: Radius.circular(18),
+          topRight: Radius.circular(28),
+          bottomRight: Radius.circular(28),
         ),
       ),
       child: SafeArea(
@@ -2945,54 +3030,50 @@ void _scrollToCategories() {
           children: [
             _buildDrawerHeader(user, name),
 
-            const SizedBox(height: 5),
-
             Expanded(
               child: ListView(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 9,
-                  vertical: 2,
-                ),
+                padding: const EdgeInsets.fromLTRB(10, 2, 10, 8),
                 children: [
+                  _buildDrawerSectionTitle(
+                    'الوصول السريع',
+                    Icons.bolt_rounded,
+                  ),
                   _buildDrawerItem(
                     icon: user == null
-                        ? Icons.login_outlined
-                        : Icons.person_outline,
+                        ? Icons.login_rounded
+                        : Icons.person_outline_rounded,
                     title: user == null ? 'تسجيل الدخول' : 'الملف الشخصي',
+                    subtitle: user == null ? 'ادخل إلى حسابك' : 'إدارة حسابك',
                     onTap: () async {
                       Navigator.pop(context);
                       await _openProfile();
                     },
                   ),
-
                   _buildDrawerItem(
-                    icon: Icons.add_circle_outline,
+                    icon: Icons.add_circle_outline_rounded,
                     title: 'إضافة إعلان',
+                    subtitle: 'اعرض ما تريد بيعه في شبشة',
+                    emphasized: true,
                     onTap: () async {
                       Navigator.pop(context);
                       await _openAddListing();
                     },
                   ),
 
-                  const SizedBox(height: 5),
-
                   if (_isAdmin) ...[
+                    _buildDrawerSectionTitle(
+                      'الإدارة',
+                      Icons.admin_panel_settings_outlined,
+                    ),
                     _buildDrawerItem(
-                      icon: Icons.admin_panel_settings_outlined,
+                      icon: Icons.admin_panel_settings_rounded,
                       title: 'لوحة تحكم الإدارة',
                       subtitle: 'إدارة ومراجعة الإعلانات',
+                      emphasized: true,
                       onTap: () async {
                         Navigator.pop(context);
                         await _openAdminPanel();
                       },
-                    ),
-
-                    const Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 6,
-                      ),
-                      child: Divider(height: 1),
                     ),
                   ],
 
@@ -3002,11 +3083,31 @@ void _scrollToCategories() {
                   ),
 
                   if (_categories.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.all(12),
-                      child: Text(
-                        'لا توجد أقسام حالياً',
-                        style: TextStyle(fontSize: 13),
+                    Container(
+                      margin: const EdgeInsets.symmetric(vertical: 5),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: _brandSoft.withValues(alpha: 0.55),
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: const Column(
+                        children: [
+                          Icon(
+                            Icons.category_outlined,
+                            size: 28,
+                            color: _brand,
+                          ),
+                          SizedBox(height: 6),
+                          Text(
+                            'لا توجد أقسام حالياً',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: _ink,
+                            ),
+                          ),
+                        ],
                       ),
                     )
                   else
@@ -3014,7 +3115,6 @@ void _scrollToCategories() {
                       final categoryId = category['id'] as int?;
                       final categoryName =
                           category['name']?.toString() ?? 'بدون اسم';
-
                       final selected = _selectedCategoryId == categoryId;
 
                       return _buildDrawerItem(
@@ -3023,51 +3123,39 @@ void _scrollToCategories() {
                         selected: selected,
                         onTap: () {
                           Navigator.pop(context);
-
                           if (categoryId == null) return;
-
                           _selectCategory(categoryId, clearSearch: true);
                         },
                       );
                     }),
 
-                  const Padding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 6,
-                    ),
-                    child: Divider(height: 1),
-                  ),
-
                   _buildDrawerSectionTitle(
                     'حسابي',
                     Icons.account_circle_outlined,
                   ),
-
                   _buildDrawerItem(
-                    icon: Icons.favorite_border,
+                    icon: Icons.favorite_border_rounded,
                     title: 'المفضلة',
+                    subtitle: 'الإعلانات التي حفظتها',
                     onTap: () {
                       Navigator.pop(context);
                       _openFavorites();
                     },
                   ),
-
                   _buildDrawerItem(
                     icon: Icons.inventory_2_outlined,
                     title: 'إعلاناتي',
+                    subtitle: 'متابعة إعلاناتك',
                     onTap: () {
                       Navigator.pop(context);
                       _openMyListings();
                     },
                   ),
-
-                  const SizedBox(height: 6),
-
                   if (user != null)
                     _buildDrawerItem(
-                      icon: Icons.logout,
+                      icon: Icons.logout_rounded,
                       title: 'تسجيل الخروج',
+                      subtitle: 'الخروج من الحساب الحالي',
                       isDestructive: true,
                       onTap: () {
                         Navigator.pop(context);
@@ -3080,23 +3168,51 @@ void _scrollToCategories() {
 
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+              margin: const EdgeInsets.fromLTRB(10, 0, 10, 8),
+              padding: const EdgeInsets.symmetric(vertical: 10),
               decoration: BoxDecoration(
-                border: Border(
-                  top: BorderSide(
-                    color: colorScheme.outlineVariant,
-                    width: 0.6,
-                  ),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.55),
                 ),
               ),
-              child: Text(
-                'دلالة شبشة',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: colorScheme.onSurfaceVariant,
-                ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.storefront_rounded,
+                    size: 16,
+                    color: _brand,
+                  ),
+                  const SizedBox(width: 6),
+                  const Text(
+                    'دلالة شبشة',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w900,
+                      color: _ink,
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                  Container(
+                    width: 4,
+                    height: 4,
+                    decoration: const BoxDecoration(
+                      color: _gold,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 5),
+                  Text(
+                    'سوقك المحلي',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
