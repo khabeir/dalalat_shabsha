@@ -20,7 +20,6 @@
 
 import 'dart:async';
 
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart' show NumberFormat;
@@ -29,6 +28,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/theme/app_colors.dart';
 import '../core/widgets/home_banner.dart';
 import '../core/widgets/home_drawer.dart';
+import '../core/widgets/listing_card.dart';
 import '../core/widgets/home_decorative_painters.dart';
 
 import 'add_listing_screen.dart';
@@ -955,42 +955,6 @@ class _HomeScreenState extends State<HomeScreen>
     return _supabase.storage.from('listing-images').getPublicUrl(path);
   }
 
-  Widget _buildListingImage(
-    Map<String, dynamic> listing, {
-    double height = 122,
-  }) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final imageUrl = _imageUrl(listing['image_path']);
-
-    Widget placeholder([
-      IconData icon = Icons.photo_library_outlined,
-    ]) {
-      return Container(
-        height: height,
-        width: double.infinity,
-        color: colorScheme.surfaceContainerHighest,
-        child: Center(
-          child: Icon(
-            icon,
-            size: 30,
-            color: colorScheme.onSurfaceVariant,
-          ),
-        ),
-      );
-    }
-
-    if (imageUrl == null) return placeholder();
-
-    return CachedNetworkImage(
-      imageUrl: imageUrl,
-      height: height,
-      width: double.infinity,
-      fit: BoxFit.cover,
-      memCacheWidth: 400,
-      placeholder: (_, __) => placeholder(Icons.image_outlined),
-      errorWidget: (_, __, ___) => placeholder(Icons.broken_image_outlined),
-    );
-  }
 
   // =========================
   // ألوان وأيقونات الأقسام
@@ -1606,267 +1570,25 @@ class _HomeScreenState extends State<HomeScreen>
     bool isCommercial = false,
     bool fillWidth = false,
   }) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     final id = listing['id'] as int?;
-
-    final rawTitle = listing['title']?.toString().trim() ?? '';
-    final title = rawTitle.isEmpty ? 'إعلان بدون عنوان' : rawTitle;
-
-    final area = listing['area']?.toString().trim() ?? '';
-
-    final meta = [
-      if (area.isNotEmpty) area,
-      _timeAgo(listing['created_at']),
-    ].where((part) => part.isNotEmpty).join(' - ');
-
     final category = _categoryById(listing['category_id']);
     final categoryName = category?['name']?.toString() ?? '';
 
-    final isFavorite = id != null && _favoriteIds.contains(id);
-    final isNegotiable = listing['price_type'] == 'negotiable';
-    final priceText = _formatPrice(listing);
-    final isContactPrice = priceText == 'السعر عند التواصل';
-
-    return SizedBox(
+    return ListingCard(
+      listing: listing,
+      imageUrl: _imageUrl(listing['image_path']),
       width: fillWidth ? double.infinity : _cardWidth,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(22),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.brand.withValues(alpha: 0.12),
-              blurRadius: 14,
-              offset: const Offset(0, 5),
-            ),
-          ],
-        ),
-        child: Material(
-          color: _cardColor,
-          borderRadius: BorderRadius.circular(22),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: () => _openListingDetails(listing),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Stack(
-                  children: [
-                    _buildListingImage(listing, height: 122),
-
-                    if (categoryName.isNotEmpty)
-                      Positioned(
-                        top: 9,
-                        right: 9,
-                        // نترك مكاناً لزر المفضلة على اليسار.
-                        left: 48,
-                        child: Align(
-                          alignment: AlignmentDirectional.centerStart,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 9,
-                              vertical: 5,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppColors.brand,
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  _filledCategoryIcon(categoryName),
-                                  size: 14,
-                                  color: Colors.white,
-                                ),
-                                const SizedBox(width: 4),
-                                Flexible(
-                                  child: Text(
-                                    categoryName,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 11.5,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-
-                    if (id != null)
-                      Positioned(
-                        top: 3,
-                        left: 3,
-                        child: GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTap: () => _toggleFavorite(id),
-                          child: Padding(
-                            padding: const EdgeInsets.all(6),
-                            child: Container(
-                              width: 34,
-                              height: 34,
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.14),
-                                    blurRadius: 6,
-                                  ),
-                                ],
-                              ),
-                              child: Icon(
-                                isFavorite
-                                    ? Icons.favorite_rounded
-                                    : Icons.favorite_border_rounded,
-                                size: 20,
-                                color: isFavorite ? Colors.red : AppColors.brand,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-
-                    if (isCommercial)
-                      Positioned(
-                        bottom: 8,
-                        right: 9,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.gold,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.star_rounded,
-                                size: 13,
-                                color: AppColors.brandDark,
-                              ),
-                              SizedBox(width: 3),
-                              Text(
-                                'مميز',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w800,
-                                  color: AppColors.brandDark,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 15,
-                          height: 1.25,
-                          fontWeight: FontWeight.w800,
-                          color: _titleColor,
-                        ),
-                      ),
-
-                      const SizedBox(height: 7),
-
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: _isDark
-                              ? colorScheme.primary.withValues(alpha: 0.18)
-                              : AppColors.brandSoft,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Text(
-                          priceText,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: isContactPrice ? 12.5 : 14.5,
-                            fontWeight: FontWeight.w800,
-                            color: _isDark ? colorScheme.primary : AppColors.brand,
-                          ),
-                        ),
-                      ),
-
-                      if (meta.isNotEmpty) ...[
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.location_on_rounded,
-                              size: 15,
-                              color: AppColors.brand,
-                            ),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                meta,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-
-                      if (isNegotiable) ...[
-                        const SizedBox(height: 7),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 9,
-                            vertical: 3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: _isDark
-                                ? colorScheme.primary.withValues(alpha: 0.18)
-                                : AppColors.brandSoft,
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: Text(
-                            'سعر قابل للتفاوض',
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w700,
-                              color: _isDark ? colorScheme.primary : AppColors.brand,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+      isCommercial: isCommercial,
+      isFavorite: id != null && _favoriteIds.contains(id),
+      categoryName: categoryName,
+      isDark: _isDark,
+      cardColor: _cardColor,
+      titleColor: _titleColor,
+      onTap: () => _openListingDetails(listing),
+      onToggleFavorite: id == null ? null : () => _toggleFavorite(id),
+      categoryIcon: _filledCategoryIcon(categoryName),
+      formatPrice: _formatPrice(listing),
+      timeAgo: _timeAgo(listing['created_at']),
     );
   }
 
