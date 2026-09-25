@@ -15,7 +15,6 @@ class CategoriesSection extends StatelessWidget {
   final IconData Function(String name) categoryIcon;
   final Color Function(String name, int index) categoryColor;
 
-  final VoidCallback? onViewAll;
   final void Function(int categoryId) onSelectCategory;
 
   const CategoriesSection({
@@ -27,7 +26,6 @@ class CategoriesSection extends StatelessWidget {
     required this.titleColor,
     required this.categoryIcon,
     required this.categoryColor,
-    required this.onViewAll,
     required this.onSelectCategory,
   });
 
@@ -60,10 +58,10 @@ class CategoriesSection extends StatelessWidget {
               ),
             ),
           ),
-          if (onViewAll != null)
+          if (categories.isNotEmpty)
             InkWell(
               borderRadius: BorderRadius.circular(12),
-              onTap: onViewAll,
+              onTap: () => _showAllCategories(context),
               child: Padding(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 4,

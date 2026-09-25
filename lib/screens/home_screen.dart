@@ -1550,11 +1550,6 @@ class _HomeScreenState extends State<HomeScreen>
   categoryColor: (name, index) {
     return _toneFor(name, index).fg;
   },
-  onViewAll: _categories.isEmpty
-      ? null
-      : () {
-          // سيتم فتح نافذة كل الأقسام من داخل CategoriesSection.
-        },
   onSelectCategory: (categoryId) {
     if (categoryId < 0) {
       _selectCategory(null);
