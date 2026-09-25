@@ -57,24 +57,24 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   static const _searchPoolSize = 500;
 
   static const _cardWidth = 172.0;
-  static const _cardHeight = 272.0;
+  static const _cardHeight = 280.0;
 
-  // ألوان الهوية.
+  // ألوان الهوية المحسّنة
   static const _brand = Color(0xFF5B2DB5);
   static const _brandDark = Color(0xFF3B1785);
-  static const _brandSoft = Color(0xFFEFE9FF);
-  static const _ink = Color(0xFF241A55);
+  static const _brandSoft = Color(0xFFF3EFFF);
+  static const _ink = Color(0xFF1E1742);
   static const _orange = Color(0xFFFF9F1C);
   static const _gold = Color(0xFFFFC93C);
 
-  // ارتفاع الترويسة بدون شريط الحالة.
+  // ارتفاع الترويسة
   static const _headerContentHeight = 200.0;
 
-  // صور اختيارية.
+  // صور اختيارية
   static const _headerAsset = 'assets/images/home_header.jpg';
   static const _bannerAsset = 'assets/images/home_banner.jpg';
 
-  // شرائح بانر العروض.
+  // شرائح بانر العروض
   static const _slides = <_BannerSlide>[
     _BannerSlide(
       'كل ما تحتاجه',
@@ -110,7 +110,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       'id, title, description, price, currency, price_type, '
       'area, category_id, status, created_at';
 
-  // جدول المفضلة.
   static const _favoritesTable = 'favorites';
   static const _favUserColumn = 'user_id';
   static const _favListingColumn = 'listing_id';
@@ -125,7 +124,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   final _bannerController = PageController();
   final _bannerIndex = ValueNotifier<int>(0);
 
-  // هل الترويسة ظاهرة.
+  // حالة رؤية الترويسة
   final _headerVisible = ValueNotifier<bool>(true);
 
   // =========================
@@ -214,8 +213,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (!_scrollController.hasClients) return;
 
     final position = _scrollController.position;
+    final isHeaderVisible = position.pixels < 110;
 
-    _headerVisible.value = position.pixels < 110;
+    if (_headerVisible.value != isHeaderVisible) {
+      _headerVisible.value = isHeaderVisible;
+    }
 
     final canLoadMore =
         _selectedCategoryId != null || _mode == _ListMode.latest;
@@ -241,7 +243,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
+      SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
     );
   }
 
@@ -935,63 +941,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   // =========================
-  // أيقونات الأقسام
-  // =========================
-  static const _iconMap = <String, IconData>{
-    'car': Icons.directions_car_outlined,
-    'home': Icons.home_work_outlined,
-    'phone': Icons.phone_android_outlined,
-    'electric': Icons.electrical_services_outlined,
-    'clothes': Icons.checkroom_outlined,
-    'furniture': Icons.weekend_outlined,
-    'animals': Icons.pets_outlined,
-    'crops': Icons.agriculture_outlined,
-    'food': Icons.restaurant_outlined,
-    'tools': Icons.build_outlined,
-    'services': Icons.handyman_outlined,
-    'jobs': Icons.work_outline,
-    'other': Icons.more_horiz_outlined,
-  };
-
-  IconData _iconForCategory(Map<String, dynamic> category) {
-    return _iconMap[category['icon']?.toString().trim()] ??
-        _categoryIcon(category['name']?.toString() ?? '');
-  }
-
-  IconData _categoryIcon(String name) {
-    switch (name.trim()) {
-      case 'سيارات ومركبات':
-        return Icons.directions_car_outlined;
-      case 'عقارات':
-        return Icons.home_work_outlined;
-      case 'موبايلات وإلكترونيات':
-        return Icons.phone_android_outlined;
-      case 'أجهزة كهربائية':
-        return Icons.electrical_services_outlined;
-      case 'ملابس وأحذية':
-        return Icons.checkroom_outlined;
-      case 'أثاث ومستلزمات منزلية':
-        return Icons.weekend_outlined;
-      case 'مواشي وحيوانات':
-        return Icons.pets_outlined;
-      case 'محاصيل زراعية':
-        return Icons.agriculture_outlined;
-      case 'مواد غذائية':
-        return Icons.restaurant_outlined;
-      case 'أدوات ومعدات':
-        return Icons.build_outlined;
-      case 'خدمات':
-        return Icons.handyman_outlined;
-      case 'وظائف':
-        return Icons.work_outline;
-      case 'أخرى':
-        return Icons.more_horiz_outlined;
-      default:
-        return Icons.category_outlined;
-    }
-  }
-
-  // =========================
   // تنسيق السعر والوقت
   // =========================
   String _formatPrice(Map<String, dynamic> listing) {
@@ -1060,12 +1009,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       return Container(
         height: height,
         width: double.infinity,
-        color: colorScheme.surfaceContainerHighest,
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
         child: Center(
           child: Icon(
             icon,
-            size: 30,
-            color: colorScheme.onSurfaceVariant,
+            size: 28,
+            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
           ),
         ),
       );
@@ -1089,11 +1038,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   // =========================
   static const _tones = <_Tone>[
     _Tone(Color(0xFFEFE7FF), Color(0xFF5B2DB5)),
-    _Tone(Color(0xFFFFF1D1), Color(0xFFF59E0B)),
-    _Tone(Color(0xFFDDF5EA), Color(0xFF0F9D7A)),
+    _Tone(Color(0xFFFFF1D1), Color(0xFFD97706)),
+    _Tone(Color(0xFFDDF5EA), Color(0xFF0D9488)),
     _Tone(Color(0xFFDFEDFF), Color(0xFF2563EB)),
     _Tone(Color(0xFFFFE3E9), Color(0xFFE11D48)),
-    _Tone(Color(0xFFE9EEF5), Color(0xFF475569)),
+    _Tone(Color(0xFFE2E8F0), Color(0xFF475569)),
   ];
 
   _Tone _toneFor(String name, int index) {
@@ -1167,10 +1116,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   // =========================
   bool get _isDark => Theme.of(context).brightness == Brightness.dark;
 
-  Color get _pageBackground => Color.alphaBlend(
-        _brand.withValues(alpha: _isDark ? 0.06 : 0.045),
-        Theme.of(context).colorScheme.surface,
-      );
+  Color get _pageBackground => _isDark
+      ? Theme.of(context).colorScheme.surface
+      : const Color(0xFFF8F7FC);
 
   Color get _titleColor =>
       _isDark ? Theme.of(context).colorScheme.onSurface : _ink;
@@ -1285,7 +1233,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 child: Text(
                   'دلالة شبشة',
                   style: TextStyle(
-                    fontSize: 30,
+                    fontSize: 28,
                     fontWeight: FontWeight.w900,
                     height: 1.1,
                     color: _brandDark,
@@ -1298,7 +1246,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: 13.5,
+                  fontSize: 13,
                   fontWeight: FontWeight.w700,
                   color: _brandDark,
                   shadows: glow,
@@ -1312,14 +1260,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           child: GestureDetector(
             onTap: _openProfile,
             child: Container(
-              width: 46,
-              height: 46,
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.94),
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.15),
+                    color: Colors.black.withValues(alpha: 0.12),
                     blurRadius: 10,
                     offset: const Offset(0, 3),
                   ),
@@ -1329,7 +1277,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 user == null
                     ? Icons.person_outline_rounded
                     : Icons.person_rounded,
-                size: 26,
+                size: 25,
                 color: _brandDark,
               ),
             ),
@@ -1341,18 +1289,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Widget _buildLogo() {
     return SizedBox(
-      width: 46,
-      height: 52,
+      width: 44,
+      height: 50,
       child: Stack(
         alignment: Alignment.topCenter,
         clipBehavior: Clip.none,
         children: [
-          const Icon(Icons.location_on_rounded, size: 52, color: _brand),
+          const Icon(Icons.location_on_rounded, size: 50, color: _brand),
           const Positioned(
-            top: 12,
+            top: 11,
             child: Icon(
               Icons.shopping_cart_rounded,
-              size: 17,
+              size: 16,
               color: Colors.white,
             ),
           ),
@@ -1360,15 +1308,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             top: 0,
             left: 0,
             child: Container(
-              width: 15,
-              height: 15,
+              width: 14,
+              height: 14,
               decoration: const BoxDecoration(
                 color: _gold,
                 shape: BoxShape.circle,
               ),
               child: const Icon(
                 Icons.local_offer_rounded,
-                size: 9,
+                size: 8,
                 color: _brandDark,
               ),
             ),
@@ -1380,17 +1328,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Widget _buildSearchField() {
     return Container(
-      height: 54,
+      height: 52,
       decoration: BoxDecoration(
         color: _isDark
             ? Theme.of(context).colorScheme.surfaceContainerHigh
             : Colors.white,
-        borderRadius: BorderRadius.circular(30),
+        borderRadius: BorderRadius.circular(26),
         boxShadow: [
           BoxShadow(
-            color: _brand.withValues(alpha: 0.20),
-            blurRadius: 18,
-            offset: const Offset(0, 6),
+            color: _brand.withValues(alpha: 0.14),
+            blurRadius: 16,
+            offset: const Offset(0, 5),
           ),
         ],
       ),
@@ -1401,23 +1349,23 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             controller: _searchController,
             textInputAction: TextInputAction.search,
             onChanged: _onSearchChanged,
-            style: const TextStyle(fontSize: 15),
+            style: const TextStyle(fontSize: 14.5),
             decoration: InputDecoration(
               hintText: 'ابحث عن إعلان أو منطقة ...',
               hintStyle: TextStyle(
-                fontSize: 14.5,
+                fontSize: 14,
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
               prefixIcon: Icon(
                 Icons.search_rounded,
-                size: 27,
-                color: _titleColor,
+                size: 24,
+                color: _brand,
               ),
               suffixIcon: value.text.isNotEmpty
                   ? IconButton(
                       onPressed: _clearSearch,
                       tooltip: 'مسح البحث',
-                      icon: const Icon(Icons.close_rounded, size: 21),
+                      icon: const Icon(Icons.close_rounded, size: 20),
                     )
                   : null,
               filled: false,
@@ -1425,7 +1373,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               border: InputBorder.none,
               enabledBorder: InputBorder.none,
               focusedBorder: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(vertical: 17),
+              contentPadding: const EdgeInsets.symmetric(vertical: 16),
             ),
           );
         },
@@ -1451,7 +1399,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return Column(
       children: [
         SizedBox(
-          height: 175,
+          height: 170,
           child: PageView.builder(
             controller: _bannerController,
             itemCount: _slides.length,
@@ -1464,7 +1412,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             },
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
         ValueListenableBuilder<int>(
           valueListenable: _bannerIndex,
           builder: (context, current, _) {
@@ -1475,11 +1423,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
                 return AnimatedContainer(
                   duration: const Duration(milliseconds: 250),
-                  margin: const EdgeInsets.symmetric(horizontal: 4),
-                  width: active ? 22 : 8,
-                  height: 8,
+                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                  width: active ? 20 : 7,
+                  height: 7,
                   decoration: BoxDecoration(
-                    color: active ? _brand : _brand.withValues(alpha: 0.22),
+                    color: active ? _brand : _brand.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(4),
                   ),
                 );
@@ -1493,7 +1441,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Widget _buildBannerSlide(_BannerSlide slide) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(26),
+      borderRadius: BorderRadius.circular(24),
       child: LayoutBuilder(
         builder: (context, constraints) {
           final width = constraints.maxWidth;
@@ -1531,7 +1479,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       child: const Icon(
                         Icons.directions_car,
                         color: Colors.white,
-                        size: 50,
+                        size: 48,
                       ),
                     ),
                   ),
@@ -1547,7 +1495,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 ),
               ),
               Positioned(
-                left: 18,
+                left: 16,
                 top: 12,
                 bottom: 12,
                 right: photoWidth - 10,
@@ -1562,7 +1510,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         slide.line1,
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 22,
+                          fontSize: 20,
                           fontWeight: FontWeight.w900,
                           height: 1.1,
                         ),
@@ -1575,7 +1523,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         slide.line2,
                         style: const TextStyle(
                           color: _gold,
-                          fontSize: 22,
+                          fontSize: 20,
                           fontWeight: FontWeight.w900,
                           height: 1.1,
                         ),
@@ -1616,16 +1564,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     GestureDetector(
                       onTap: () => _onBannerAction(slide.action),
                       child: Container(
-                        height: 36,
+                        height: 34,
                         padding: const EdgeInsets.symmetric(horizontal: 14),
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
                             colors: [Color(0xFFFFB02E), Color(0xFFFF8A00)],
                           ),
-                          borderRadius: BorderRadius.circular(20),
+                          borderRadius: BorderRadius.circular(18),
                           boxShadow: [
                             BoxShadow(
-                              color: _orange.withValues(alpha: 0.4),
+                              color: _orange.withValues(alpha: 0.35),
                               blurRadius: 8,
                               offset: const Offset(0, 3),
                             ),
@@ -1639,14 +1587,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                   ? Icons.add_circle_outline_rounded
                                   : Icons.grid_view_rounded,
                               color: Colors.white,
-                              size: 18,
+                              size: 16,
                             ),
-                            const SizedBox(width: 6),
+                            const SizedBox(width: 5),
                             Text(
                               slide.cta,
                               style: const TextStyle(
                                 color: Colors.white,
-                                fontSize: 13,
+                                fontSize: 12.5,
                                 fontWeight: FontWeight.w800,
                               ),
                             ),
@@ -1678,8 +1626,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       child: Row(
         children: [
           if (icon != null) ...[
-            Icon(icon, size: 24, color: iconColor ?? _brand),
-            const SizedBox(width: 8),
+            Icon(icon, size: 22, color: iconColor ?? _brand),
+            const SizedBox(width: 7),
           ],
           Expanded(
             child: Text(
@@ -1687,7 +1635,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: 19,
+                fontSize: 18,
                 fontWeight: FontWeight.w900,
                 color: _titleColor,
               ),
@@ -1695,18 +1643,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ),
           if (onViewAll != null)
             InkWell(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(10),
               onTap: onViewAll,
               child: Padding(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                    const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
                       'عرض الكل',
                       style: TextStyle(
-                        fontSize: 14,
+                        fontSize: 13.5,
                         fontWeight: FontWeight.w700,
                         color: _isDark
                             ? Theme.of(context).colorScheme.primary
@@ -1715,7 +1663,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     ),
                     Icon(
                       Icons.chevron_left_rounded,
-                      size: 22,
+                      size: 20,
                       color: _isDark
                           ? Theme.of(context).colorScheme.primary
                           : _brand,
@@ -1748,31 +1696,31 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
         decoration: BoxDecoration(
           color: _isDark ? tone.fg.withValues(alpha: 0.16) : tone.bg,
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: selected ? tone.fg : Colors.transparent,
             width: 2,
           ),
           boxShadow: [
             BoxShadow(
-              color: tone.fg.withValues(alpha: selected ? 0.28 : 0.12),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
+              color: tone.fg.withValues(alpha: selected ? 0.22 : 0.08),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
             ),
           ],
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(_filledCategoryIcon(name), size: 34, color: tone.fg),
-            const SizedBox(height: 8),
+            Icon(_filledCategoryIcon(name), size: 32, color: tone.fg),
+            const SizedBox(height: 6),
             Text(
               name,
               textAlign: TextAlign.center,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: 12,
+                fontSize: 11.5,
                 height: 1.2,
                 fontWeight: FontWeight.w700,
                 color: _titleColor,
@@ -1802,7 +1750,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           )
         else
           SizedBox(
-            height: 118,
+            height: 112,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -1814,9 +1762,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 final selected = _selectedCategoryId == categoryId;
 
                 return Padding(
-                  padding: const EdgeInsets.only(bottom: 14),
+                  padding: const EdgeInsets.only(bottom: 10),
                   child: SizedBox(
-                    width: 88,
+                    width: 86,
                     child: _buildCategoryTile(
                       category,
                       index,
@@ -1915,7 +1863,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final meta = [
       if (area.isNotEmpty) area,
       _timeAgo(listing['created_at']),
-    ].where((part) => part.isNotEmpty).join(' - ');
+    ].where((part) => part.isNotEmpty).join(' • ');
 
     final category = _categoryById(listing['category_id']);
     final categoryName = category?['name']?.toString() ?? '';
@@ -1929,18 +1877,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       width: fillWidth ? double.infinity : _cardWidth,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: _brand.withValues(alpha: 0.12),
-              blurRadius: 14,
-              offset: const Offset(0, 5),
+              color: _brand.withValues(alpha: 0.08),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
         child: Material(
           color: _cardColor,
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: BorderRadius.circular(20),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
             onTap: () => _openListingDetails(listing),
@@ -1949,29 +1897,29 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               children: [
                 Stack(
                   children: [
-                    _buildListingImage(listing, height: 122),
+                    _buildListingImage(listing, height: 120),
                     if (categoryName.isNotEmpty)
                       Positioned(
-                        top: 9,
-                        right: 9,
-                        left: 48,
+                        top: 8,
+                        right: 8,
+                        left: 46,
                         child: Align(
                           alignment: AlignmentDirectional.centerStart,
                           child: Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 9,
-                              vertical: 5,
+                              horizontal: 8,
+                              vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color: _brand,
-                              borderRadius: BorderRadius.circular(16),
+                              color: _brand.withValues(alpha: 0.9),
+                              borderRadius: BorderRadius.circular(12),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Icon(
                                   _filledCategoryIcon(categoryName),
-                                  size: 14,
+                                  size: 13,
                                   color: Colors.white,
                                 ),
                                 const SizedBox(width: 4),
@@ -1982,7 +1930,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
                                       color: Colors.white,
-                                      fontSize: 11.5,
+                                      fontSize: 11,
                                       fontWeight: FontWeight.w700,
                                     ),
                                   ),
@@ -1994,22 +1942,22 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       ),
                     if (id != null)
                       Positioned(
-                        top: 3,
-                        left: 3,
+                        top: 4,
+                        left: 4,
                         child: GestureDetector(
                           behavior: HitTestBehavior.opaque,
                           onTap: () => _toggleFavorite(id),
                           child: Padding(
-                            padding: const EdgeInsets.all(6),
+                            padding: const EdgeInsets.all(4),
                             child: Container(
-                              width: 34,
-                              height: 34,
+                              width: 32,
+                              height: 32,
                               decoration: BoxDecoration(
                                 color: Colors.white,
                                 shape: BoxShape.circle,
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.14),
+                                    color: Colors.black.withValues(alpha: 0.12),
                                     blurRadius: 6,
                                   ),
                                 ],
@@ -2018,7 +1966,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                 isFavorite
                                     ? Icons.favorite_rounded
                                     : Icons.favorite_border_rounded,
-                                size: 20,
+                                size: 18,
                                 color: isFavorite ? Colors.red : _brand,
                               ),
                             ),
@@ -2028,29 +1976,29 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     if (isCommercial)
                       Positioned(
                         bottom: 8,
-                        right: 9,
+                        right: 8,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
+                            horizontal: 7,
                             vertical: 3,
                           ),
                           decoration: BoxDecoration(
                             color: _gold,
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(10),
                           ),
                           child: const Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(
                                 Icons.star_rounded,
-                                size: 13,
+                                size: 12,
                                 color: _brandDark,
                               ),
-                              SizedBox(width: 3),
+                              SizedBox(width: 2),
                               Text(
                                 'مميز',
                                 style: TextStyle(
-                                  fontSize: 11,
+                                  fontSize: 10.5,
                                   fontWeight: FontWeight.w800,
                                   color: _brandDark,
                                 ),
@@ -2062,7 +2010,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   ],
                 ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                  padding: const EdgeInsets.all(10),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -2071,52 +2019,52 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: 15,
+                          fontSize: 14,
                           height: 1.25,
                           fontWeight: FontWeight.w800,
                           color: _titleColor,
                         ),
                       ),
-                      const SizedBox(height: 7),
+                      const SizedBox(height: 6),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 5,
+                          horizontal: 8,
+                          vertical: 4,
                         ),
                         decoration: BoxDecoration(
                           color: _isDark
                               ? colorScheme.primary.withValues(alpha: 0.18)
                               : _brandSoft,
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
                           priceText,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            fontSize: isContactPrice ? 12.5 : 14.5,
+                            fontSize: isContactPrice ? 11.5 : 13.5,
                             fontWeight: FontWeight.w800,
                             color: _isDark ? colorScheme.primary : _brand,
                           ),
                         ),
                       ),
                       if (meta.isNotEmpty) ...[
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 6),
                         Row(
                           children: [
                             const Icon(
                               Icons.location_on_rounded,
-                              size: 15,
+                              size: 13,
                               color: _brand,
                             ),
-                            const SizedBox(width: 4),
+                            const SizedBox(width: 3),
                             Expanded(
                               child: Text(
                                 meta,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
-                                  fontSize: 12,
+                                  fontSize: 11.5,
                                   color: colorScheme.onSurfaceVariant,
                                 ),
                               ),
@@ -2125,25 +2073,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         ),
                       ],
                       if (isNegotiable) ...[
-                        const SizedBox(height: 7),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 9,
-                            vertical: 3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: _isDark
-                                ? colorScheme.primary.withValues(alpha: 0.18)
-                                : _brandSoft,
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: Text(
-                            'سعر قابل للتفاوض',
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w700,
-                              color: _isDark ? colorScheme.primary : _brand,
-                            ),
+                        const SizedBox(height: 5),
+                        Text(
+                          'قابل للتفاوض',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: _isDark ? colorScheme.primary : _brand,
                           ),
                         ),
                       ],
@@ -2163,7 +2099,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     bool commercial = false,
   }) {
     return SizedBox(
-      height: _cardHeight + 16,
+      height: _cardHeight + 12,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -2171,7 +2107,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         separatorBuilder: (_, __) => const SizedBox(width: 12),
         itemBuilder: (context, index) {
           return Padding(
-            padding: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.only(bottom: 10),
             child: _buildListingCard(
               listings[index],
               isCommercial: commercial,
@@ -2219,7 +2155,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 19,
+                    fontSize: 18,
                     fontWeight: FontWeight.w900,
                     color: _titleColor,
                   ),
@@ -2228,7 +2164,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               Text(
                 '${results.length} إعلان',
                 style: TextStyle(
-                  fontSize: 12.5,
+                  fontSize: 12,
                   color: colorScheme.onSurfaceVariant,
                 ),
               ),
@@ -2239,16 +2175,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   visualDensity: VisualDensity.compact,
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                 ),
-                icon: const Icon(Icons.close_rounded, size: 17),
+                icon: const Icon(Icons.close_rounded, size: 16),
                 label: const Text(
                   'إلغاء التصفية',
-                  style: TextStyle(fontSize: 12.5),
+                  style: TextStyle(fontSize: 12),
                 ),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
         if (showSpinner && results.isEmpty)
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 40),
@@ -2259,8 +2195,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             padding: const EdgeInsets.symmetric(vertical: 35, horizontal: 16),
             child: Column(
               children: [
-                const Icon(Icons.search_off_outlined, size: 48),
-                const SizedBox(height: 9),
+                const Icon(Icons.search_off_outlined, size: 44),
+                const SizedBox(height: 8),
                 Text(
                   _isSearching
                       ? 'لم نجد إعلانات تطابق بحثك'
@@ -2278,7 +2214,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               itemCount: results.length,
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
-                mainAxisSpacing: 14,
+                mainAxisSpacing: 12,
                 crossAxisSpacing: 12,
                 mainAxisExtent: _cardHeight,
               ),
@@ -2322,8 +2258,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         padding: EdgeInsets.symmetric(vertical: 32),
         child: Column(
           children: [
-            Icon(Icons.inventory_2_outlined, size: 48),
-            SizedBox(height: 10),
+            Icon(Icons.inventory_2_outlined, size: 44),
+            SizedBox(height: 8),
             Text('لا توجد إعلانات متاحة حالياً'),
           ],
         ),
@@ -2356,7 +2292,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
       categoryRows.add(
         Padding(
-          padding: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.only(bottom: 8),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -2366,7 +2302,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 iconColor: _toneFor(name, i).fg,
                 onViewAll: () => _selectCategory(categoryId),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               _buildHorizontalListings(items),
             ],
           ),
@@ -2384,9 +2320,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             iconColor: const Color(0xFFFF6A1A),
             onViewAll: () => _showAll(_ListMode.featured),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           _buildHorizontalListings(promoted),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
         ],
         if (latestListings.isNotEmpty) ...[
           _sectionHeader(
@@ -2394,9 +2330,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             icon: Icons.schedule_rounded,
             onViewAll: () => _showAll(_ListMode.latest),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           _buildHorizontalListings(latestListings),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
         ],
         ...categoryRows,
       ],
@@ -2446,16 +2382,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 child: Text(
                   'مرحباً يا $name 👋',
                   style: TextStyle(
-                    fontSize: 13.5,
+                    fontSize: 13,
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
               ),
             _buildBannerCarousel(),
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
           ],
           _buildCategoriesSection(),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           if (_isFiltering) _buildSearchResults() else _buildHomeSections(),
         ],
       );
@@ -2468,7 +2404,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         controller: _scrollController,
         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: EdgeInsets.only(bottom: 112 + bottomInset),
+        padding: EdgeInsets.only(bottom: 110 + bottomInset),
         children: [
           _buildHeader(topPadding),
           content,
@@ -2493,28 +2429,28 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
       return Expanded(
         child: InkWell(
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(20),
           onTap: onTap,
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 26, color: color),
-              const SizedBox(height: 3),
+              Icon(icon, size: 24, color: color),
+              const SizedBox(height: 2),
               FittedBox(
                 fit: BoxFit.scaleDown,
                 child: Text(
                   label,
                   style: TextStyle(
-                    fontSize: 11.5,
+                    fontSize: 11,
                     fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
                     color: color,
                   ),
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 3),
               selected
                   ? Container(
-                      width: 30,
+                      width: 24,
                       height: 3,
                       decoration: BoxDecoration(
                         color: _brand,
@@ -2531,7 +2467,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return SafeArea(
       top: false,
       child: SizedBox(
-        height: 104,
+        height: 98,
         child: Stack(
           clipBehavior: Clip.none,
           children: [
@@ -2539,16 +2475,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               left: 14,
               right: 14,
               bottom: 8,
-              height: 68,
+              height: 64,
               child: Container(
                 decoration: BoxDecoration(
                   color: _cardColor,
-                  borderRadius: BorderRadius.circular(30),
+                  borderRadius: BorderRadius.circular(28),
                   boxShadow: [
                     BoxShadow(
-                      color: _brand.withValues(alpha: 0.20),
-                      blurRadius: 24,
-                      offset: const Offset(0, 8),
+                      color: _brand.withValues(alpha: 0.16),
+                      blurRadius: 20,
+                      offset: const Offset(0, 6),
                     ),
                   ],
                 ),
@@ -2573,11 +2509,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         child: const Align(
                           alignment: Alignment.bottomCenter,
                           child: Padding(
-                            padding: EdgeInsets.only(bottom: 9),
+                            padding: EdgeInsets.only(bottom: 8),
                             child: Text(
                               'أضف إعلان',
                               style: TextStyle(
-                                fontSize: 11.5,
+                                fontSize: 11,
                                 fontWeight: FontWeight.w800,
                                 color: _brand,
                               ),
@@ -2601,26 +2537,26 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               ),
             ),
             Positioned(
-              top: 6,
+              top: 4,
               left: 0,
               right: 0,
               child: Center(
                 child: GestureDetector(
                   onTap: _openAddListing,
                   child: SizedBox(
-                    width: 84,
-                    height: 66,
+                    width: 80,
+                    height: 62,
                     child: Stack(
                       alignment: Alignment.center,
                       clipBehavior: Clip.none,
                       children: [
                         const CustomPaint(
-                          size: Size(84, 66),
+                          size: Size(80, 62),
                           painter: _SparklesPainter(),
                         ),
                         Container(
-                          width: 60,
-                          height: 60,
+                          width: 56,
+                          height: 56,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             gradient: const LinearGradient(
@@ -2631,15 +2567,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             border: Border.all(color: Colors.white, width: 3),
                             boxShadow: [
                               BoxShadow(
-                                color: _brand.withValues(alpha: 0.40),
-                                blurRadius: 14,
-                                offset: const Offset(0, 6),
+                                color: _brand.withValues(alpha: 0.35),
+                                blurRadius: 12,
+                                offset: const Offset(0, 5),
                               ),
                             ],
                           ),
                           child: const Icon(
                             Icons.add_rounded,
-                            size: 36,
+                            size: 34,
                             color: Colors.white,
                           ),
                         ),
@@ -2694,15 +2630,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       child: Row(
         children: [
           Container(
-            width: 52,
-            height: 52,
+            width: 50,
+            height: 50,
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(15),
+              borderRadius: BorderRadius.circular(14),
             ),
             child: Icon(
               user == null ? Icons.person_outline : Icons.storefront_rounded,
-              size: 28,
+              size: 26,
               color: primary,
             ),
           ),
@@ -2717,18 +2653,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 16,
+                    fontSize: 15.5,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 3),
                 Text(
                   contact,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: Colors.white.withValues(alpha: 0.82),
-                    fontSize: 12,
+                    fontSize: 11.5,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -2744,19 +2680,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final primary = Theme.of(context).colorScheme.primary;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(9, 5, 9, 4),
+      padding: const EdgeInsets.fromLTRB(8, 6, 8, 4),
       child: Row(
         children: [
           Icon(
             icon,
-            size: 18,
+            size: 17,
             color: primary,
           ),
-          const SizedBox(width: 7),
+          const SizedBox(width: 6),
           Text(
             title,
             style: TextStyle(
-              fontSize: 14,
+              fontSize: 13.5,
               fontWeight: FontWeight.w800,
               color: primary,
             ),
@@ -2786,11 +2722,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Material(
         color: selected
-            ? colorScheme.primaryContainer.withValues(alpha: 0.65)
+            ? colorScheme.primaryContainer.withValues(alpha: 0.6)
             : Colors.transparent,
-        borderRadius: BorderRadius.circular(11),
+        borderRadius: BorderRadius.circular(10),
         child: InkWell(
-          borderRadius: BorderRadius.circular(11),
+          borderRadius: BorderRadius.circular(10),
           onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.symmetric(
@@ -2800,21 +2736,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             child: Row(
               children: [
                 Container(
-                  width: 34,
-                  height: 34,
+                  width: 32,
+                  height: 32,
                   decoration: BoxDecoration(
                     color: selected
                         ? colorScheme.primary.withValues(alpha: 0.12)
                         : Colors.transparent,
-                    borderRadius: BorderRadius.circular(9),
+                    borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(
                     icon,
-                    size: 21,
+                    size: 20,
                     color: itemColor,
                   ),
                 ),
-                const SizedBox(width: 9),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -2824,7 +2760,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: 14.5,
+                          fontSize: 14,
                           fontWeight: FontWeight.w700,
                           color: itemColor,
                         ),
@@ -2836,7 +2772,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            fontSize: 11.5,
+                            fontSize: 11,
                             color: colorScheme.onSurfaceVariant,
                           ),
                         ),
@@ -2864,7 +2800,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             Expanded(
               child: ListView(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                 children: [
                   _buildDrawerSectionTitle(
                       'التنقل السريع', Icons.explore_outlined),
@@ -2901,7 +2837,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       _openFavorites();
                     },
                   ),
-                  const Divider(height: 20),
+                  const Divider(height: 18),
                   _buildDrawerSectionTitle(
                       'الحساب والضبط', Icons.person_outline),
                   _buildDrawerItem(
@@ -2923,7 +2859,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       },
                     ),
                   if (user != null) ...[
-                    const Divider(height: 20),
+                    const Divider(height: 18),
                     _buildDrawerItem(
                       icon: Icons.logout_rounded,
                       title: 'تسجيل الخروج',
@@ -2946,13 +2882,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     final topPadding = MediaQuery.of(context).padding.top;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Directionality(
       textDirection: TextDirection.rtl,
       child: ValueListenableBuilder<bool>(
         valueListenable: _headerVisible,
-        builder: (context, headerVisible, child) {
-          final isDark = Theme.of(context).brightness == Brightness.dark;
+        builder: (context, headerVisible, _) {
           final overlayStyle = headerVisible
               ? SystemUiOverlayStyle.dark.copyWith(
                   statusBarColor: Colors.transparent,
@@ -2968,25 +2904,24 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
           return AnnotatedRegion<SystemUiOverlayStyle>(
             value: overlayStyle,
-            child: child!,
+            child: Scaffold(
+              key: _scaffoldKey,
+              backgroundColor: _pageBackground,
+              drawer: _buildDrawer(),
+              body: Stack(
+                children: [
+                  _buildBody(topPadding),
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: _buildBottomNavigation(),
+                  ),
+                ],
+              ),
+            ),
           );
         },
-        child: Scaffold(
-          key: _scaffoldKey,
-          backgroundColor: _pageBackground,
-          drawer: _buildDrawer(),
-          body: Stack(
-            children: [
-              _buildBody(topPadding),
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: _buildBottomNavigation(),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -3024,9 +2959,9 @@ class _SwooshPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.25)
+      ..color = Colors.white.withValues(alpha: 0.22)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.0;
+      ..strokeWidth = 2.5;
 
     final path = Path();
     path.moveTo(size.width * 0.23, 0);
@@ -3082,11 +3017,11 @@ class _SparklesPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = const Color(0xFFFFC93C).withValues(alpha: 0.6)
+      ..color = const Color(0xFFFFC93C).withValues(alpha: 0.55)
       ..style = PaintingStyle.fill;
 
     canvas.drawCircle(Offset(size.width * 0.15, size.height * 0.3), 3, paint);
-    canvas.drawCircle(Offset(size.width * 0.85, size.height * 0.25), 4, paint);
+    canvas.drawCircle(Offset(size.width * 0.85, size.height * 0.25), 3.5, paint);
     canvas.drawCircle(Offset(size.width * 0.78, size.height * 0.7), 2.5, paint);
   }
 
