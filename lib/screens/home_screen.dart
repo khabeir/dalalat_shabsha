@@ -1,4 +1,26 @@
+// Orginal home screen 
+// =====================================
+// الصفحة الرئيسية لتطبيق دلالة شبشة (التصميم الجديد)
+//
+// الحزم المطلوبة في pubspec.yaml:
+//   intl: ^0.19.0
+//   cached_network_image: ^3.3.1
+//
+// يعتمد الكود على الافتراضات التالية، عدّلها إن اختلفت عندك:
+//   1) جدول المفضلة: أسماؤه في الثوابت _favoritesTable وما بعده.
+//   2) علاقة (foreign key) بين listing_images.listing_id و listings.id.
+//      إن لم توجد يعمل الكود تلقائياً بالطريقة القديمة (طلب منفصل للصور).
+//   3) عمود icon في جدول categories (اختياري): مفاتيح مثل car, home, phone.
+//      إن كان فارغاً تُستخدم الأيقونة حسب اسم القسم كما كان سابقاً.
+//   4) صور الترويسة والبانر اختيارية: ضع صورتك في
+//        assets/images/home_header.jpg   (خلفية الترويسة)
+//        assets/images/home_banner.jpg   (صورة البانر)
+//      وأضف assets/images/ إلى pubspec.yaml. وإن لم توجد يظهر رسم
+//      مشهد شبشة المرسوم بالكود.
+// =============================================================
+
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -14,32 +36,6 @@ import 'listing_details_screen.dart';
 import 'my_listings_screen.dart';
 import 'profile_screen.dart';
 
-enum _BannerAction { addListing, browseCategories }
-
-class _BannerSlide {
-  final String line1;
-  final String line2;
-  final List<String> bullets;
-  final String cta;
-  final _BannerAction action;
-
-  const _BannerSlide(
-    this.line1,
-    this.line2,
-    this.bullets,
-    this.cta,
-    this.action,
-  );
-}
-
-enum _ListMode { home, featured, latest }
-
-class _Tone {
-  final Color bg;
-  final Color fg;
-  const _Tone(this.bg, this.fg);
-}
-
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -47,7 +43,8 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
+class _HomeScreenState extends State<HomeScreen>
+    with WidgetsBindingObserver {
   // =========================
   // ثوابت
   // =========================
@@ -56,29 +53,29 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   static const _searchPoolSize = 500;
 
   static const _cardWidth = 172.0;
-  static const _cardHeight = 280.0;
+  static const _cardHeight = 272.0;
 
-  // ألوان الهوية المحسّنة
+  // ألوان الهوية.
   static const _brand = Color(0xFF5B2DB5);
   static const _brandDark = Color(0xFF3B1785);
-  static const _brandSoft = Color(0xFFF3EFFF);
-  static const _ink = Color(0xFF1E1742);
+  static const _brandSoft = Color(0xFFEFE9FF);
+  static const _ink = Color(0xFF241A55);
   static const _orange = Color(0xFFFF9F1C);
   static const _gold = Color(0xFFFFC93C);
 
-  // ارتفاع الترويسة
-  static const _headerContentHeight = 200.0;
+  // ارتفاع الترويسة بدون شريط الحالة.
+  static const _headerContentHeight = 188.0;
 
-  // صور اختيارية
+  // صور اختيارية (انظر التعليق في أعلى الملف).
   static const _headerAsset = 'assets/images/home_header.jpg';
   static const _bannerAsset = 'assets/images/home_banner.jpg';
 
-  // شرائح بانر العروض
+  // شرائح بانر العروض.
   static const _slides = <_BannerSlide>[
     _BannerSlide(
       'كل ما تحتاجه',
       'في مكان واحد',
-      ['إعلانات مميزة', 'بيع وشراء محلي', 'انتشار واسع'],
+      ['إعلانات مجانية', 'بيع وشراء محلي', 'دعم مجتمعك'],
       'أضف إعلانك الآن',
       _BannerAction.addListing,
     ),
@@ -99,7 +96,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _BannerSlide(
       'ابحث بسهولة',
       'عن أي شيء',
-      ['أقسام منظمة', 'بحث سريع', 'الأحدث أولاً'],
+      ['أقسام منظمة', 'بحث بالحي', 'الأحدث أولاً'],
       'تصفح الأقسام',
       _BannerAction.browseCategories,
     ),
@@ -109,6 +106,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       'id, title, description, price, currency, price_type, '
       'area, category_id, status, created_at';
 
+  // جدول المفضلة (عدّل الأسماء حسب مشروعك).
   static const _favoritesTable = 'favorites';
   static const _favUserColumn = 'user_id';
   static const _favListingColumn = 'listing_id';
@@ -123,7 +121,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   final _bannerController = PageController();
   final _bannerIndex = ValueNotifier<int>(0);
 
-  // حالة رؤية الترويسة
+  // هل الترويسة ظاهرة (لتغيير لون أيقونات شريط الحالة).
   final _headerVisible = ValueNotifier<bool>(true);
 
   // =========================
@@ -135,8 +133,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   List<Map<String, dynamic>>? _searchPool;
   Set<int> _favoriteIds = {};
 
-  bool _loading = true;
-  bool _listingsLoading = false;
+  bool _loading = true; // أول تحميل للصفحة فقط
+  bool _listingsLoading = false; // عند تغيير القسم
   bool _loadingMore = false;
   bool _searchPoolLoading = false;
   bool _hasMore = true;
@@ -171,11 +169,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _loadAll(showSpinner: false);
     _checkAdminStatus();
 
+    // تحديث الإعلانات التجارية كل 5 دقائق (وتتوقف مع dispose).
     _promotedRefreshTimer = Timer.periodic(
       const Duration(minutes: 5),
       (_) => _loadPromotedListings(),
     );
 
+    // تقليب شرائح البانر كل 5 ثوان.
     _bannerTimer = Timer.periodic(const Duration(seconds: 5), (_) {
       if (!mounted || !_bannerController.hasClients) return;
 
@@ -201,6 +201,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     super.dispose();
   }
 
+  // عند رجوع المستخدم للتطبيق نحدّث الإعلانات التجارية فقط.
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
@@ -208,16 +209,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
+  // التمرير: لون شريط الحالة + التحميل التلقائي للمزيد.
   void _onScroll() {
     if (!_scrollController.hasClients) return;
 
     final position = _scrollController.position;
-    final isHeaderVisible = position.pixels < 110;
 
-    if (_headerVisible.value != isHeaderVisible) {
-      _headerVisible.value = isHeaderVisible;
-    }
+    _headerVisible.value = position.pixels < 110;
 
+    // التحميل التلقائي داخل القسم أو "أحدث الإعلانات" فقط.
     final canLoadMore =
         _selectedCategoryId != null || _mode == _ListMode.latest;
 
@@ -242,11 +242,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
+      SnackBar(content: Text(message)),
     );
   }
 
@@ -287,7 +283,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     setState(() => _searchQuery = '');
   }
 
+  // نتائج البحث/القسم. البحث يعمل على مجموعة أكبر (حتى 500 إعلان)
+  // تُحمّل مرة واحدة عند أول بحث، ثم يُبحث فيها محلياً بالتطبيع العربي.
   List<Map<String, dynamic>> get _visibleResults {
+    // "عرض الكل" للإعلانات المميزة.
     if (_mode == _ListMode.featured &&
         _selectedCategoryId == null &&
         !_isSearching) {
@@ -331,10 +330,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
       if (!mounted) return;
 
+      // إن فشل التحميل نبحث في الإعلانات المحمّلة حالياً.
       setState(() => _searchPoolLoading = false);
     }
   }
 
+  // الإعلانات التجارية تنتهي محلياً بدون انتظار المؤقّت.
   List<Map<String, dynamic>> get _activePromoted {
     final now = DateTime.now().toUtc();
 
@@ -355,6 +356,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       });
     }
 
+    // نجعل مجموعة البحث تُحمّل من جديد عند الحاجة.
     _searchPool = null;
 
     try {
@@ -411,6 +413,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Future<void> _loadListings({bool reset = true}) async {
     if (!reset && (_loadingMore || !_hasMore || _listingsLoading)) return;
 
+    // رقم الطلب يمنع نتيجة قديمة من الكتابة فوق نتيجة أحدث.
     final requestId = reset ? ++_listingsRequestId : _listingsRequestId;
     final categoryId = _selectedCategoryId;
     final pageSize = _pageSizeFor(categoryId);
@@ -450,6 +453,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
+  // جلب الإعلانات مع أول صورة لكل إعلان في طلب واحد.
+  // إن فشل الطلب المدمج نعود للطريقة القديمة (طلب منفصل للصور).
   Future<List<Map<String, dynamic>>> _fetchListings({
     required int from,
     required int to,
@@ -500,6 +505,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
+  // استخراج غلاف الإعلان وتجهيز نص البحث المطبّع مرة واحدة.
   Map<String, dynamic> _prepareListing(Map<String, dynamic> row) {
     final images = row['listing_images'];
 
@@ -516,6 +522,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return row;
   }
 
+  // جلب أول صورة لكل إعلان بطلب منفصل (وسيلة احتياطية + الإعلانات التجارية).
   Future<void> _attachCoverImages(List<Map<String, dynamic>> rows) async {
     final ids = rows
         .map((row) => row['id'])
@@ -566,6 +573,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         return;
       }
 
+      // لا نعرض الإعلان التجاري إلا إذا كان الإعلان نفسه approved.
       final listingsResponse = await _supabase
           .from('listings')
           .select(_listingColumns)
@@ -581,6 +589,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
       final result = <Map<String, dynamic>>[];
 
+      // نحافظ على ترتيب start_at القادم من promoted_listings.
       for (final promoted in promotedRows) {
         final listing = listingsById[promoted['listing_id']];
 
@@ -603,6 +612,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
       setState(() => _promotedListings = result);
     } catch (e) {
+      // لا نوقف الصفحة الرئيسية إذا فشل تحميل الإعلانات التجارية.
       debugPrint('loadPromoted error: $e');
     }
   }
@@ -683,6 +693,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
+  // "عرض الكل" للإعلانات المميزة أو الأحدث.
   void _showAll(_ListMode mode) {
     _debounce?.cancel();
     _searchController.clear();
@@ -702,17 +713,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       }
     }
     return null;
-  }
-
-  void _scrollToCategories() {
-    final ctx = _categoriesKey.currentContext;
-    if (ctx != null) {
-      Scrollable.ensureVisible(
-        ctx,
-        duration: const Duration(milliseconds: 500),
-        curve: Curves.easeInOut,
-      );
-    }
   }
 
   // =========================
@@ -756,6 +756,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     final wasFavorite = _favoriteIds.contains(listingId);
 
+    // تحديث فوري للواجهة ثم مزامنة مع الخادم.
     setState(() {
       if (wasFavorite) {
         _favoriteIds.remove(listingId);
@@ -782,6 +783,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
       if (!mounted) return;
 
+      // نتراجع عن التحديث الفوري.
       setState(() {
         if (wasFavorite) {
           _favoriteIds.add(listingId);
@@ -936,7 +938,66 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     if (!mounted) return;
 
+    // قد يكون المستخدم أضاف/أزال المفضلة من صفحة التفاصيل.
     await _loadFavorites();
+  }
+
+  // =========================
+  // أيقونات الأقسام
+  // =========================
+  static const _iconMap = <String, IconData>{
+    'car': Icons.directions_car_outlined,
+    'home': Icons.home_work_outlined,
+    'phone': Icons.phone_android_outlined,
+    'electric': Icons.electrical_services_outlined,
+    'clothes': Icons.checkroom_outlined,
+    'furniture': Icons.weekend_outlined,
+    'animals': Icons.pets_outlined,
+    'crops': Icons.agriculture_outlined,
+    'food': Icons.restaurant_outlined,
+    'tools': Icons.build_outlined,
+    'services': Icons.handyman_outlined,
+    'jobs': Icons.work_outline,
+    'other': Icons.more_horiz_outlined,
+  };
+
+  // الأولوية لعمود icon في قاعدة البيانات، ثم اسم القسم.
+  IconData _iconForCategory(Map<String, dynamic> category) {
+    return _iconMap[category['icon']?.toString().trim()] ??
+        _categoryIcon(category['name']?.toString() ?? '');
+  }
+
+  IconData _categoryIcon(String name) {
+    switch (name.trim()) {
+      case 'سيارات ومركبات':
+        return Icons.directions_car_outlined;
+      case 'عقارات':
+        return Icons.home_work_outlined;
+      case 'موبايلات وإلكترونيات':
+        return Icons.phone_android_outlined;
+      case 'أجهزة كهربائية':
+        return Icons.electrical_services_outlined;
+      case 'ملابس وأحذية':
+        return Icons.checkroom_outlined;
+      case 'أثاث ومستلزمات منزلية':
+        return Icons.weekend_outlined;
+      case 'مواشي وحيوانات':
+        return Icons.pets_outlined;
+      case 'محاصيل زراعية':
+        return Icons.agriculture_outlined;
+      case 'مواد غذائية':
+        return Icons.restaurant_outlined;
+      case 'أدوات ومعدات':
+        return Icons.build_outlined;
+      case 'خدمات':
+        return Icons.handyman_outlined;
+      case 'وظائف':
+        return Icons.work_outline;
+      case 'أخرى':
+        return Icons.more_horiz_outlined;
+      default:
+        return Icons.category_outlined;
+    }
   }
 
   // =========================
@@ -1008,12 +1069,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       return Container(
         height: height,
         width: double.infinity,
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+        color: colorScheme.surfaceContainerHighest,
         child: Center(
           child: Icon(
             icon,
-            size: 28,
-            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+            size: 30,
+            color: colorScheme.onSurfaceVariant,
           ),
         ),
       );
@@ -1036,12 +1097,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   // ألوان وأيقونات الأقسام
   // =========================
   static const _tones = <_Tone>[
-    _Tone(Color(0xFFEFE7FF), Color(0xFF5B2DB5)),
-    _Tone(Color(0xFFFFF1D1), Color(0xFFD97706)),
-    _Tone(Color(0xFFDDF5EA), Color(0xFF0D9488)),
-    _Tone(Color(0xFFDFEDFF), Color(0xFF2563EB)),
-    _Tone(Color(0xFFFFE3E9), Color(0xFFE11D48)),
-    _Tone(Color(0xFFE2E8F0), Color(0xFF475569)),
+    _Tone(Color(0xFFEFE7FF), Color(0xFF5B2DB5)), // بنفسجي
+    _Tone(Color(0xFFFFF1D1), Color(0xFFF59E0B)), // أصفر
+    _Tone(Color(0xFFDDF5EA), Color(0xFF0F9D7A)), // أخضر
+    _Tone(Color(0xFFDFEDFF), Color(0xFF2563EB)), // أزرق
+    _Tone(Color(0xFFFFE3E9), Color(0xFFE11D48)), // وردي
+    _Tone(Color(0xFFE9EEF5), Color(0xFF475569)), // رمادي
   ];
 
   _Tone _toneFor(String name, int index) {
@@ -1115,9 +1176,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   // =========================
   bool get _isDark => Theme.of(context).brightness == Brightness.dark;
 
-  Color get _pageBackground => _isDark
-      ? Theme.of(context).colorScheme.surface
-      : const Color(0xFFF8F7FC);
+  Color get _pageBackground => Color.alphaBlend(
+        _brand.withValues(alpha: _isDark ? 0.06 : 0.045),
+        Theme.of(context).colorScheme.surface,
+      );
 
   Color get _titleColor =>
       _isDark ? Theme.of(context).colorScheme.onSurface : _ink;
@@ -1127,7 +1189,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       : Colors.white;
 
   // =========================
-  // الترويسة
+  // الترويسة (صورة شبشة + الشعار + البحث)
   // =========================
   Widget _buildHeader(double topPadding) {
     final height = topPadding + _headerContentHeight;
@@ -1147,6 +1209,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               ),
             ),
           ),
+
+          // تدرج علوي خفيف لوضوح شريط الحالة.
           Positioned(
             top: 0,
             left: 0,
@@ -1165,18 +1229,22 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               ),
             ),
           ),
+
           Positioned(
             top: topPadding + 10,
             left: 16,
             right: 16,
             child: _buildTopRow(),
           ),
+
           Positioned(
             left: 16,
             right: 16,
             bottom: 36,
             child: _buildSearchField(),
           ),
+
+          // حافة الصفحة المنحنية أسفل الترويسة.
           Positioned(
             left: 0,
             right: 0,
@@ -1207,6 +1275,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
+        // (يمين) زر القائمة
         Tooltip(
           message: 'القائمة',
           child: InkWell(
@@ -1218,9 +1287,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
           ),
         ),
+
         const SizedBox(width: 2),
+
         _buildLogo(),
+
         const SizedBox(width: 8),
+
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1232,7 +1305,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 child: Text(
                   'دلالة شبشة',
                   style: TextStyle(
-                    fontSize: 28,
+                    fontSize: 30,
                     fontWeight: FontWeight.w900,
                     height: 1.1,
                     color: _brandDark,
@@ -1245,7 +1318,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: 13,
+                  fontSize: 13.5,
                   fontWeight: FontWeight.w700,
                   color: _brandDark,
                   shadows: glow,
@@ -1254,19 +1327,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ],
           ),
         ),
+
+        // (يسار) حساب المستخدم
         Tooltip(
           message: user == null ? 'تسجيل الدخول' : 'الملف الشخصي',
           child: GestureDetector(
             onTap: _openProfile,
             child: Container(
-              width: 44,
-              height: 44,
+              width: 46,
+              height: 46,
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.94),
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.12),
+                    color: Colors.black.withValues(alpha: 0.15),
                     blurRadius: 10,
                     offset: const Offset(0, 3),
                   ),
@@ -1276,7 +1351,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 user == null
                     ? Icons.person_outline_rounded
                     : Icons.person_rounded,
-                size: 25,
+                size: 26,
                 color: _brandDark,
               ),
             ),
@@ -1288,18 +1363,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Widget _buildLogo() {
     return SizedBox(
-      width: 44,
-      height: 50,
+      width: 46,
+      height: 52,
       child: Stack(
         alignment: Alignment.topCenter,
         clipBehavior: Clip.none,
         children: [
-          const Icon(Icons.location_on_rounded, size: 50, color: _brand),
+          const Icon(Icons.location_on_rounded, size: 52, color: _brand),
           const Positioned(
-            top: 11,
+            top: 12,
             child: Icon(
               Icons.shopping_cart_rounded,
-              size: 16,
+              size: 17,
               color: Colors.white,
             ),
           ),
@@ -1307,15 +1382,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             top: 0,
             left: 0,
             child: Container(
-              width: 14,
-              height: 14,
+              width: 15,
+              height: 15,
               decoration: const BoxDecoration(
                 color: _gold,
                 shape: BoxShape.circle,
               ),
               child: const Icon(
                 Icons.local_offer_rounded,
-                size: 8,
+                size: 9,
                 color: _brandDark,
               ),
             ),
@@ -1327,17 +1402,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Widget _buildSearchField() {
     return Container(
-      height: 52,
+      height: 54,
       decoration: BoxDecoration(
         color: _isDark
             ? Theme.of(context).colorScheme.surfaceContainerHigh
             : Colors.white,
-        borderRadius: BorderRadius.circular(26),
+        borderRadius: BorderRadius.circular(30),
         boxShadow: [
           BoxShadow(
-            color: _brand.withValues(alpha: 0.14),
-            blurRadius: 16,
-            offset: const Offset(0, 5),
+            color: _brand.withValues(alpha: 0.20),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
@@ -1348,23 +1423,23 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             controller: _searchController,
             textInputAction: TextInputAction.search,
             onChanged: _onSearchChanged,
-            style: const TextStyle(fontSize: 14.5),
+            style: const TextStyle(fontSize: 15),
             decoration: InputDecoration(
               hintText: 'ابحث عن إعلان أو منطقة ...',
               hintStyle: TextStyle(
-                fontSize: 14,
+                fontSize: 14.5,
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
               prefixIcon: Icon(
                 Icons.search_rounded,
-                size: 24,
-                color: _brand,
+                size: 27,
+                color: _titleColor,
               ),
               suffixIcon: value.text.isNotEmpty
                   ? IconButton(
                       onPressed: _clearSearch,
                       tooltip: 'مسح البحث',
-                      icon: const Icon(Icons.close_rounded, size: 20),
+                      icon: const Icon(Icons.close_rounded, size: 21),
                     )
                   : null,
               filled: false,
@@ -1372,7 +1447,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               border: InputBorder.none,
               enabledBorder: InputBorder.none,
               focusedBorder: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(vertical: 16),
+              contentPadding: const EdgeInsets.symmetric(vertical: 17),
             ),
           );
         },
@@ -1383,22 +1458,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   // =========================
   // بانر العروض المتحرك
   // =========================
-  void _onBannerAction(_BannerAction action) {
-    switch (action) {
-      case _BannerAction.addListing:
-        _openAddListing();
-        break;
-      case _BannerAction.browseCategories:
-        _scrollToCategories();
-        break;
-    }
-  }
-
   Widget _buildBannerCarousel() {
     return Column(
       children: [
         SizedBox(
-          height: 170,
+          height: 150,
           child: PageView.builder(
             controller: _bannerController,
             itemCount: _slides.length,
@@ -1411,7 +1475,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             },
           ),
         ),
+
         const SizedBox(height: 10),
+
         ValueListenableBuilder<int>(
           valueListenable: _bannerIndex,
           builder: (context, current, _) {
@@ -1422,12 +1488,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
                 return AnimatedContainer(
                   duration: const Duration(milliseconds: 250),
-                  margin: const EdgeInsets.symmetric(horizontal: 3),
-                  width: active ? 20 : 7,
-                  height: 7,
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  width: active ? 12 : 8,
+                  height: active ? 12 : 8,
                   decoration: BoxDecoration(
-                    color: active ? _brand : _brand.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(4),
+                    color: active ? _brand : _brand.withValues(alpha: 0.22),
+                    shape: BoxShape.circle,
                   ),
                 );
               }),
@@ -1438,13 +1504,37 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
+  void _onBannerAction(_BannerAction action) {
+    switch (action) {
+      case _BannerAction.addListing:
+        _openAddListing();
+        break;
+      case _BannerAction.browseCategories:
+        _scrollToCategories();
+        break;
+    }
+  }
+
+  void _scrollToCategories() {
+    final target = _categoriesKey.currentContext;
+
+    if (target == null) return;
+
+    Scrollable.ensureVisible(
+      target,
+      duration: const Duration(milliseconds: 400),
+      curve: Curves.easeInOut,
+      alignment: 0.05,
+    );
+  }
+
   Widget _buildBannerSlide(_BannerSlide slide) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(24),
+      borderRadius: BorderRadius.circular(26),
       child: LayoutBuilder(
         builder: (context, constraints) {
           final width = constraints.maxWidth;
-          final photoWidth = width * 0.48;
+          final photoWidth = width * 0.34;
 
           return Stack(
             children: [
@@ -1452,8 +1542,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 child: DecoratedBox(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      begin: Alignment.centerRight,
-                      end: Alignment.centerLeft,
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
                       colors: [
                         Color(0xFF3B1785),
                         Color(0xFF5B2DB5),
@@ -1463,6 +1553,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   ),
                 ),
               ),
+
+              // الصورة على اليمين بحافة منحنية.
               Positioned(
                 right: 0,
                 top: 0,
@@ -1473,17 +1565,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   child: Image.asset(
                     _bannerAsset,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
-                      color: Colors.white24,
-                      child: const Icon(
-                        Icons.directions_car,
-                        color: Colors.white,
-                        size: 48,
-                      ),
+                    errorBuilder: (_, __, ___) => const RepaintBoundary(
+                      child: CustomPaint(painter: _ShabshaScenePainter()),
                     ),
                   ),
                 ),
               ),
+
               Positioned(
                 right: 0,
                 top: 0,
@@ -1493,11 +1581,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   child: CustomPaint(painter: _SwooshPainter()),
                 ),
               ),
+
               Positioned(
-                left: 16,
-                top: 12,
-                bottom: 12,
-                right: photoWidth - 10,
+                left: 18,
+                top: 14,
+                bottom: 14,
+                width: width * 0.66,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -1509,9 +1598,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         slide.line1,
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 20,
+                          fontSize: 25,
                           fontWeight: FontWeight.w900,
-                          height: 1.1,
+                          height: 1.2,
                         ),
                       ),
                     ),
@@ -1522,19 +1611,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         slide.line2,
                         style: const TextStyle(
                           color: _gold,
-                          fontSize: 20,
+                          fontSize: 25,
                           fontWeight: FontWeight.w900,
-                          height: 1.1,
+                          height: 1.2,
                         ),
                       ),
                     ),
-                    const SizedBox(height: 6),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: slide.bullets.map((bullet) {
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 2),
-                          child: Row(
+                    const SizedBox(height: 5),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 2,
+                      children: [
+                        for (final bullet in slide.bullets)
+                          Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Container(
@@ -1545,57 +1634,56 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                   shape: BoxShape.circle,
                                 ),
                               ),
-                              const SizedBox(width: 5),
+                              const SizedBox(width: 4),
                               Text(
                                 bullet,
                                 style: const TextStyle(
                                   color: Colors.white,
-                                  fontSize: 10.5,
+                                  fontSize: 11.5,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
                             ],
                           ),
-                        );
-                      }).toList(),
+                      ],
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 7),
                     GestureDetector(
                       onTap: () => _onBannerAction(slide.action),
                       child: Container(
-                        height: 34,
+                        height: 36,
                         padding: const EdgeInsets.symmetric(horizontal: 14),
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
                             colors: [Color(0xFFFFB02E), Color(0xFFFF8A00)],
                           ),
-                          borderRadius: BorderRadius.circular(18),
+                          borderRadius: BorderRadius.circular(22),
                           boxShadow: [
                             BoxShadow(
-                              color: _orange.withValues(alpha: 0.35),
-                              blurRadius: 8,
-                              offset: const Offset(0, 3),
+                              color: _orange.withValues(alpha: 0.45),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
                             ),
                           ],
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
+                            Text(
+                              slide.cta,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
                             Icon(
                               slide.action == _BannerAction.addListing
                                   ? Icons.add_circle_outline_rounded
                                   : Icons.grid_view_rounded,
                               color: Colors.white,
-                              size: 16,
-                            ),
-                            const SizedBox(width: 5),
-                            Text(
-                              slide.cta,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w800,
-                              ),
+                              size: 22,
                             ),
                           ],
                         ),
@@ -1625,8 +1713,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       child: Row(
         children: [
           if (icon != null) ...[
-            Icon(icon, size: 22, color: iconColor ?? _brand),
-            const SizedBox(width: 7),
+            Icon(icon, size: 24, color: iconColor ?? _brand),
+            const SizedBox(width: 8),
           ],
           Expanded(
             child: Text(
@@ -1634,7 +1722,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: 18,
+                fontSize: 19,
                 fontWeight: FontWeight.w900,
                 color: _titleColor,
               ),
@@ -1642,18 +1730,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ),
           if (onViewAll != null)
             InkWell(
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(12),
               onTap: onViewAll,
               child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
                       'عرض الكل',
                       style: TextStyle(
-                        fontSize: 13.5,
+                        fontSize: 14,
                         fontWeight: FontWeight.w700,
                         color: _isDark
                             ? Theme.of(context).colorScheme.primary
@@ -1662,7 +1749,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     ),
                     Icon(
                       Icons.chevron_left_rounded,
-                      size: 20,
+                      size: 22,
                       color: _isDark
                           ? Theme.of(context).colorScheme.primary
                           : _brand,
@@ -1695,31 +1782,31 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
         decoration: BoxDecoration(
           color: _isDark ? tone.fg.withValues(alpha: 0.16) : tone.bg,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(22),
           border: Border.all(
             color: selected ? tone.fg : Colors.transparent,
             width: 2,
           ),
           boxShadow: [
             BoxShadow(
-              color: tone.fg.withValues(alpha: selected ? 0.22 : 0.08),
-              blurRadius: 8,
-              offset: const Offset(0, 3),
+              color: tone.fg.withValues(alpha: selected ? 0.28 : 0.12),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(_filledCategoryIcon(name), size: 32, color: tone.fg),
-            const SizedBox(height: 6),
+            Icon(_filledCategoryIcon(name), size: 34, color: tone.fg),
+            const SizedBox(height: 8),
             Text(
               name,
               textAlign: TextAlign.center,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: 11.5,
+                fontSize: 12,
                 height: 1.2,
                 fontWeight: FontWeight.w700,
                 color: _titleColor,
@@ -1741,7 +1828,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           icon: Icons.grid_view_rounded,
           onViewAll: _categories.isEmpty ? null : _showAllCategories,
         ),
+
         const SizedBox(height: 10),
+
         if (_categories.isEmpty)
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 14),
@@ -1749,7 +1838,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           )
         else
           SizedBox(
-            height: 112,
+            height: 118,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -1761,9 +1850,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 final selected = _selectedCategoryId == categoryId;
 
                 return Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.only(bottom: 14),
                   child: SizedBox(
-                    width: 86,
+                    width: 88,
                     child: _buildCategoryTile(
                       category,
                       index,
@@ -1783,6 +1872,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
+  // كل الأقسام في نافذة سفلية.
   void _showAllCategories() {
     showModalBottomSheet<void>(
       context: context,
@@ -1799,8 +1889,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 children: [
                   const Text(
                     'كل الأقسام',
-                    style:
-                        TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
                   ),
                   const SizedBox(height: 14),
                   Flexible(
@@ -1862,7 +1951,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final meta = [
       if (area.isNotEmpty) area,
       _timeAgo(listing['created_at']),
-    ].where((part) => part.isNotEmpty).join(' • ');
+    ].where((part) => part.isNotEmpty).join(' - ');
 
     final category = _categoryById(listing['category_id']);
     final categoryName = category?['name']?.toString() ?? '';
@@ -1876,18 +1965,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       width: fillWidth ? double.infinity : _cardWidth,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(22),
           boxShadow: [
             BoxShadow(
-              color: _brand.withValues(alpha: 0.08),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
+              color: _brand.withValues(alpha: 0.12),
+              blurRadius: 14,
+              offset: const Offset(0, 5),
             ),
           ],
         ),
         child: Material(
           color: _cardColor,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(22),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
             onTap: () => _openListingDetails(listing),
@@ -1896,29 +1985,31 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               children: [
                 Stack(
                   children: [
-                    _buildListingImage(listing, height: 120),
+                    _buildListingImage(listing, height: 122),
+
                     if (categoryName.isNotEmpty)
                       Positioned(
-                        top: 8,
-                        right: 8,
-                        left: 46,
+                        top: 9,
+                        right: 9,
+                        // نترك مكاناً لزر المفضلة على اليسار.
+                        left: 48,
                         child: Align(
                           alignment: AlignmentDirectional.centerStart,
                           child: Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
+                              horizontal: 9,
+                              vertical: 5,
                             ),
                             decoration: BoxDecoration(
-                              color: _brand.withValues(alpha: 0.9),
-                              borderRadius: BorderRadius.circular(12),
+                              color: _brand,
+                              borderRadius: BorderRadius.circular(16),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Icon(
                                   _filledCategoryIcon(categoryName),
-                                  size: 13,
+                                  size: 14,
                                   color: Colors.white,
                                 ),
                                 const SizedBox(width: 4),
@@ -1929,7 +2020,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
                                       color: Colors.white,
-                                      fontSize: 11,
+                                      fontSize: 11.5,
                                       fontWeight: FontWeight.w700,
                                     ),
                                   ),
@@ -1939,24 +2030,25 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           ),
                         ),
                       ),
+
                     if (id != null)
                       Positioned(
-                        top: 4,
-                        left: 4,
+                        top: 3,
+                        left: 3,
                         child: GestureDetector(
                           behavior: HitTestBehavior.opaque,
                           onTap: () => _toggleFavorite(id),
                           child: Padding(
-                            padding: const EdgeInsets.all(4),
+                            padding: const EdgeInsets.all(6),
                             child: Container(
-                              width: 32,
-                              height: 32,
+                              width: 34,
+                              height: 34,
                               decoration: BoxDecoration(
                                 color: Colors.white,
                                 shape: BoxShape.circle,
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.12),
+                                    color: Colors.black.withValues(alpha: 0.14),
                                     blurRadius: 6,
                                   ),
                                 ],
@@ -1965,39 +2057,40 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                 isFavorite
                                     ? Icons.favorite_rounded
                                     : Icons.favorite_border_rounded,
-                                size: 18,
+                                size: 20,
                                 color: isFavorite ? Colors.red : _brand,
                               ),
                             ),
                           ),
                         ),
                       ),
+
                     if (isCommercial)
                       Positioned(
                         bottom: 8,
-                        right: 8,
+                        right: 9,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 7,
+                            horizontal: 8,
                             vertical: 3,
                           ),
                           decoration: BoxDecoration(
                             color: _gold,
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(12),
                           ),
                           child: const Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(
                                 Icons.star_rounded,
-                                size: 12,
+                                size: 13,
                                 color: _brandDark,
                               ),
-                              SizedBox(width: 2),
+                              SizedBox(width: 3),
                               Text(
                                 'مميز',
                                 style: TextStyle(
-                                  fontSize: 10.5,
+                                  fontSize: 11,
                                   fontWeight: FontWeight.w800,
                                   color: _brandDark,
                                 ),
@@ -2008,8 +2101,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       ),
                   ],
                 ),
+
                 Padding(
-                  padding: const EdgeInsets.all(10),
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -2018,52 +2112,55 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: 14,
+                          fontSize: 15,
                           height: 1.25,
                           fontWeight: FontWeight.w800,
                           color: _titleColor,
                         ),
                       ),
-                      const SizedBox(height: 6),
+
+                      const SizedBox(height: 7),
+
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
+                          horizontal: 10,
+                          vertical: 5,
                         ),
                         decoration: BoxDecoration(
                           color: _isDark
                               ? colorScheme.primary.withValues(alpha: 0.18)
                               : _brandSoft,
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(10),
                         ),
                         child: Text(
                           priceText,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            fontSize: isContactPrice ? 11.5 : 13.5,
+                            fontSize: isContactPrice ? 12.5 : 14.5,
                             fontWeight: FontWeight.w800,
                             color: _isDark ? colorScheme.primary : _brand,
                           ),
                         ),
                       ),
+
                       if (meta.isNotEmpty) ...[
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 8),
                         Row(
                           children: [
                             const Icon(
                               Icons.location_on_rounded,
-                              size: 13,
+                              size: 15,
                               color: _brand,
                             ),
-                            const SizedBox(width: 3),
+                            const SizedBox(width: 4),
                             Expanded(
                               child: Text(
                                 meta,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
-                                  fontSize: 11.5,
+                                  fontSize: 12,
                                   color: colorScheme.onSurfaceVariant,
                                 ),
                               ),
@@ -2071,14 +2168,27 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           ],
                         ),
                       ],
+
                       if (isNegotiable) ...[
-                        const SizedBox(height: 5),
-                        Text(
-                          'قابل للتفاوض',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: _isDark ? colorScheme.primary : _brand,
+                        const SizedBox(height: 7),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 9,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _isDark
+                                ? colorScheme.primary.withValues(alpha: 0.18)
+                                : _brandSoft,
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Text(
+                            'سعر قابل للتفاوض',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                              color: _isDark ? colorScheme.primary : _brand,
+                            ),
                           ),
                         ),
                       ],
@@ -2098,7 +2208,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     bool commercial = false,
   }) {
     return SizedBox(
-      height: _cardHeight + 12,
+      height: _cardHeight + 16,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -2106,7 +2216,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         separatorBuilder: (_, __) => const SizedBox(width: 12),
         itemBuilder: (context, index) {
           return Padding(
-            padding: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.only(bottom: 12),
             child: _buildListingCard(
               listings[index],
               isCommercial: commercial,
@@ -2118,7 +2228,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   // =========================
-  // نتائج البحث / القسم
+  // نتائج البحث / القسم / عرض الكل
   // =========================
   Widget _buildSearchResults() {
     final colorScheme = Theme.of(context).colorScheme;
@@ -2154,7 +2264,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 18,
+                    fontSize: 19,
                     fontWeight: FontWeight.w900,
                     color: _titleColor,
                   ),
@@ -2163,7 +2273,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               Text(
                 '${results.length} إعلان',
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 12.5,
                   color: colorScheme.onSurfaceVariant,
                 ),
               ),
@@ -2174,16 +2284,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   visualDensity: VisualDensity.compact,
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                 ),
-                icon: const Icon(Icons.close_rounded, size: 16),
+                icon: const Icon(Icons.close_rounded, size: 17),
                 label: const Text(
                   'إلغاء التصفية',
-                  style: TextStyle(fontSize: 12),
+                  style: TextStyle(fontSize: 12.5),
                 ),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 10),
+
+        const SizedBox(height: 12),
+
         if (showSpinner && results.isEmpty)
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 40),
@@ -2194,8 +2306,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             padding: const EdgeInsets.symmetric(vertical: 35, horizontal: 16),
             child: Column(
               children: [
-                const Icon(Icons.search_off_outlined, size: 44),
-                const SizedBox(height: 8),
+                const Icon(Icons.search_off_outlined, size: 48),
+                const SizedBox(height: 9),
                 Text(
                   _isSearching
                       ? 'لم نجد إعلانات تطابق بحثك'
@@ -2213,7 +2325,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               itemCount: results.length,
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
-                mainAxisSpacing: 12,
+                mainAxisSpacing: 14,
                 crossAxisSpacing: 12,
                 mainAxisExtent: _cardHeight,
               ),
@@ -2228,6 +2340,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               },
             ),
           ),
+
         if (_loadingMore)
           const Padding(
             padding: EdgeInsets.all(16),
@@ -2257,8 +2370,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         padding: EdgeInsets.symmetric(vertical: 32),
         child: Column(
           children: [
-            Icon(Icons.inventory_2_outlined, size: 44),
-            SizedBox(height: 8),
+            Icon(Icons.inventory_2_outlined, size: 48),
+            SizedBox(height: 10),
             Text('لا توجد إعلانات متاحة حالياً'),
           ],
         ),
@@ -2272,6 +2385,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         .take(10)
         .toList();
 
+    // صفوف الأقسام التي فيها إعلانات.
     final categoryRows = <Widget>[];
 
     for (var i = 0; i < _categories.length; i++) {
@@ -2291,7 +2405,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
       categoryRows.add(
         Padding(
-          padding: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.only(bottom: 10),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -2301,7 +2415,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 iconColor: _toneFor(name, i).fg,
                 onViewAll: () => _selectCategory(categoryId),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
               _buildHorizontalListings(items),
             ],
           ),
@@ -2319,20 +2433,22 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             iconColor: const Color(0xFFFF6A1A),
             onViewAll: () => _showAll(_ListMode.featured),
           ),
-          const SizedBox(height: 10),
-          _buildHorizontalListings(promoted),
           const SizedBox(height: 12),
+          _buildHorizontalListings(promoted),
+          const SizedBox(height: 14),
         ],
+
         if (latestListings.isNotEmpty) ...[
           _sectionHeader(
             'أحدث الإعلانات',
             icon: Icons.schedule_rounded,
             onViewAll: () => _showAll(_ListMode.latest),
           ),
-          const SizedBox(height: 10),
-          _buildHorizontalListings(latestListings),
           const SizedBox(height: 12),
+          _buildHorizontalListings(latestListings),
+          const SizedBox(height: 14),
         ],
+
         ...categoryRows,
       ],
     );
@@ -2381,16 +2497,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 child: Text(
                   'مرحباً يا $name 👋',
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: 13.5,
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
               ),
             _buildBannerCarousel(),
-            const SizedBox(height: 14),
+            const SizedBox(height: 16),
           ],
+
           _buildCategoriesSection(),
-          const SizedBox(height: 6),
+
+          const SizedBox(height: 8),
+
           if (_isFiltering) _buildSearchResults() else _buildHomeSections(),
         ],
       );
@@ -2403,7 +2522,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         controller: _scrollController,
         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: EdgeInsets.only(bottom: 110 + bottomInset),
+        // نحدد الحشوة صراحة حتى تبدأ الترويسة من أعلى الشاشة.
+        padding: EdgeInsets.only(bottom: 112 + bottomInset),
         children: [
           _buildHeader(topPadding),
           content,
@@ -2428,28 +2548,28 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
       return Expanded(
         child: InkWell(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(24),
           onTap: onTap,
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 24, color: color),
-              const SizedBox(height: 2),
+              Icon(icon, size: 26, color: color),
+              const SizedBox(height: 3),
               FittedBox(
                 fit: BoxFit.scaleDown,
                 child: Text(
                   label,
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 11.5,
                     fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
                     color: color,
                   ),
                 ),
               ),
-              const SizedBox(height: 3),
+              const SizedBox(height: 4),
               selected
                   ? Container(
-                      width: 24,
+                      width: 30,
                       height: 3,
                       decoration: BoxDecoration(
                         color: _brand,
@@ -2466,7 +2586,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return SafeArea(
       top: false,
       child: SizedBox(
-        height: 98,
+        height: 104,
         child: Stack(
           clipBehavior: Clip.none,
           children: [
@@ -2474,16 +2594,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               left: 14,
               right: 14,
               bottom: 8,
-              height: 64,
+              height: 68,
               child: Container(
                 decoration: BoxDecoration(
                   color: _cardColor,
-                  borderRadius: BorderRadius.circular(28),
+                  borderRadius: BorderRadius.circular(30),
                   boxShadow: [
                     BoxShadow(
-                      color: _brand.withValues(alpha: 0.16),
-                      blurRadius: 20,
-                      offset: const Offset(0, 6),
+                      color: _brand.withValues(alpha: 0.20),
+                      blurRadius: 24,
+                      offset: const Offset(0, 8),
                     ),
                   ],
                 ),
@@ -2494,6 +2614,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       icon: Icons.home_rounded,
                       label: 'الرئيسية',
                       selected: true,
+                      // يصعد لأعلى الصفحة ويمسح الفلاتر.
                       onTap: _clearFilters,
                     ),
                     navItem(
@@ -2508,11 +2629,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         child: const Align(
                           alignment: Alignment.bottomCenter,
                           child: Padding(
-                            padding: EdgeInsets.only(bottom: 8),
+                            padding: EdgeInsets.only(bottom: 9),
                             child: Text(
                               'أضف إعلان',
                               style: TextStyle(
-                                fontSize: 11,
+                                fontSize: 11.5,
                                 fontWeight: FontWeight.w800,
                                 color: _brand,
                               ),
@@ -2535,27 +2656,28 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 ),
               ),
             ),
+
             Positioned(
-              top: 4,
+              top: 6,
               left: 0,
               right: 0,
               child: Center(
                 child: GestureDetector(
                   onTap: _openAddListing,
                   child: SizedBox(
-                    width: 80,
-                    height: 62,
+                    width: 84,
+                    height: 66,
                     child: Stack(
                       alignment: Alignment.center,
                       clipBehavior: Clip.none,
                       children: [
                         const CustomPaint(
-                          size: Size(80, 62),
+                          size: Size(84, 66),
                           painter: _SparklesPainter(),
                         ),
                         Container(
-                          width: 56,
-                          height: 56,
+                          width: 60,
+                          height: 60,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             gradient: const LinearGradient(
@@ -2566,15 +2688,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             border: Border.all(color: Colors.white, width: 3),
                             boxShadow: [
                               BoxShadow(
-                                color: _brand.withValues(alpha: 0.35),
-                                blurRadius: 12,
-                                offset: const Offset(0, 5),
+                                color: _brand.withValues(alpha: 0.40),
+                                blurRadius: 14,
+                                offset: const Offset(0, 6),
                               ),
                             ],
                           ),
                           child: const Icon(
                             Icons.add_rounded,
-                            size: 34,
+                            size: 36,
                             color: Colors.white,
                           ),
                         ),
@@ -2602,11 +2724,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ? 'مرحباً بك'
             : 'مستخدم دلالة شبشة';
 
+    // رقم الهاتف الحقيقي لحسابات الهاتف.
     final authPhone = user?.phone?.trim() ?? '';
+
+    // البريد الإلكتروني لحسابات البريد.
     final email = user?.email?.trim() ?? '';
+
+    // رقم الهاتف المحفوظ في metadata كخيار احتياطي.
     final metadataPhone =
         user?.userMetadata?['phone']?.toString().trim() ?? '';
 
+    // إذا كان الحساب مرتبطاً برقم هاتف نعرضه أولاً.
     final phone = authPhone.isNotEmpty ? authPhone : metadataPhone;
 
     final contact = phone.isNotEmpty
@@ -2629,19 +2757,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       child: Row(
         children: [
           Container(
-            width: 50,
-            height: 50,
+            width: 52,
+            height: 52,
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(15),
             ),
             child: Icon(
               user == null ? Icons.person_outline : Icons.storefront_rounded,
-              size: 26,
+              size: 28,
               color: primary,
             ),
           ),
+
           const SizedBox(width: 12),
+
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -2652,18 +2782,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 15.5,
+                    fontSize: 16,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
-                const SizedBox(height: 3),
+
+                const SizedBox(height: 4),
+
                 Text(
                   contact,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: Colors.white.withValues(alpha: 0.82),
-                    fontSize: 11.5,
+                    fontSize: 12,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -2679,19 +2811,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final primary = Theme.of(context).colorScheme.primary;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 6, 8, 4),
+      padding: const EdgeInsets.fromLTRB(9, 5, 9, 4),
       child: Row(
         children: [
           Icon(
             icon,
-            size: 17,
+            size: 18,
             color: primary,
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 7),
           Text(
             title,
             style: TextStyle(
-              fontSize: 13.5,
+              fontSize: 14,
               fontWeight: FontWeight.w800,
               color: primary,
             ),
@@ -2721,11 +2853,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Material(
         color: selected
-            ? colorScheme.primaryContainer.withValues(alpha: 0.6)
+            ? colorScheme.primaryContainer.withValues(alpha: 0.65)
             : Colors.transparent,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(11),
         child: InkWell(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(11),
           onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.symmetric(
@@ -2735,21 +2867,23 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             child: Row(
               children: [
                 Container(
-                  width: 32,
-                  height: 32,
+                  width: 34,
+                  height: 34,
                   decoration: BoxDecoration(
                     color: selected
                         ? colorScheme.primary.withValues(alpha: 0.12)
                         : Colors.transparent,
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(9),
                   ),
                   child: Icon(
                     icon,
-                    size: 20,
+                    size: 21,
                     color: itemColor,
                   ),
                 ),
-                const SizedBox(width: 8),
+
+                const SizedBox(width: 9),
+
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -2759,11 +2893,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: 14,
+                          fontSize: 14.5,
                           fontWeight: FontWeight.w700,
                           color: itemColor,
                         ),
                       ),
+
                       if (subtitle != null) ...[
                         const SizedBox(height: 1),
                         Text(
@@ -2779,6 +2914,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     ],
                   ),
                 ),
+
+                if (selected)
+                  Icon(
+                    Icons.chevron_left_rounded,
+                    size: 19,
+                    color: colorScheme.primary,
+                  ),
               ],
             ),
           ),
@@ -2787,80 +2929,145 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildDrawer() {
-    final user = _supabase.auth.currentUser;
-    final name = (user?.userMetadata?['full_name'] as String?)?.trim();
+  Widget _buildDrawer(User? user, String? name) {
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Drawer(
+      width: 220,
+      elevation: 3,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.only(
+          topRight: Radius.circular(18),
+          bottomRight: Radius.circular(18),
+        ),
+      ),
       child: SafeArea(
         child: Column(
           children: [
             _buildDrawerHeader(user, name),
+
+            const SizedBox(height: 5),
+
             Expanded(
               child: ListView(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 9,
+                  vertical: 2,
+                ),
                 children: [
-                  _buildDrawerSectionTitle(
-                      'التنقل السريع', Icons.explore_outlined),
                   _buildDrawerItem(
-                    icon: Icons.home_outlined,
-                    title: 'الرئيسية',
-                    selected: !_isFiltering,
-                    onTap: () {
+                    icon: user == null
+                        ? Icons.login_outlined
+                        : Icons.person_outline,
+                    title: user == null ? 'تسجيل الدخول' : 'الملف الشخصي',
+                    onTap: () async {
                       Navigator.pop(context);
-                      _clearFilters();
+                      await _openProfile();
                     },
                   ),
+
                   _buildDrawerItem(
                     icon: Icons.add_circle_outline,
-                    title: 'إضافة إعلان جديد',
-                    onTap: () {
+                    title: 'إضافة إعلان',
+                    onTap: () async {
                       Navigator.pop(context);
-                      _openAddListing();
+                      await _openAddListing();
                     },
                   ),
-                  _buildDrawerItem(
-                    icon: Icons.list_alt_outlined,
-                    title: 'إعلاناتي',
-                    onTap: () {
-                      Navigator.pop(context);
-                      _openMyListings();
-                    },
+
+                  const SizedBox(height: 5),
+
+                  if (_isAdmin) ...[
+                    _buildDrawerItem(
+                      icon: Icons.admin_panel_settings_outlined,
+                      title: 'لوحة تحكم الإدارة',
+                      subtitle: 'إدارة ومراجعة الإعلانات',
+                      onTap: () async {
+                        Navigator.pop(context);
+                        await _openAdminPanel();
+                      },
+                    ),
+
+                    const Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 6,
+                      ),
+                      child: Divider(height: 1),
+                    ),
+                  ],
+
+                  _buildDrawerSectionTitle(
+                    'الأقسام',
+                    Icons.grid_view_rounded,
                   ),
+
+                  if (_categories.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.all(12),
+                      child: Text(
+                        'لا توجد أقسام حالياً',
+                        style: TextStyle(fontSize: 13),
+                      ),
+                    )
+                  else
+                    ..._categories.map((category) {
+                      final categoryId = category['id'] as int?;
+                      final categoryName =
+                          category['name']?.toString() ?? 'بدون اسم';
+
+                      final selected = _selectedCategoryId == categoryId;
+
+                      return _buildDrawerItem(
+                        icon: _iconForCategory(category),
+                        title: categoryName,
+                        selected: selected,
+                        onTap: () {
+                          Navigator.pop(context);
+
+                          if (categoryId == null) return;
+
+                          _selectCategory(categoryId, clearSearch: true);
+                        },
+                      );
+                    }),
+
+                  const Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 6,
+                    ),
+                    child: Divider(height: 1),
+                  ),
+
+                  _buildDrawerSectionTitle(
+                    'حسابي',
+                    Icons.account_circle_outlined,
+                  ),
+
                   _buildDrawerItem(
-                    icon: Icons.favorite_border_outlined,
+                    icon: Icons.favorite_border,
                     title: 'المفضلة',
                     onTap: () {
                       Navigator.pop(context);
                       _openFavorites();
                     },
                   ),
-                  const Divider(height: 18),
-                  _buildDrawerSectionTitle(
-                      'الحساب والضبط', Icons.person_outline),
+
                   _buildDrawerItem(
-                    icon: Icons.account_circle_outlined,
-                    title: 'الملف الشخصي',
+                    icon: Icons.inventory_2_outlined,
+                    title: 'إعلاناتي',
                     onTap: () {
                       Navigator.pop(context);
-                      _openProfile();
+                      _openMyListings();
                     },
                   ),
-                  if (_isAdmin)
+
+                  const SizedBox(height: 6),
+
+                  if (user != null)
                     _buildDrawerItem(
-                      icon: Icons.admin_panel_settings_outlined,
-                      title: 'لوحة الإدارة',
-                      subtitle: 'إدارة الإعلانات الموقوفة والموافقة',
-                      onTap: () {
-                        Navigator.pop(context);
-                        _openAdminPanel();
-                      },
-                    ),
-                  if (user != null) ...[
-                    const Divider(height: 18),
-                    _buildDrawerItem(
-                      icon: Icons.logout_rounded,
+                      icon: Icons.logout,
                       title: 'تسجيل الخروج',
                       isDestructive: true,
                       onTap: () {
@@ -2868,8 +3075,29 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         _signOut();
                       },
                     ),
-                  ],
                 ],
+              ),
+            ),
+
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+              decoration: BoxDecoration(
+                border: Border(
+                  top: BorderSide(
+                    color: colorScheme.outlineVariant,
+                    width: 0.6,
+                  ),
+                ),
+              ),
+              child: Text(
+                'دلالة شبشة',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: colorScheme.onSurfaceVariant,
+                ),
               ),
             ),
           ],
@@ -2878,150 +3106,882 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
+  // =========================
+  // البناء
+  // =========================
   @override
   Widget build(BuildContext context) {
+    final user = _supabase.auth.currentUser;
+    final name = user?.userMetadata?['full_name'] as String?;
     final topPadding = MediaQuery.of(context).padding.top;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Directionality(
       textDirection: TextDirection.rtl,
       child: ValueListenableBuilder<bool>(
         valueListenable: _headerVisible,
-        builder: (context, headerVisible, _) {
-          final overlayStyle = headerVisible
-              ? SystemUiOverlayStyle.dark.copyWith(
-                  statusBarColor: Colors.transparent,
-                  statusBarIconBrightness: Brightness.dark,
-                )
-              : (isDark
-                  ? SystemUiOverlayStyle.light.copyWith(
-                      statusBarColor: Colors.transparent,
-                    )
-                  : SystemUiOverlayStyle.dark.copyWith(
-                      statusBarColor: Colors.transparent,
-                    ));
-
+        // أيقونات شريط الحالة بيضاء فوق الصورة، وداكنة بعد التمرير.
+        builder: (context, headerVisible, child) {
           return AnnotatedRegion<SystemUiOverlayStyle>(
-            value: overlayStyle,
-            child: Scaffold(
-              key: _scaffoldKey,
-              backgroundColor: _pageBackground,
-              drawer: _buildDrawer(),
-              body: Stack(
-                children: [
-                  _buildBody(topPadding),
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    child: _buildBottomNavigation(),
-                  ),
-                ],
-              ),
-            ),
+            value: (headerVisible
+                    ? SystemUiOverlayStyle.light
+                    : SystemUiOverlayStyle.dark)
+                .copyWith(statusBarColor: Colors.transparent),
+            child: child!,
           );
         },
+        child: PopScope(
+          // زر الرجوع يلغي التصفية أولاً قبل الخروج من التطبيق.
+          canPop: !_isFiltering,
+          onPopInvokedWithResult: (didPop, _) {
+            if (!didPop) _clearFilters();
+          },
+          child: Scaffold(
+            key: _scaffoldKey,
+            backgroundColor: _pageBackground,
+            extendBody: true,
+            drawer: _buildDrawer(user, name),
+            body: _buildBody(topPadding),
+            bottomNavigationBar: _buildBottomNavigation(),
+          ),
+        ),
       ),
     );
   }
 }
 
-// =========================
-// الرسومات والتصميم الخارجي
-// =========================
-class _PhotoClipper extends CustomClipper<Path> {
-  const _PhotoClipper();
+// =============================================================
+// أنواع مساعدة للتصميم
+// =============================================================
 
+// وضع عرض القائمة الكاملة (عرض الكل).
+enum _ListMode { home, featured, latest }
+
+// ألوان بطاقة القسم.
+class _Tone {
+  final Color bg;
+  final Color fg;
+
+  const _Tone(this.bg, this.fg);
+}
+
+// ============================================================
+// Banner
+// ============================================================
+
+enum _BannerAction {
+  addListing,
+  browseCategories,
+}
+
+class _BannerSlide {
+  final String title;
+  final String subtitle;
+  final List<String> bullets;
+  final String buttonText;
+  final _BannerAction action;
+
+  const _BannerSlide({
+    required this.title,
+    required this.subtitle,
+    required this.bullets,
+    required this.buttonText,
+    required this.action,
+  });
+}
+
+final List<_BannerSlide> _slides = const [
+  _BannerSlide(
+    title: 'كل ما تحتاجه',
+    subtitle: 'في مكان واحد',
+    bullets: [
+      'إعلانات مميزة',
+      'بيع وشراء محلي',
+      'انتشار واسع',
+    ],
+    buttonText: 'أضف إعلانك الآن',
+    action: _BannerAction.addListing,
+  ),
+  _BannerSlide(
+    title: 'بيع أسرع',
+    subtitle: 'بصور واضحة',
+    bullets: [
+      'صوّر بالكاميرا',
+      'حتى 6 صور',
+      'سعر واضح',
+    ],
+    buttonText: 'أضف إعلانك الآن',
+    action: _BannerAction.addListing,
+  ),
+  _BannerSlide(
+    title: 'تسوق بثقة',
+    subtitle: 'من أهل شبشة',
+    bullets: [
+      'عاين قبل الدفع',
+      'قابل البائع في مكان عام',
+    ],
+    buttonText: 'تصفح الأقسام',
+    action: _BannerAction.browseCategories,
+  ),
+  _BannerSlide(
+    title: 'ابحث بسهولة',
+    subtitle: 'عن أي شيء',
+    bullets: [
+      'أقسام منظمة',
+      'بحث سريع',
+      'الأحدث أولاً',
+    ],
+    buttonText: 'تصفح الأقسام',
+    action: _BannerAction.browseCategories,
+  ),
+];
+
+final PageController _bannerController = PageController();
+int _bannerIndex = 0;
+Timer? _bannerTimer;
+
+void _startBannerTimer() {
+  _bannerTimer?.cancel();
+
+  _bannerTimer = Timer.periodic(
+    const Duration(seconds: 5),
+    (_) {
+      if (!_bannerController.hasClients) return;
+
+      final nextPage = (_bannerIndex + 1) % _slides.length;
+
+      _bannerController.animateToPage(
+        nextPage,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOut,
+      );
+    },
+  );
+}
+
+void _onBannerAction(_BannerAction action) {
+  switch (action) {
+    case _BannerAction.addListing:
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const AddListingScreen(),
+        ),
+      );
+      break;
+
+    case _BannerAction.browseCategories:
+      // استخدم هنا نفس شاشة الأقسام الموجودة في مشروعك
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const CategoriesScreen(),
+        ),
+      );
+      break;
+  }
+}
+
+Widget _buildBannerCarousel() {
+  return Column(
+    children: [
+      SizedBox(
+        height: 170,
+        child: PageView.builder(
+          controller: _bannerController,
+          itemCount: _slides.length,
+          onPageChanged: (index) {
+            setState(() {
+              _bannerIndex = index;
+            });
+          },
+          itemBuilder: (context, index) {
+            return _buildBannerSlide(_slides[index]);
+          },
+        ),
+      ),
+
+      const SizedBox(height: 8),
+
+      Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: List.generate(
+          _slides.length,
+          (index) {
+            final selected = index == _bannerIndex;
+
+            return AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              margin: const EdgeInsets.symmetric(horizontal: 3),
+              width: selected ? 20 : 7,
+              height: 7,
+              decoration: BoxDecoration(
+                color: selected
+                    ? const Color(0xFF673AB7)
+                    : Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(10),
+              ),
+            );
+          },
+        ),
+      ),
+    ],
+  );
+}
+
+Widget _buildBannerSlide(_BannerSlide slide) {
+  return Container(
+    margin: const EdgeInsets.symmetric(horizontal: 16),
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(24),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.08),
+          blurRadius: 12,
+          offset: const Offset(0, 5),
+        ),
+      ],
+    ),
+    child: ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final width = constraints.maxWidth;
+          final photoWidth = width * 0.48;
+
+          return Stack(
+            children: [
+              // الخلفية
+              Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.centerRight,
+                    end: Alignment.centerLeft,
+                    colors: [
+                      Color(0xFF4A148C),
+                      Color(0xFF7B1FA2),
+                      Color(0xFF9C27B0),
+                    ],
+                  ),
+                ),
+              ),
+
+              // الصورة
+              Positioned.fill(
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: SizedBox(
+                    width: photoWidth,
+                    height: double.infinity,
+                    child: ClipPath(
+                      clipper: _PhotoClipper(),
+                      child: Image.asset(
+                        'assets/images/home_banner.jpg',
+                        fit: BoxFit.cover,
+                        alignment: Alignment.center,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              // المحتوى
+              Positioned.fill(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    18,
+                    12,
+                    18,
+                    10,
+                  ),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: SizedBox(
+                      width: width * 0.66,
+                      child: Directionality(
+                        textDirection: TextDirection.rtl,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              slide.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 20,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+
+                            const SizedBox(height: 1),
+
+                            Text(
+                              slide.subtitle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+
+                            const SizedBox(height: 5),
+
+                            ...slide.bullets.map(
+                              (bullet) => Padding(
+                                padding:
+                                    const EdgeInsets.only(bottom: 1),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(
+                                      Icons.check_circle,
+                                      size: 12,
+                                      color: Colors.white,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Flexible(
+                                      child: Text(
+                                        bullet,
+                                        maxLines: 1,
+                                        overflow:
+                                            TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 10.5,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+
+                            const SizedBox(height: 5),
+
+                            SizedBox(
+                              height: 28,
+                              child: ElevatedButton(
+                                onPressed: () =>
+                                    _onBannerAction(slide.action),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.white,
+                                  foregroundColor:
+                                      const Color(0xFF6A1B9A),
+                                  elevation: 0,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius:
+                                        BorderRadius.circular(20),
+                                  ),
+                                ),
+                                child: Text(
+                                  slide.buttonText,
+                                  style: const TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              // الزخرفة
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: CustomPaint(
+                    painter: _SwooshPainter(),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    ),
+  );
+}
+
+// ============================================================
+// Banner photo clipper
+// ============================================================
+
+class _PhotoClipper extends CustomClipper<Path> {
   @override
   Path getClip(Size size) {
-    final path = Path();
-    path.moveTo(size.width * 0.25, 0);
-    path.quadraticBezierTo(
-      0,
-      size.height * 0.5,
-      size.width * 0.35,
-      size.height,
-    );
-    path.lineTo(size.width, size.height);
-    path.lineTo(size.width, 0);
-    path.close();
-    return path;
+    final w = size.width;
+    final h = size.height;
+
+    return Path()
+      ..moveTo(w * 0.34, 0)
+      ..lineTo(w, 0)
+      ..lineTo(w, h)
+      ..lineTo(w * 0.02, h)
+      ..cubicTo(
+        w * 0.40,
+        h * 0.86,
+        w * 0.02,
+        h * 0.42,
+        w * 0.34,
+        0,
+      )
+      ..close();
   }
 
   @override
-  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
+  bool shouldReclip(covariant CustomClipper<Path> oldClipper) {
+    return false;
+  }
 }
+
+// ============================================================
+// Banner decorative swoosh
+// ============================================================
 
 class _SwooshPainter extends CustomPainter {
-  const _SwooshPainter();
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+
+    Path curve(double dx) {
+      return Path()
+        ..moveTo(w * 0.02 + dx, h)
+        ..cubicTo(
+          w * 0.40 + dx,
+          h * 0.86,
+          w * 0.02 + dx,
+          h * 0.42,
+          w * 0.34 + dx,
+          0,
+        );
+    }
+
+    // الخط البنفسجي
+    final purplePaint = Paint()
+      ..color = const Color(0xFF6A1B9A)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 14
+      ..strokeCap = StrokeCap.round;
+
+    canvas.drawPath(curve(0), purplePaint);
+
+    // الخط الذهبي
+    final goldPaint = Paint()
+      ..shader = const LinearGradient(
+        colors: [
+          Color(0xFFFFB300),
+          Color(0xFFFFD54F),
+        ],
+      ).createShader(
+        Rect.fromLTWH(0, 0, w, h),
+      )
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 8
+      ..strokeCap = StrokeCap.round;
+
+    canvas.drawPath(curve(3), goldPaint);
+
+    // اللمسة البيضاء
+    final whitePaint = Paint()
+      ..color = Colors.white.withOpacity(0.9)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.6;
+
+    canvas.drawPath(curve(5), whitePaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) {
+    return false;
+  }
+}
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.22)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.5;
+    final w = size.width;
+    final h = size.height;
 
-    final path = Path();
-    path.moveTo(size.width * 0.23, 0);
-    path.quadraticBezierTo(
-      -2,
-      size.height * 0.5,
-      size.width * 0.33,
-      size.height,
+    Path curve(double dx) {
+      return Path()
+        ..moveTo(w * 0.02 + dx, h)
+        ..cubicTo(w * 0.40 + dx, h * 0.86, w * 0.02 + dx, h * 0.42,
+            w * 0.34 + dx, 0);
+    }
+
+    canvas.drawPath(
+      curve(-3),
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 14
+        ..strokeCap = StrokeCap.round
+        ..color = const Color(0xFF7A45DA).withValues(alpha: 0.55),
     );
 
-    canvas.drawPath(path, paint);
+    canvas.drawPath(
+      curve(-6),
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 8
+        ..strokeCap = StrokeCap.round
+        ..shader = const LinearGradient(
+          begin: Alignment.bottomCenter,
+          end: Alignment.topCenter,
+          colors: [Color(0xFFFF9F1C), Color(0xFFFFC93C)],
+        ).createShader(Offset.zero & size),
+    );
+
+    canvas.drawPath(
+      curve(-17),
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.6
+        ..color = Colors.white.withValues(alpha: 0.35),
+    );
   }
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-class _ShabshaScenePainter extends CustomPainter {
-  const _ShabshaScenePainter();
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final bgPaint = Paint()..color = const Color(0xFFEFE9FF);
-    canvas.drawRect(Offset.zero & size, bgPaint);
-
-    final hillPaint = Paint()..color = const Color(0xFFDCD2F9);
-    final path = Path()
-      ..moveTo(0, size.height)
-      ..quadraticBezierTo(
-        size.width * 0.3,
-        size.height * 0.6,
-        size.width * 0.7,
-        size.height * 0.8,
-      )
-      ..quadraticBezierTo(
-        size.width * 0.85,
-        size.height * 0.9,
-        size.width,
-        size.height * 0.7,
-      )
-      ..lineTo(size.width, size.height)
-      ..close();
-    canvas.drawPath(path, hillPaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
+// شرارات صغيرة حول زر "أضف إعلان".
 class _SparklesPainter extends CustomPainter {
   const _SparklesPainter();
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = const Color(0xFFFFC93C).withValues(alpha: 0.55)
-      ..style = PaintingStyle.fill;
+    final center = Offset(size.width / 2, size.height / 2);
 
-    canvas.drawCircle(Offset(size.width * 0.15, size.height * 0.3), 3, paint);
-    canvas.drawCircle(Offset(size.width * 0.85, size.height * 0.25), 3.5, paint);
-    canvas.drawCircle(Offset(size.width * 0.78, size.height * 0.7), 2.5, paint);
+    final paint = Paint()
+      ..color = const Color(0xFFFFB02E)
+      ..strokeWidth = 2.6
+      ..strokeCap = StrokeCap.round;
+
+    for (final degrees in const [-150.0, -90.0, -30.0]) {
+      final angle = degrees * math.pi / 180;
+      final direction = Offset(math.cos(angle), math.sin(angle));
+
+      canvas.drawLine(
+        center + direction * 34,
+        center + direction * 41,
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+// رسم احتياطي لمشهد شبشة عند الغروب (مباني طينية ونخيل ونهر).
+// يظهر إذا لم تضف صورة حقيقية في assets/images.
+class _ShabshaScenePainter extends CustomPainter {
+  const _ShabshaScenePainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+    final horizon = h * 0.64;
+
+    // السماء
+    final skyRect = Rect.fromLTWH(0, 0, w, horizon + 1);
+
+    canvas.drawRect(
+      skyRect,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Color(0xFF7C9CEB),
+            Color(0xFFB6A4E8),
+            Color(0xFFF5B5A6),
+            Color(0xFFFFCB90),
+          ],
+          stops: [0.0, 0.38, 0.72, 1.0],
+        ).createShader(skyRect),
+    );
+
+    // سحب ناعمة
+    void cloud(double cx, double cy, double cw, double ch, Color color) {
+      canvas.drawOval(
+        Rect.fromCenter(
+          center: Offset(w * cx, h * cy),
+          width: w * cw,
+          height: h * ch,
+        ),
+        Paint()
+          ..color = color
+          ..maskFilter = MaskFilter.blur(BlurStyle.normal, h * 0.03),
+      );
+    }
+
+    cloud(0.20, 0.15, 0.50, 0.10, Colors.white.withValues(alpha: 0.30));
+    cloud(0.68, 0.10, 0.44, 0.09, const Color(0xFFFFC2C8).withValues(alpha: 0.45));
+    cloud(0.90, 0.26, 0.40, 0.08, Colors.white.withValues(alpha: 0.28));
+    cloud(0.42, 0.34, 0.60, 0.08, const Color(0xFFFFB27A).withValues(alpha: 0.40));
+
+    // وهج الشمس عند الأفق
+    canvas.drawRect(
+      skyRect,
+      Paint()
+        ..shader = const RadialGradient(
+          colors: [Color(0x99FFE3AA), Color(0x00FFE3AA)],
+        ).createShader(
+          Rect.fromCircle(center: Offset(w * 0.72, horizon), radius: w * 0.5),
+        ),
+    );
+
+    // تلال بعيدة
+    final hills = Path()
+      ..moveTo(0, horizon)
+      ..quadraticBezierTo(w * 0.2, horizon - h * 0.10, w * 0.42, horizon - h * 0.03)
+      ..quadraticBezierTo(w * 0.7, horizon - h * 0.12, w, horizon - h * 0.04)
+      ..lineTo(w, horizon)
+      ..close();
+
+    canvas.drawPath(
+      hills,
+      Paint()..color = const Color(0xFFD59A78).withValues(alpha: 0.55),
+    );
+
+    // المباني الطينية: [x, العرض, الارتفاع] كنسب من الأبعاد.
+    const buildings = <List<double>>[
+      [0.00, 0.11, 0.20],
+      [0.09, 0.10, 0.31],
+      [0.18, 0.13, 0.23],
+      [0.30, 0.10, 0.34],
+      [0.39, 0.10, 0.26],
+      [0.49, 0.13, 0.30],
+      [0.61, 0.11, 0.22],
+      [0.71, 0.12, 0.33],
+      [0.82, 0.10, 0.24],
+      [0.91, 0.10, 0.30],
+    ];
+
+    for (var i = 0; i < buildings.length; i++) {
+      final b = buildings[i];
+      final bx = w * b[0];
+      final bw = w * b[1];
+      final bh = h * b[2];
+      final top = horizon - bh;
+
+      final tone = i.isEven ? const Color(0xFFB9744A) : const Color(0xFFA5613C);
+      final shade = Color.lerp(tone, const Color(0xFF6B3A25), 0.35)!;
+      final rect = Rect.fromLTWH(bx, top, bw + 1, bh + 1);
+
+      canvas.drawRect(
+        rect,
+        Paint()
+          ..shader = LinearGradient(
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+            colors: [tone, shade],
+          ).createShader(rect),
+      );
+
+      // شرفات علوية
+      final teeth = math.max(3, (bw / (h * 0.045)).floor());
+      final toothWidth = bw / (teeth * 2 - 1);
+      final toothHeight = h * 0.022;
+
+      for (var t = 0; t < teeth; t++) {
+        canvas.drawRect(
+          Rect.fromLTWH(
+            bx + t * toothWidth * 2,
+            top - toothHeight,
+            toothWidth,
+            toothHeight + 1,
+          ),
+          Paint()..color = tone,
+        );
+      }
+
+      // نوافذ صغيرة
+      final windowPaint = Paint()
+        ..color = const Color(0xFF4A2A1B).withValues(alpha: 0.75);
+
+      final cols = math.max(2, (bw / (h * 0.09)).floor());
+      final rows = math.max(1, (bh / (h * 0.12)).floor() - 1);
+
+      for (var r = 0; r < rows; r++) {
+        for (var c = 0; c < cols; c++) {
+          final cx = bx + bw * (c + 0.5) / cols;
+          final cy = top + bh * 0.20 + r * (bh * 0.66 / rows);
+
+          canvas.drawRect(
+            Rect.fromCenter(
+              center: Offset(cx, cy),
+              width: h * 0.026,
+              height: h * 0.042,
+            ),
+            windowPaint,
+          );
+        }
+      }
+    }
+
+    // البرج
+    final towerWidth = w * 0.05;
+    final towerX = w * 0.45;
+    final towerHeight = h * 0.46;
+    final towerTop = horizon - towerHeight;
+
+    canvas.drawRect(
+      Rect.fromLTWH(towerX, towerTop, towerWidth, towerHeight + 1),
+      Paint()..color = const Color(0xFFB06A42),
+    );
+
+    canvas.drawRect(
+      Rect.fromLTWH(
+        towerX - towerWidth * 0.12,
+        towerTop,
+        towerWidth * 1.24,
+        h * 0.03,
+      ),
+      Paint()..color = const Color(0xFF8E512F),
+    );
+
+    canvas.drawArc(
+      Rect.fromLTWH(
+        towerX + towerWidth * 0.1,
+        towerTop - towerWidth * 0.5,
+        towerWidth * 0.8,
+        towerWidth,
+      ),
+      math.pi,
+      math.pi,
+      true,
+      Paint()..color = const Color(0xFF7A4326),
+    );
+
+    canvas.drawCircle(
+      Offset(towerX + towerWidth / 2, towerTop + h * 0.09),
+      towerWidth * 0.22,
+      Paint()..color = const Color(0xFFFFE8B0),
+    );
+
+    // النهر
+    final riverRect = Rect.fromLTWH(0, horizon, w, h - horizon);
+
+    canvas.drawRect(
+      riverRect,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Color(0xFFFFBE85),
+            Color(0xFFC99AB6),
+            Color(0xFF5E6FB0),
+            Color(0xFF3A3F86),
+          ],
+          stops: [0.0, 0.35, 0.75, 1.0],
+        ).createShader(riverRect),
+    );
+
+    // ضفة خضراء
+    final bank = Path()
+      ..moveTo(0, horizon + h * 0.01)
+      ..cubicTo(w * 0.15, horizon - h * 0.05, w * 0.30, horizon + h * 0.02,
+          w * 0.50, horizon - h * 0.02)
+      ..cubicTo(w * 0.70, horizon - h * 0.06, w * 0.85, horizon, w,
+          horizon - h * 0.02)
+      ..lineTo(w, horizon + h * 0.05)
+      ..lineTo(0, horizon + h * 0.05)
+      ..close();
+
+    canvas.drawPath(bank, Paint()..color = const Color(0xFF2E5B34));
+
+    // انعكاسات على الماء
+    final streak = Paint()..color = Colors.white.withValues(alpha: 0.22);
+
+    for (var i = 0; i < 6; i++) {
+      final y = horizon + h * (0.09 + i * 0.05);
+      final streakWidth = w * (0.22 + (i % 3) * 0.10);
+      final cx = w * (0.20 + ((i * 0.17) % 0.62));
+
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromCenter(
+            center: Offset(cx, y),
+            width: streakWidth,
+            height: h * 0.008,
+          ),
+          const Radius.circular(4),
+        ),
+        streak,
+      );
+    }
+
+    // النخيل
+    void palm(double bxFraction, double baseY, double height, double lean) {
+      final base = Offset(w * bxFraction, baseY);
+      final top = Offset(base.dx + lean * w, baseY - height);
+
+      final trunk = Path()
+        ..moveTo(base.dx, base.dy)
+        ..quadraticBezierTo(
+          base.dx + lean * w * 0.2,
+          baseY - height * 0.5,
+          top.dx,
+          top.dy,
+        );
+
+      canvas.drawPath(
+        trunk,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = math.max(2.0, h * 0.022)
+          ..strokeCap = StrokeCap.round
+          ..color = const Color(0xFF3F2A1A),
+      );
+
+      const angles = [-172.0, -150.0, -125.0, -100.0, -80.0, -55.0, -30.0, -8.0];
+
+      for (var i = 0; i < angles.length; i++) {
+        final angle = angles[i] * math.pi / 180;
+        final direction = Offset(math.cos(angle), math.sin(angle));
+        final length = height * 0.55;
+
+        final end = top + direction * length + Offset(0, length * 0.30);
+        final control =
+            top + direction * length * 0.55 + Offset(0, -length * 0.30);
+
+        final frond = Path()
+          ..moveTo(top.dx, top.dy)
+          ..quadraticBezierTo(control.dx, control.dy, end.dx, end.dy);
+
+        canvas.drawPath(
+          frond,
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = math.max(1.6, h * 0.016)
+            ..strokeCap = StrokeCap.round
+            ..color = i.isEven
+                ? const Color(0xFF1F5A2E)
+                : const Color(0xFF2E7A3E),
+        );
+      }
+    }
+
+    palm(0.10, horizon + h * 0.03, h * 0.46, 0.015);
+    palm(0.27, horizon, h * 0.36, -0.010);
+    palm(0.60, horizon + h * 0.02, h * 0.42, 0.010);
+    palm(0.78, horizon, h * 0.34, -0.012);
+    palm(0.94, horizon + h * 0.03, h * 0.50, -0.020);
   }
 
   @override
