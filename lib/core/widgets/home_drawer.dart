@@ -276,7 +276,7 @@ class HomeDrawer extends StatelessWidget {
     );
   }
 
-  Widget _buildItem({
+  Widget _buildItem(BuildContext context, {
     required IconData icon,
     required String title,
     required VoidCallback onTap,
@@ -364,7 +364,7 @@ class HomeDrawer extends StatelessWidget {
                       if (subtitle != null) ...[
                         const SizedBox(height: 2),
                         Text(
-                          subtitle!,
+                          subtitle,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
@@ -427,7 +427,7 @@ class HomeDrawer extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(10, 2, 10, 8),
                 children: [
                   _buildSectionTitle('الوصول السريع', Icons.bolt_rounded),
-                  _buildItem(
+                  _buildItem(context,
                     icon: user == null
                         ? Icons.login_rounded
                         : Icons.person_outline_rounded,
@@ -435,7 +435,7 @@ class HomeDrawer extends StatelessWidget {
                     subtitle: user == null ? 'ادخل إلى حسابك' : 'إدارة حسابك',
                     onTap: () => _closeAndRun(onProfile),
                   ),
-                  _buildItem(
+                  _buildItem(context,
                     icon: Icons.add_circle_outline_rounded,
                     title: 'إضافة إعلان',
                     subtitle: 'اعرض ما تريد بيعه في شبشة',
@@ -447,7 +447,7 @@ class HomeDrawer extends StatelessWidget {
                       'الإدارة',
                       Icons.admin_panel_settings_outlined,
                     ),
-                    _buildItem(
+                    _buildItem(context,
                       icon: Icons.admin_panel_settings_rounded,
                       title: 'لوحة تحكم الإدارة',
                       subtitle: 'إدارة ومراجعة الإعلانات',
@@ -491,7 +491,7 @@ class HomeDrawer extends StatelessWidget {
                           category['name']?.toString() ?? 'بدون اسم';
                       final selected = selectedCategoryId == categoryId;
 
-                      return _buildItem(
+                      return _buildItem(context,
                         icon: _iconForCategory(category),
                         title: categoryName,
                         selected: selected,
@@ -506,7 +506,7 @@ class HomeDrawer extends StatelessWidget {
                     'حسابي',
                     Icons.account_circle_outlined,
                   ),
-                  _buildItem(
+                  _buildItem(context,
                     icon: Icons.favorite_border_rounded,
                     title: 'المفضلة',
                     subtitle: 'الإعلانات التي حفظتها',
@@ -515,7 +515,7 @@ class HomeDrawer extends StatelessWidget {
                       onFavorites();
                     },
                   ),
-                  _buildItem(
+                  _buildItem(context,
                     icon: Icons.inventory_2_outlined,
                     title: 'إعلاناتي',
                     subtitle: 'متابعة إعلاناتك',
@@ -525,7 +525,7 @@ class HomeDrawer extends StatelessWidget {
                     },
                   ),
                   if (user != null)
-                    _buildItem(
+                    _buildItem(context,
                       icon: Icons.logout_rounded,
                       title: 'تسجيل الخروج',
                       subtitle: 'الخروج من الحساب الحالي',
