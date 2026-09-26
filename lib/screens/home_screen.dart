@@ -26,6 +26,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart' show NumberFormat;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../core/widgets/home_loading.dart';
 import '../core/widgets/home_bottom_navigation.dart';
 import '../core/widgets/categories_section.dart';
 import '../core/widgets/listing_section.dart';
@@ -1455,10 +1456,7 @@ class _HomeScreenState extends State<HomeScreen>
                 EdgeInsets.symmetric(
               vertical: 40,
             ),
-            child: Center(
-              child:
-                  CircularProgressIndicator(),
-            ),
+            child: const HomeLoading(),
           )
         else if (results.isEmpty)
           Padding(
@@ -1520,11 +1518,7 @@ class _HomeScreenState extends State<HomeScreen>
         if (_loadingMore)
           const Padding(
             padding: EdgeInsets.all(16),
-            child: Center(
-              child:
-                  CircularProgressIndicator(
-                strokeWidth: 2,
-              ),
+            child: const HomeLoading(),
             ),
           ),
       ],
@@ -1550,10 +1544,7 @@ class _HomeScreenState extends State<HomeScreen>
             EdgeInsets.symmetric(
           vertical: 90,
         ),
-        child: Center(
-          child:
-              CircularProgressIndicator(),
-        ),
+        child: const HomeLoading(),
       );
     } else if (_error != null) {
       content = Padding(
