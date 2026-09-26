@@ -28,7 +28,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/widgets/home_greeting.dart';
 import '../core/widgets/home_error_state.dart';
-import '../core/widgets/home_empty_state.dart';
 import '../core/widgets/home_loading.dart';
 import '../core/widgets/home_search_results.dart';
 import '../core/widgets/home_bottom_navigation.dart';
