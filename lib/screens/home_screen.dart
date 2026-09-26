@@ -1456,7 +1456,7 @@ class _HomeScreenState extends State<HomeScreen>
                 EdgeInsets.symmetric(
               vertical: 40,
             ),
-            child: const HomeLoading(),
+            child: HomeLoading(),
           )
         else if (results.isEmpty)
           Padding(
@@ -1543,7 +1543,7 @@ class _HomeScreenState extends State<HomeScreen>
             EdgeInsets.symmetric(
           vertical: 90,
         ),
-        child: const HomeLoading(),
+        child: HomeLoading(),
       );
     } else if (_error != null) {
       content = Padding(
