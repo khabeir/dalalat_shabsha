@@ -335,7 +335,6 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     String url, {
     required bool unavailable,
   }) {
-    final colorScheme = Theme.of(context).colorScheme;
 
     Widget placeholder(IconData icon) {
       return Container(
@@ -395,7 +394,6 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   Widget _buildFavoriteCard(
     Map<String, dynamic> favorite,
   ) {
-    final colorScheme = Theme.of(context).colorScheme;
 
     final listingId = favorite['listing_id'];
 
@@ -670,7 +668,6 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   // =========================
 
   Widget _buildErrorState() {
-    final colorScheme = Theme.of(context).colorScheme;
 
     return Center(
       child: Padding(
@@ -731,7 +728,6 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   // =========================
 
   Widget _buildEmptyState() {
-    final colorScheme = Theme.of(context).colorScheme;
 
     return RefreshIndicator(
       color: AppColors.brand,
