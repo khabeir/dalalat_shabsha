@@ -822,6 +822,8 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     }
 
     if (_favorites.isEmpty) {
+      final colorScheme = Theme.of(context).colorScheme;
+
       return _buildEmptyState();
     }
 
