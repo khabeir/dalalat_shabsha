@@ -26,6 +26,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart' show NumberFormat;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../core/widgets/home_greeting.dart';
 import '../core/widgets/home_error_state.dart';
 import '../core/widgets/home_empty_state.dart';
 import '../core/widgets/home_loading.dart';
@@ -1552,25 +1553,10 @@ class _HomeScreenState extends State<HomeScreen>
         children: [
           if (!_isFiltering) ...[
             if (name != null &&
-                name.isNotEmpty)
-              Padding(
-                padding:
-                    const EdgeInsets.fromLTRB(
-                  20,
-                  0,
-                  20,
-                  8,
-                ),
-                child: Text(
-                  'مرحباً يا $name 👋',
-                  style: TextStyle(
-                    fontSize: 13.5,
-                    color: Theme.of(context)
-                        .colorScheme
-                        .onSurfaceVariant,
-                  ),
-                ),
-              ),
+    name.isNotEmpty)
+  HomeGreeting(
+    name: name,
+  ),
             _buildBannerCarousel(),
             const SizedBox(height: 16),
           ],
