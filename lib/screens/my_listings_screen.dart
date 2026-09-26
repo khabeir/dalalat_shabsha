@@ -343,48 +343,58 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
     return 'منذ ${(difference.inDays / 365).floor()} سنة';
   }
 
-  Future<void> _openListing(String listingId) async {
-    await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => ListingDetailsScreen(
-          listingId: listingId,
-        ),
+  Future<void> _openListing(Map<String, dynamic> listing) async {
+  final rawId = listing['id'];
+
+  if (rawId == null) return;
+
+  final int? listingId = rawId is int
+      ? rawId
+      : int.tryParse(rawId.toString());
+
+  if (listingId == null) return;
+
+  await Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => ListingDetailsScreen(
+        listingId: listingId,
       ),
-    );
+    ),
+  );
 
-    if (mounted) {
-      _loadListings();
-    }
+  if (mounted) {
+    _loadListings();
   }
+}
 
-  Future<void> _addListing() async {
-    await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const AddListingScreen(),
+Future<void> _addListing() async {
+  await Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => const AddListingScreen(),
+    ),
+  );
+
+  if (mounted) {
+    _loadListings();
+  }
+}
+
+Future<void> _editListing(Map<String, dynamic> listing) async {
+  await Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => EditListingScreen(
+        listing: listing,
       ),
-    );
+    ),
+  );
 
-    if (mounted) {
-      _loadListings();
-    }
+  if (mounted) {
+    _loadListings();
   }
-
-  Future<void> _editListing(Map<String, dynamic> listing) async {
-    await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => EditListingScreen(
-          listing: listing,
-        ),
-      ),
-    );
-
-    if (mounted) {
-      _loadListings();
-    }
-  }
+}
 
   Future<void> _confirmChangeStatus(
     Map<String, dynamic> listing,
