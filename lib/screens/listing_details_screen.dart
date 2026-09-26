@@ -4,6 +4,8 @@ import 'package:intl/intl.dart' show NumberFormat;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../core/theme/app_colors.dart';
+import '../core/theme/app_decorations.dart';
 import 'auth_screen.dart';
 
 class ListingDetailsScreen extends StatefulWidget {
@@ -22,7 +24,7 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
   static final _numberFormat = NumberFormat('#,##0.##', 'en');
 
   static const _whatsappGreen = Color(0xFF25D366);
-  static const _defaultCountryCode = '249'; // السودان
+  static const _defaultCountryCode = '249';
 
   final _supabase = Supabase.instance.client;
   final _pageController = PageController();
@@ -60,12 +62,29 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
   // =========================
   // أدوات مساعدة
   // =========================
+
   void _showSnack(String message) {
     if (!mounted) return;
 
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
+      ..showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: AppColors.ink,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          content: Text(
+            message,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      );
   }
 
   bool get _isOwner {
@@ -90,16 +109,20 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
   String _priceLabel(Map<String, dynamic> listing) {
     final price = listing['price'];
 
-    final currency = listing['currency']?.toString().trim().isNotEmpty == true
-        ? listing['currency'].toString().trim()
-        : 'SDG';
+    final currency =
+        listing['currency']?.toString().trim().isNotEmpty == true
+            ? listing['currency'].toString().trim()
+            : 'SDG';
 
     if (listing['price_type'] == 'contact' || price == null) {
       return 'السعر عند التواصل';
     }
 
     final number = num.tryParse(price.toString());
-    if (number == null) return '$price $currency';
+
+    if (number == null) {
+      return '$price $currency';
+    }
 
     return '${_numberFormat.format(number)} $currency';
   }
@@ -135,11 +158,14 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
 
     if (cleanPath.isEmpty) return '';
 
-    if (cleanPath.startsWith('http://') || cleanPath.startsWith('https://')) {
+    if (cleanPath.startsWith('http://') ||
+        cleanPath.startsWith('https://')) {
       return cleanPath;
     }
 
-    return _supabase.storage.from('listing-images').getPublicUrl(cleanPath);
+    return _supabase.storage
+        .from('listing-images')
+        .getPublicUrl(cleanPath);
   }
 
   String _toWesternDigits(String input) {
@@ -155,7 +181,8 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
   }
 
   String? _whatsappNumber(String phone) {
-    var digits = _toWesternDigits(phone).replaceAll(RegExp(r'[^0-9]'), '');
+    var digits =
+        _toWesternDigits(phone).replaceAll(RegExp(r'[^0-9]'), '');
 
     if (digits.startsWith('00')) {
       digits = digits.substring(2);
@@ -171,6 +198,7 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
   // =========================
   // تحميل البيانات
   // =========================
+
   Future<void> _loadListing({bool silent = false}) async {
     if (!silent && mounted) {
       setState(() {
@@ -207,6 +235,7 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
         _loading = false;
         _error = null;
         _currentImageIndex = 0;
+        _descriptionExpanded = false;
       });
 
       if (_pageController.hasClients) {
@@ -263,6 +292,7 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
   Future<bool> _checkFavorite() async {
     try {
       final user = _supabase.auth.currentUser;
+
       if (user == null) return false;
 
       final result = await _supabase
@@ -299,7 +329,10 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
           .maybeSingle();
 
       if (!mounted) return;
-      setState(() => _categoryName = category?['name']?.toString());
+
+      setState(
+        () => _categoryName = category?['name']?.toString(),
+      );
     } catch (e) {
       debugPrint('loadCategoryName error: $e');
     }
@@ -315,6 +348,7 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
       );
 
       final name = result?.toString().trim();
+
       if (!mounted) return;
 
       if (name != null && name.isNotEmpty) {
@@ -332,6 +366,7 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
           .eq('status', 'approved');
 
       if (!mounted) return;
+
       setState(() => _sellerAdsCount = ads.length);
     } catch (e) {
       debugPrint('loadSellerAds error: $e');
@@ -344,7 +379,9 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
     try {
       final response = await _supabase
           .from('listings')
-          .select('id, title, price, currency, price_type, area')
+          .select(
+            'id, title, price, currency, price_type, area',
+          )
           .eq('status', 'approved')
           .eq('category_id', categoryId)
           .neq('id', widget.listingId)
@@ -352,6 +389,7 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
           .limit(8);
 
       final rows = List<Map<String, dynamic>>.from(response);
+
       if (rows.isEmpty) return;
 
       final ids = rows.map((row) => row['id']).toList();
@@ -363,8 +401,13 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
           .order('sort_order');
 
       final covers = <dynamic, dynamic>{};
-      for (final image in List<Map<String, dynamic>>.from(imagesResponse)) {
-        covers.putIfAbsent(image['listing_id'], () => image['image_path']);
+
+      for (final image
+          in List<Map<String, dynamic>>.from(imagesResponse)) {
+        covers.putIfAbsent(
+          image['listing_id'],
+          () => image['image_path'],
+        );
       }
 
       for (final row in rows) {
@@ -372,6 +415,7 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
       }
 
       if (!mounted) return;
+
       setState(() => _similar = rows);
     } catch (e) {
       debugPrint('loadSimilar error: $e');
@@ -381,21 +425,27 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
   // =========================
   // مصادقة وتفاعل
   // =========================
+
   Future<bool> _ensureSignedIn() async {
     if (_supabase.auth.currentUser != null) return true;
 
     final result = await Navigator.push<bool>(
       context,
-      MaterialPageRoute(builder: (_) => const AuthScreen()),
+      MaterialPageRoute(
+        builder: (_) => const AuthScreen(),
+      ),
     );
 
     if (!mounted) return false;
 
-    if (result == true && _supabase.auth.currentUser != null) {
+    if (result == true &&
+        _supabase.auth.currentUser != null) {
       final favorite = await _checkFavorite();
+
       if (!mounted) return false;
 
       setState(() => _favorite = favorite);
+
       return true;
     }
 
@@ -404,9 +454,11 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
 
   Future<void> _toggleFavorite() async {
     if (_favoriteBusy) return;
+
     if (!await _ensureSignedIn()) return;
 
     final user = _supabase.auth.currentUser;
+
     if (user == null) return;
 
     final wasFavorite = _favorite;
@@ -431,46 +483,65 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
       }
     } catch (e) {
       debugPrint('toggleFavorite error: $e');
+
       if (mounted) {
         setState(() => _favorite = wasFavorite);
         _showSnack('تعذر تحديث المفضلة');
       }
     }
 
-    if (mounted) setState(() => _favoriteBusy = false);
+    if (mounted) {
+      setState(() => _favoriteBusy = false);
+    }
   }
 
   Future<void> _callSeller() async {
-    final phone = _listing?['contact_phone']?.toString().trim();
+    final phone =
+        _listing?['contact_phone']?.toString().trim();
+
     if (phone == null || phone.isEmpty) {
       _showSnack('رقم التواصل غير متوفر');
       return;
     }
 
-    final cleaned = _toWesternDigits(phone).replaceAll(RegExp(r'[^0-9+]'), '');
+    final cleaned = _toWesternDigits(phone)
+        .replaceAll(RegExp(r'[^0-9+]'), '');
 
     try {
-      final launched = await launchUrl(Uri(scheme: 'tel', path: cleaned));
-      if (!launched) _showSnack('تعذر فتح تطبيق الاتصال');
+      final launched = await launchUrl(
+        Uri(
+          scheme: 'tel',
+          path: cleaned,
+        ),
+      );
+
+      if (!launched) {
+        _showSnack('تعذر فتح تطبيق الاتصال');
+      }
     } catch (_) {
       _showSnack('تعذر فتح تطبيق الاتصال');
     }
   }
 
   Future<void> _openWhatsApp() async {
-    final phone = _listing?['contact_phone']?.toString().trim();
+    final phone =
+        _listing?['contact_phone']?.toString().trim();
+
     if (phone == null || phone.isEmpty) {
       _showSnack('رقم التواصل غير متوفر');
       return;
     }
 
     final number = _whatsappNumber(phone);
+
     if (number == null) {
       _showSnack('رقم التواصل غير صالح لواتساب');
       return;
     }
 
-    final title = _listing?['title']?.toString().trim() ?? '';
+    final title =
+        _listing?['title']?.toString().trim() ?? '';
+
     final message = title.isEmpty
         ? 'مرحباً، رأيت إعلانك في تطبيق دلالة شبشة.'
         : 'مرحباً، رأيت إعلانك "$title" في تطبيق دلالة شبشة. هل ما زال متاحاً؟';
@@ -487,7 +558,10 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
         uri,
         mode: LaunchMode.externalApplication,
       );
-      if (!launched) _showSnack('تعذر فتح واتساب');
+
+      if (!launched) {
+        _showSnack('تعذر فتح واتساب');
+      }
     } catch (_) {
       _showSnack('تعذر فتح واتساب');
     }
@@ -495,10 +569,14 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
 
   Future<void> _shareListing() async {
     final listing = _listing;
+
     if (listing == null) return;
 
-    final title = listing['title']?.toString().trim() ?? '';
-    final area = listing['area']?.toString().trim() ?? '';
+    final title =
+        listing['title']?.toString().trim() ?? '';
+
+    final area =
+        listing['area']?.toString().trim() ?? '';
 
     final text = [
       if (title.isNotEmpty) title,
@@ -520,7 +598,10 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
         uri,
         mode: LaunchMode.externalApplication,
       );
-      if (!launched) _showSnack('تعذر فتح واتساب للمشاركة');
+
+      if (!launched) {
+        _showSnack('تعذر فتح واتساب للمشاركة');
+      }
     } catch (_) {
       _showSnack('تعذر فتح واتساب للمشاركة');
     }
@@ -530,17 +611,22 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
     if (!await _ensureSignedIn()) return;
 
     final user = _supabase.auth.currentUser;
+
     if (user == null || !mounted) return;
 
-    final result = await showModalBottomSheet<Map<String, String>>(
+    final result =
+        await showModalBottomSheet<Map<String, String>>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
       builder: (_) => const _ReportSheet(),
     );
 
-    final reason = result?['reason']?.trim() ?? '';
-    final details = result?['details']?.trim() ?? '';
+    final reason =
+        result?['reason']?.trim() ?? '';
+
+    final details =
+        result?['details']?.trim() ?? '';
 
     if (reason.isEmpty) return;
 
@@ -552,7 +638,9 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
         'details': details.isEmpty ? null : details,
       });
 
-      _showSnack('تم إرسال البلاغ للمراجعة، شكراً لك');
+      _showSnack(
+        'تم إرسال البلاغ للمراجعة، شكراً لك',
+      );
     } catch (e) {
       debugPrint('report error: $e');
       _showSnack('تعذر إرسال البلاغ');
@@ -562,15 +650,21 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
   // =========================
   // الصور
   // =========================
+
   List<String> get _imageUrls {
     return _images
-        .map((image) => _imageUrl(image['image_path']?.toString() ?? ''))
+        .map(
+          (image) => _imageUrl(
+            image['image_path']?.toString() ?? '',
+          ),
+        )
         .where((url) => url.isNotEmpty)
         .toList();
   }
 
   void _openFullScreenGallery(int index) {
     final urls = _imageUrls;
+
     if (urls.isEmpty) return;
 
     Navigator.push(
@@ -589,22 +683,27 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
     IconData icon = Icons.image_outlined,
     String? message,
   }) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return Container(
       width: double.infinity,
       height: double.infinity,
-      color: colorScheme.surfaceContainerHighest,
+      color: AppColors.brandSoft,
       child: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 56, color: colorScheme.onSurfaceVariant),
+            Icon(
+              icon,
+              size: 56,
+              color: AppColors.brand,
+            ),
             if (message != null) ...[
               const SizedBox(height: 8),
               Text(
                 message,
-                style: TextStyle(color: colorScheme.onSurfaceVariant),
+                style: const TextStyle(
+                  color: AppColors.ink,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ],
           ],
@@ -613,9 +712,11 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
     );
   }
 
-  Widget _networkImage(String url, {int memCacheWidth = 900, String? heroTag}) {
-    final colorScheme = Theme.of(context).colorScheme;
-
+  Widget _networkImage(
+    String url, {
+    int memCacheWidth = 900,
+    String? heroTag,
+  }) {
     Widget image = CachedNetworkImage(
       imageUrl: url,
       fit: BoxFit.cover,
@@ -623,9 +724,12 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
       height: double.infinity,
       memCacheWidth: memCacheWidth,
       placeholder: (_, __) => Container(
-        color: colorScheme.surfaceContainerHighest,
+        color: AppColors.brandSoft,
         child: const Center(
-          child: CircularProgressIndicator(strokeWidth: 2),
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: AppColors.brand,
+          ),
         ),
       ),
       errorWidget: (_, __, ___) => _imagePlaceholder(
@@ -635,14 +739,16 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
     );
 
     if (heroTag != null) {
-      return Hero(tag: heroTag, child: image);
+      return Hero(
+        tag: heroTag,
+        child: image,
+      );
     }
 
     return image;
   }
 
   Widget _buildGallery() {
-    final colorScheme = Theme.of(context).colorScheme;
     final urls = _imageUrls;
 
     return SizedBox(
@@ -651,17 +757,24 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
         children: [
           Positioned.fill(
             child: urls.isEmpty
-                ? _imagePlaceholder(message: 'لا توجد صور لهذا الإعلان')
+                ? _imagePlaceholder(
+                    message: 'لا توجد صور لهذا الإعلان',
+                  )
                 : PageView.builder(
                     controller: _pageController,
                     itemCount: urls.length,
                     onPageChanged: (index) {
-                      setState(() => _currentImageIndex = index);
+                      setState(
+                        () => _currentImageIndex = index,
+                      );
                     },
                     itemBuilder: (context, index) {
-                      final heroTag = 'listing_img_${widget.listingId}_$index';
+                      final heroTag =
+                          'listing_img_${widget.listingId}_$index';
+
                       return GestureDetector(
-                        onTap: () => _openFullScreenGallery(index),
+                        onTap: () =>
+                            _openFullScreenGallery(index),
                         child: _networkImage(
                           urls[index],
                           heroTag: heroTag,
@@ -671,41 +784,49 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
                   ),
           ),
 
+          // إعلان مميز
           if (_isCommercial)
             Positioned(
-              top: 12,
-              right: 12,
+              top: 14,
+              right: 14,
               child: Container(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 5,
+                  horizontal: 11,
+                  vertical: 7,
                 ),
                 decoration: BoxDecoration(
-                  color: colorScheme.primary,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: const [
+                  gradient: const LinearGradient(
+                    colors: [
+                      AppColors.orange,
+                      AppColors.gold,
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(22),
+                  boxShadow: [
                     BoxShadow(
-                      color: Colors.black26,
-                      blurRadius: 4,
-                      offset: Offset(0, 2),
+                      color: Colors.black.withValues(
+                        alpha: 0.20,
+                      ),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
                     ),
                   ],
                 ),
-                child: Row(
+                child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
-                      Icons.local_offer,
-                      size: 14,
-                      color: colorScheme.onPrimary,
+                      Icons.local_offer_rounded,
+                      size: 15,
+                      color: Colors.white,
                     ),
-                    const SizedBox(width: 5),
+                    SizedBox(width: 5),
                     Text(
-                      'إعلان تجاري',
+                      'إعلان مميز',
                       style: TextStyle(
                         fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: colorScheme.onPrimary,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
                       ),
                     ),
                   ],
@@ -713,42 +834,60 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
               ),
             ),
 
-          if (urls.length > 1) ...[
+          // نقاط الصور
+          if (urls.length > 1)
             Positioned(
-              bottom: 12,
+              bottom: 13,
               left: 0,
               right: 0,
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(urls.length, (index) {
-                  final active = index == _currentImageIndex;
+                mainAxisAlignment:
+                    MainAxisAlignment.center,
+                children: List.generate(
+                  urls.length,
+                  (index) {
+                    final active =
+                        index == _currentImageIndex;
 
-                  return AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    margin: const EdgeInsets.symmetric(horizontal: 3),
-                    width: active ? 20 : 7,
-                    height: 7,
-                    decoration: BoxDecoration(
-                      color: active ? Colors.white : Colors.white54,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  );
-                }),
+                    return AnimatedContainer(
+                      duration:
+                          const Duration(milliseconds: 200),
+                      margin:
+                          const EdgeInsets.symmetric(
+                        horizontal: 3,
+                      ),
+                      width: active ? 20 : 7,
+                      height: 7,
+                      decoration: BoxDecoration(
+                        color: active
+                            ? Colors.white
+                            : Colors.white60,
+                        borderRadius:
+                            BorderRadius.circular(4),
+                      ),
+                    );
+                  },
+                ),
               ),
             ),
 
+          // رقم الصورة
+          if (urls.length > 1)
             Positioned(
               bottom: 10,
               left: 12,
               child: Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 10,
-                  vertical: 4,
+                  vertical: 5,
                 ),
                 decoration: BoxDecoration(
-  color: Colors.black.withValues(alpha: 0.6),
-  borderRadius: BorderRadius.circular(12),
-),
+                  color: Colors.black.withValues(
+                    alpha: 0.62,
+                  ),
+                  borderRadius:
+                      BorderRadius.circular(12),
+                ),
                 child: Text(
                   '${_currentImageIndex + 1} / ${urls.length}',
                   style: const TextStyle(
@@ -759,91 +898,139 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
                 ),
               ),
             ),
-          ],
         ],
       ),
     );
   }
 
   // =========================
-  // مكوّنات الصفحة
+  // مكونات الصفحة
   // =========================
-  Widget _buildChip(IconData icon, String text) {
-    final colorScheme = Theme.of(context).colorScheme;
 
+  Widget _buildChip(
+    IconData icon,
+    String text,
+  ) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 12,
+        vertical: 7,
+      ),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
+        color: AppColors.brandSoft,
         borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: AppColors.brand.withValues(alpha: 0.10),
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: colorScheme.onSurfaceVariant),
+          Icon(
+            icon,
+            size: 16,
+            color: AppColors.brand,
+          ),
           const SizedBox(width: 6),
           Text(
             text,
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+            style: const TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
+              color: AppColors.ink,
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildCard({required Widget child}) {
-    return Card(
-      margin: EdgeInsets.zero,
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(
-          color: Theme.of(context).colorScheme.outlineVariant,
+  Widget _buildCard({
+    required Widget child,
+  }) {
+    return Container(
+      decoration: AppDecorations.card(),
+      padding: const EdgeInsets.all(16),
+      child: child,
+    );
+  }
+
+  Widget _buildSectionTitle(
+    IconData icon,
+    String title,
+  ) {
+    return Row(
+      children: [
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: AppColors.brandSoft,
+            borderRadius: BorderRadius.circular(11),
+          ),
+          child: Icon(
+            icon,
+            size: 20,
+            color: AppColors.brand,
+          ),
         ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: child,
-      ),
+        const SizedBox(width: 10),
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 17,
+            fontWeight: FontWeight.w900,
+            color: AppColors.ink,
+          ),
+        ),
+      ],
     );
   }
 
   Widget _buildStatusBanner(String? status) {
     final message = _statusMessage(status);
 
-    if (status == 'approved' || status == null || message.isEmpty) {
+    if (status == 'approved' ||
+        status == null ||
+        message.isEmpty) {
       return const SizedBox.shrink();
     }
 
-    final colorScheme = Theme.of(context).colorScheme;
     final isRejected = status == 'rejected';
+
+    final background = isRejected
+        ? Colors.red.shade50
+        : AppColors.brandSoft;
+
+    final foreground = isRejected
+        ? Colors.red.shade700
+        : AppColors.brandDark;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(13),
       decoration: BoxDecoration(
-        color: isRejected
-            ? colorScheme.errorContainer
-            : colorScheme.tertiaryContainer,
-        borderRadius: BorderRadius.circular(12),
+        color: background,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: foreground.withValues(alpha: 0.12),
+        ),
       ),
       child: Row(
         children: [
           Icon(
-            Icons.info_outline,
-            color: isRejected
-                ? colorScheme.onErrorContainer
-                : colorScheme.onTertiaryContainer,
+            isRejected
+                ? Icons.error_outline_rounded
+                : Icons.info_outline_rounded,
+            color: foreground,
           ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               message,
               style: TextStyle(
-                fontWeight: FontWeight.w600,
-                color: isRejected
-                    ? colorScheme.onErrorContainer
-                    : colorScheme.onTertiaryContainer,
+                fontWeight: FontWeight.w700,
+                color: foreground,
               ),
             ),
           ),
@@ -852,30 +1039,56 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
     );
   }
 
-  Widget _buildPriceBox(Map<String, dynamic> listing) {
-    final colorScheme = Theme.of(context).colorScheme;
+  Widget _buildPriceBox(
+    Map<String, dynamic> listing,
+  ) {
     final isContact =
-        listing['price_type'] == 'contact' || listing['price'] == null;
-    final isNegotiable = listing['price_type'] == 'negotiable';
+        listing['price_type'] == 'contact' ||
+        listing['price'] == null;
+
+    final isNegotiable =
+        listing['price_type'] == 'negotiable';
 
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: colorScheme.primaryContainer,
-        borderRadius: BorderRadius.circular(16),
+        gradient: LinearGradient(
+          begin: AlignmentDirectional.centerStart,
+          end: AlignmentDirectional.centerEnd,
+          colors: [
+            AppColors.brandSoft,
+            AppColors.brandSoft.withValues(alpha: 0.65),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(17),
+        border: Border.all(
+          color: AppColors.brand.withValues(alpha: 0.10),
+        ),
       ),
       child: Row(
         children: [
-          Icon(Icons.sell_outlined, color: colorScheme.primary, size: 26),
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: AppColors.brand,
+              borderRadius: BorderRadius.circular(13),
+            ),
+            child: const Icon(
+              Icons.sell_outlined,
+              color: Colors.white,
+              size: 23,
+            ),
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
               _priceLabel(listing),
               style: TextStyle(
-                fontSize: isContact ? 19 : 23,
-                fontWeight: FontWeight.w800,
-                color: colorScheme.onPrimaryContainer,
+                fontSize: isContact ? 18 : 22,
+                fontWeight: FontWeight.w900,
+                color: AppColors.ink,
               ),
             ),
           ),
@@ -883,18 +1096,18 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
             Container(
               padding: const EdgeInsets.symmetric(
                 horizontal: 10,
-                vertical: 4,
+                vertical: 5,
               ),
               decoration: BoxDecoration(
-                color: colorScheme.primary,
+                color: AppColors.orange,
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: Text(
+              child: const Text(
                 'قابل للتفاوض',
                 style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: colorScheme.onPrimary,
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
                 ),
               ),
             ),
@@ -903,38 +1116,56 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
     );
   }
 
-  Widget _buildDescription(String description) {
+  Widget _buildDescription(
+    String description,
+  ) {
     final isLong = description.length > 220;
 
     return _buildCard(
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment:
+            CrossAxisAlignment.stretch,
         children: [
-          const Row(
-            children: [
-              Icon(Icons.description_outlined),
-              SizedBox(width: 8),
-              Text(
-                'وصف الإعلان',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-            ],
+          _buildSectionTitle(
+            Icons.description_outlined,
+            'وصف الإعلان',
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           SelectableText(
-            description.isEmpty ? 'لا يوجد وصف لهذا الإعلان.' : description,
-            maxLines: (_descriptionExpanded || !isLong) ? null : 6,
-            style: const TextStyle(fontSize: 15.5, height: 1.8),
+            description.isEmpty
+                ? 'لا يوجد وصف لهذا الإعلان.'
+                : description,
+            maxLines:
+                (_descriptionExpanded || !isLong)
+                    ? null
+                    : 6,
+            style: const TextStyle(
+              fontSize: 15,
+              height: 1.8,
+              color: AppColors.ink,
+            ),
           ),
           if (isLong)
             Align(
-              alignment: AlignmentDirectional.centerStart,
-              child: TextButton(
+              alignment:
+                  AlignmentDirectional.centerStart,
+              child: TextButton.icon(
                 onPressed: () {
-                  setState(() => _descriptionExpanded = !_descriptionExpanded);
+                  setState(
+                    () => _descriptionExpanded =
+                        !_descriptionExpanded,
+                  );
                 },
-                child: Text(
-                  _descriptionExpanded ? 'عرض أقل' : 'عرض المزيد',
+                icon: Icon(
+                  _descriptionExpanded
+                      ? Icons.keyboard_arrow_up
+                      : Icons.keyboard_arrow_down,
+                  size: 20,
+                ),
+                label: Text(
+                  _descriptionExpanded
+                      ? 'عرض أقل'
+                      : 'عرض المزيد',
                 ),
               ),
             ),
@@ -944,11 +1175,11 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
   }
 
   Widget _buildSellerCard() {
-    if (_sellerName == null && _sellerAdsCount == null) {
+    if (_sellerName == null &&
+        _sellerAdsCount == null) {
       return const SizedBox.shrink();
     }
 
-    final colorScheme = Theme.of(context).colorScheme;
     final name = _sellerName ?? 'البائع';
 
     return Padding(
@@ -956,38 +1187,68 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
       child: _buildCard(
         child: Row(
           children: [
-            CircleAvatar(
-              radius: 24,
-              backgroundColor: colorScheme.primaryContainer,
-              child: Text(
-                String.fromCharCode(name.runes.first),
-                style: TextStyle(
-                  fontSize: 19,
-                  fontWeight: FontWeight.bold,
-                  color: colorScheme.onPrimaryContainer,
+            Container(
+              width: 52,
+              height: 52,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    AppColors.brand,
+                    AppColors.brandDark,
+                  ],
+                ),
+                shape: BoxShape.circle,
+              ),
+              child: Center(
+                child: Text(
+                  name.runes.isEmpty
+                      ? 'ب'
+                      : String.fromCharCode(
+                          name.runes.first,
+                        ),
+                  style: const TextStyle(
+                    fontSize: 21,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                  ),
                 ),
               ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment:
+                    CrossAxisAlignment.start,
                 children: [
                   Text(
                     name,
                     style: const TextStyle(
                       fontSize: 16,
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.ink,
                     ),
                   ),
-                  if (_sellerAdsCount != null)
-                    Text(
-                      '$_sellerAdsCount إعلان نشط',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
+                  if (_sellerAdsCount != null) ...[
+                    const SizedBox(height: 3),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.storefront_outlined,
+                          size: 15,
+                          color: AppColors.orange,
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          '$_sellerAdsCount إعلان نشط',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            color: Colors.grey.shade700,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ),
+                  ],
                 ],
               ),
             ),
@@ -998,25 +1259,34 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
   }
 
   Widget _buildSafetyTips() {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return Container(
       margin: const EdgeInsets.only(top: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: colorScheme.secondaryContainer.withValues(alpha: 0.5),
+        color: AppColors.gold.withValues(alpha: 0.13),
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppColors.gold.withValues(alpha: 0.22),
+        ),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: const Row(
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
         children: [
-          Icon(Icons.shield_outlined, color: colorScheme.secondary),
-          const SizedBox(width: 10),
-          const Expanded(
+          Icon(
+            Icons.shield_outlined,
+            color: AppColors.orange,
+          ),
+          SizedBox(width: 10),
+          Expanded(
             child: Text(
-              'نصائح للأمان: عاين المنتج قبل الدفع، وقابل البائع في مكان '
-              'عام، ولا تحوّل أي مبلغ مقدماً لشخص لا تعرفه.',
-              style: TextStyle(fontSize: 13, height: 1.6),
+              'نصائح للأمان: عاين المنتج قبل الدفع، وقابل البائع في مكان عام، ولا تحوّل أي مبلغ مقدماً لشخص لا تعرفه.',
+              style: TextStyle(
+                fontSize: 13,
+                height: 1.6,
+                color: AppColors.ink,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ],
@@ -1024,24 +1294,24 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
     );
   }
 
-  Widget _buildSimilarCard(Map<String, dynamic> listing) {
-    final colorScheme = Theme.of(context).colorScheme;
-
+  Widget _buildSimilarCard(
+    Map<String, dynamic> listing,
+  ) {
     final id = listing['id'];
-    final path = listing['image_path']?.toString() ?? '';
-    final url = path.isEmpty ? '' : _imageUrl(path);
-    final title = listing['title']?.toString().trim() ?? '';
+    final path =
+        listing['image_path']?.toString() ?? '';
+
+    final url =
+        path.isEmpty ? '' : _imageUrl(path);
+
+    final title =
+        listing['title']?.toString().trim() ?? '';
 
     return SizedBox(
-      width: 150,
-      child: Card(
-        margin: EdgeInsets.zero,
-        elevation: 0,
+      width: 155,
+      child: Container(
+        decoration: AppDecorations.card(),
         clipBehavior: Clip.antiAlias,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-          side: BorderSide(color: colorScheme.outlineVariant),
-        ),
         child: InkWell(
           onTap: id is! int
               ? null
@@ -1049,43 +1319,56 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => ListingDetailsScreen(listingId: id),
+                      builder: (_) =>
+                          ListingDetailsScreen(
+                        listingId: id,
+                      ),
                     ),
                   );
                 },
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment:
+                CrossAxisAlignment.stretch,
             children: [
               SizedBox(
-                height: 95,
+                height: 98,
                 child: url.isEmpty
                     ? _imagePlaceholder()
-                    : _networkImage(url, memCacheWidth: 350),
+                    : _networkImage(
+                        url,
+                        memCacheWidth: 350,
+                      ),
               ),
               Padding(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(9),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment:
+                      CrossAxisAlignment.start,
                   children: [
                     Text(
-                      title.isEmpty ? 'إعلان بدون عنوان' : title,
+                      title.isEmpty
+                          ? 'إعلان بدون عنوان'
+                          : title,
                       maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+                      overflow:
+                          TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontSize: 13,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.w800,
                         height: 1.25,
+                        color: AppColors.ink,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 5),
                     Text(
                       _priceLabel(listing),
                       maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
+                      overflow:
+                          TextOverflow.ellipsis,
+                      style: const TextStyle(
                         fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                        color: colorScheme.primary,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.brand,
                       ),
                     ),
                   ],
@@ -1099,25 +1382,32 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
   }
 
   Widget _buildSimilarSection() {
-    if (_similar.isEmpty) return const SizedBox.shrink();
+    if (_similar.isEmpty) {
+      return const SizedBox.shrink();
+    }
 
     return Padding(
       padding: const EdgeInsets.only(top: 20),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment:
+            CrossAxisAlignment.stretch,
         children: [
-          const Text(
+          _buildSectionTitle(
+            Icons.auto_awesome_outlined,
             'إعلانات مشابهة',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 11),
           SizedBox(
-            height: 185,
+            height: 188,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: _similar.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 10),
-              itemBuilder: (_, index) => _buildSimilarCard(_similar[index]),
+              separatorBuilder: (_, __) =>
+                  const SizedBox(width: 10),
+              itemBuilder: (_, index) =>
+                  _buildSimilarCard(
+                _similar[index],
+              ),
             ),
           ),
         ],
@@ -1130,64 +1420,96 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
 
     if (listing == null) return null;
     if (_isOwner) return null;
-    if (listing['status'] != 'approved') return null;
-
-    final colorScheme = Theme.of(context).colorScheme;
+    if (listing['status'] != 'approved') {
+      return null;
+    }
 
     return SafeArea(
       top: false,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.fromLTRB(
+          16,
+          11,
+          16,
+          12,
+        ),
         decoration: BoxDecoration(
-          color: colorScheme.surface,
+          color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 10,
-              offset: const Offset(0, -3),
+              color: AppColors.brand.withValues(
+                alpha: 0.10,
+              ),
+              blurRadius: 16,
+              offset: const Offset(0, -4),
             ),
           ],
           border: Border(
-            top: BorderSide(color: colorScheme.outlineVariant, width: 0.6),
+            top: BorderSide(
+              color: AppColors.brand.withValues(
+                alpha: 0.08,
+              ),
+              width: 0.8,
+            ),
           ),
         ),
         child: Row(
           children: [
             Expanded(
               child: SizedBox(
-                height: 48,
+                height: 49,
                 child: FilledButton.icon(
                   onPressed: _callSeller,
                   style: FilledButton.styleFrom(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                    backgroundColor:
+                        AppColors.brand,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape:
+                        RoundedRectangleBorder(
+                      borderRadius:
+                          BorderRadius.circular(14),
                     ),
                   ),
-                  icon: const Icon(Icons.phone),
+                  icon: const Icon(
+                    Icons.phone_rounded,
+                  ),
                   label: const Text(
                     'اتصال',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      fontSize: 15.5,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                 ),
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             Expanded(
               child: SizedBox(
-                height: 48,
+                height: 49,
                 child: FilledButton.icon(
                   onPressed: _openWhatsApp,
                   style: FilledButton.styleFrom(
-                    backgroundColor: _whatsappGreen,
+                    backgroundColor:
+                        _whatsappGreen,
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                    elevation: 0,
+                    shape:
+                        RoundedRectangleBorder(
+                      borderRadius:
+                          BorderRadius.circular(14),
                     ),
                   ),
-                  icon: const Icon(Icons.chat),
+                  icon: const Icon(
+                    Icons.chat_rounded,
+                  ),
                   label: const Text(
                     'واتساب',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      fontSize: 15.5,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                 ),
               ),
@@ -1200,7 +1522,11 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
 
   Widget _buildBody() {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(
+        child: CircularProgressIndicator(
+          color: AppColors.brand,
+        ),
+      );
     }
 
     final listing = _listing;
@@ -1212,16 +1538,46 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.error_outline, size: 56),
-              const SizedBox(height: 12),
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  color: AppColors.brandSoft,
+                  borderRadius:
+                      BorderRadius.circular(22),
+                ),
+                child: const Icon(
+                  Icons.error_outline_rounded,
+                  size: 40,
+                  color: AppColors.brand,
+                ),
+              ),
+              const SizedBox(height: 14),
               Text(
                 _error ?? 'الإعلان غير موجود',
                 textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.ink,
+                ),
               ),
-              const SizedBox(height: 12),
-              FilledButton(
+              const SizedBox(height: 14),
+              FilledButton.icon(
                 onPressed: _loadListing,
-                child: const Text('إعادة المحاولة'),
+                icon: const Icon(
+                  Icons.refresh_rounded,
+                ),
+                label: const Text('إعادة المحاولة'),
+                style: FilledButton.styleFrom(
+                  backgroundColor:
+                      AppColors.brand,
+                  shape:
+                      RoundedRectangleBorder(
+                    borderRadius:
+                        BorderRadius.circular(13),
+                  ),
+                ),
               ),
             ],
           ),
@@ -1229,15 +1585,26 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
       );
     }
 
-    final title = listing['title']?.toString().trim() ?? '';
-    final description = listing['description']?.toString().trim() ?? '';
-    final area = listing['area']?.toString().trim() ?? '';
-    final timeAgo = _timeAgo(listing['created_at']);
+    final title =
+        listing['title']?.toString().trim() ?? '';
+
+    final description =
+        listing['description']?.toString().trim() ??
+            '';
+
+    final area =
+        listing['area']?.toString().trim() ?? '';
+
+    final timeAgo =
+        _timeAgo(listing['created_at']);
 
     return RefreshIndicator(
-      onRefresh: () => _loadListing(silent: true),
+      color: AppColors.brand,
+      onRefresh: () =>
+          _loadListing(silent: true),
       child: ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
+        physics:
+            const AlwaysScrollableScrollPhysics(),
         padding: EdgeInsets.zero,
         children: [
           _buildGallery(),
@@ -1245,29 +1612,48 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+              crossAxisAlignment:
+                  CrossAxisAlignment.stretch,
               children: [
-                _buildStatusBanner(listing['status']?.toString()),
+                _buildStatusBanner(
+                  listing['status']?.toString(),
+                ),
 
                 if (_isOwner)
                   Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    padding: const EdgeInsets.all(12),
+                    margin:
+                        const EdgeInsets.only(
+                      bottom: 12,
+                    ),
+                    padding:
+                        const EdgeInsets.all(13),
                     decoration: BoxDecoration(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .primaryContainer
-                          .withValues(alpha: 0.6),
-                      borderRadius: BorderRadius.circular(12),
+                      color: AppColors.brandSoft,
+                      borderRadius:
+                          BorderRadius.circular(14),
+                      border: Border.all(
+                        color: AppColors.brand
+                            .withValues(alpha: 0.10),
+                      ),
                     ),
                     child: const Row(
                       children: [
-                        Icon(Icons.person_pin_outlined),
+                        Icon(
+                          Icons
+                              .person_pin_outlined,
+                          color:
+                              AppColors.brand,
+                        ),
                         SizedBox(width: 10),
                         Expanded(
                           child: Text(
                             'هذا إعلانك. يمكنك إدارته من صفحة "إعلاناتي".',
-                            style: TextStyle(fontWeight: FontWeight.w600),
+                            style: TextStyle(
+                              fontWeight:
+                                  FontWeight.w700,
+                              color:
+                                  AppColors.ink,
+                            ),
                           ),
                         ),
                       ],
@@ -1275,11 +1661,15 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
                   ),
 
                 Text(
-                  title.isEmpty ? 'إعلان بدون عنوان' : title,
+                  title.isEmpty
+                      ? 'إعلان بدون عنوان'
+                      : title,
                   style: const TextStyle(
                     fontSize: 22,
-                    fontWeight: FontWeight.bold,
+                    fontWeight:
+                        FontWeight.w900,
                     height: 1.4,
+                    color: AppColors.ink,
                   ),
                 ),
 
@@ -1290,14 +1680,28 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
                   runSpacing: 8,
                   children: [
                     if (area.isNotEmpty)
-                      _buildChip(Icons.location_on_outlined, area),
-                    if (listing['condition'] == 'new' ||
-                        listing['condition'] == 'used')
-                      _buildChip(Icons.inventory_2_outlined, _conditionText()),
+                      _buildChip(
+                        Icons.location_on_outlined,
+                        area,
+                      ),
+                    if (listing['condition'] ==
+                            'new' ||
+                        listing['condition'] ==
+                            'used')
+                      _buildChip(
+                        Icons.inventory_2_outlined,
+                        _conditionText(),
+                      ),
                     if (_categoryName != null)
-                      _buildChip(Icons.category_outlined, _categoryName!),
+                      _buildChip(
+                        Icons.category_outlined,
+                        _categoryName!,
+                      ),
                     if (timeAgo.isNotEmpty)
-                      _buildChip(Icons.schedule, timeAgo),
+                      _buildChip(
+                        Icons.schedule_rounded,
+                        timeAgo,
+                      ),
                   ],
                 ),
 
@@ -1326,40 +1730,69 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final ready = !_loading && _listing != null;
+    final ready =
+        !_loading && _listing != null;
 
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
+        backgroundColor:
+            AppColors.pageBackground,
         appBar: AppBar(
-          title: const Text('تفاصيل الإعلان'),
+          backgroundColor: AppColors.brand,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          title: const Text(
+            'تفاصيل الإعلان',
+            style: TextStyle(
+              fontWeight: FontWeight.w900,
+            ),
+          ),
           actions: [
             if (ready) ...[
               IconButton(
-                tooltip: _favorite ? 'إزالة من المفضلة' : 'إضافة للمفضلة',
+                tooltip: _favorite
+                    ? 'إزالة من المفضلة'
+                    : 'إضافة للمفضلة',
                 onPressed: _toggleFavorite,
                 icon: Icon(
-                  _favorite ? Icons.favorite : Icons.favorite_border,
-                  color: _favorite ? Colors.red : null,
+                  _favorite
+                      ? Icons.favorite_rounded
+                      : Icons.favorite_border_rounded,
+                  color: _favorite
+                      ? Colors.red.shade200
+                      : Colors.white,
                 ),
               ),
               IconButton(
                 tooltip: 'مشاركة',
                 onPressed: _shareListing,
-                icon: const Icon(Icons.share_outlined),
+                icon: const Icon(
+                  Icons.share_outlined,
+                ),
               ),
               PopupMenuButton<String>(
+                icon: const Icon(
+                  Icons.more_vert_rounded,
+                ),
                 onSelected: (value) {
-                  if (value == 'report') _reportListing();
+                  if (value == 'report') {
+                    _reportListing();
+                  }
                 },
                 itemBuilder: (_) => const [
                   PopupMenuItem(
                     value: 'report',
                     child: Row(
                       children: [
-                        Icon(Icons.flag_outlined),
+                        Icon(
+                          Icons.flag_outlined,
+                          color: AppColors.brand,
+                        ),
                         SizedBox(width: 8),
-                        Text('الإبلاغ عن الإعلان'),
+                        Text(
+                          'الإبلاغ عن الإعلان',
+                        ),
                       ],
                     ),
                   ),
@@ -1369,16 +1802,19 @@ class _ListingDetailsScreenState extends State<ListingDetailsScreen> {
           ],
         ),
         body: _buildBody(),
-        bottomNavigationBar: _buildContactBar(),
+        bottomNavigationBar:
+            _buildContactBar(),
       ),
     );
   }
 }
 
 // =========================
-// عرض الصور بملء الشاشة مع التكبير
+// عرض الصور بملء الشاشة
 // =========================
-class _FullScreenGallery extends StatefulWidget {
+
+class _FullScreenGallery
+    extends StatefulWidget {
   final List<String> urls;
   final int initialIndex;
   final int listingId;
@@ -1390,12 +1826,16 @@ class _FullScreenGallery extends StatefulWidget {
   });
 
   @override
-  State<_FullScreenGallery> createState() => _FullScreenGalleryState();
+  State<_FullScreenGallery> createState() =>
+      _FullScreenGalleryState();
 }
 
-class _FullScreenGalleryState extends State<_FullScreenGallery> {
+class _FullScreenGalleryState
+    extends State<_FullScreenGallery> {
   late final PageController _controller =
-      PageController(initialPage: widget.initialIndex);
+      PageController(
+    initialPage: widget.initialIndex,
+  );
 
   late int _index = widget.initialIndex;
 
@@ -1414,14 +1854,21 @@ class _FullScreenGalleryState extends State<_FullScreenGallery> {
         appBar: AppBar(
           backgroundColor: Colors.black,
           foregroundColor: Colors.white,
-          title: Text('${_index + 1} من ${widget.urls.length}'),
+          title: Text(
+            '${_index + 1} من ${widget.urls.length}',
+            style: const TextStyle(
+              fontWeight: FontWeight.w800,
+            ),
+          ),
         ),
         body: PageView.builder(
           controller: _controller,
           itemCount: widget.urls.length,
-          onPageChanged: (index) => setState(() => _index = index),
+          onPageChanged: (index) =>
+              setState(() => _index = index),
           itemBuilder: (context, index) {
-            final heroTag = 'listing_img_${widget.listingId}_$index';
+            final heroTag =
+                'listing_img_${widget.listingId}_$index';
 
             return InteractiveViewer(
               minScale: 1,
@@ -1432,11 +1879,18 @@ class _FullScreenGalleryState extends State<_FullScreenGallery> {
                   child: CachedNetworkImage(
                     imageUrl: widget.urls[index],
                     fit: BoxFit.contain,
-                    placeholder: (_, __) => const Center(
-                      child: CircularProgressIndicator(color: Colors.white),
+                    placeholder: (_, __) =>
+                        const Center(
+                      child:
+                          CircularProgressIndicator(
+                        color: Colors.white,
+                      ),
                     ),
-                    errorWidget: (_, __, ___) => const Icon(
-                      Icons.broken_image_outlined,
+                    errorWidget:
+                        (_, __, ___) =>
+                            const Icon(
+                      Icons
+                          .broken_image_outlined,
                       color: Colors.white54,
                       size: 60,
                     ),
@@ -1454,14 +1908,17 @@ class _FullScreenGalleryState extends State<_FullScreenGallery> {
 // =========================
 // نافذة الإبلاغ
 // =========================
+
 class _ReportSheet extends StatefulWidget {
   const _ReportSheet();
 
   @override
-  State<_ReportSheet> createState() => _ReportSheetState();
+  State<_ReportSheet> createState() =>
+      _ReportSheetState();
 }
 
-class _ReportSheetState extends State<_ReportSheet> {
+class _ReportSheetState
+    extends State<_ReportSheet> {
   static const _otherReason = 'سبب آخر';
 
   static const _reasons = [
@@ -1473,7 +1930,8 @@ class _ReportSheetState extends State<_ReportSheet> {
     _otherReason,
   ];
 
-  final _noteController = TextEditingController();
+  final _noteController =
+      TextEditingController();
 
   String? _selected;
   String? _error;
@@ -1485,19 +1943,31 @@ class _ReportSheetState extends State<_ReportSheet> {
   }
 
   void _submit() {
-    final note = _noteController.text.trim();
+    final note =
+        _noteController.text.trim();
 
     if (_selected == null) {
-      setState(() => _error = 'اختر سبب البلاغ');
+      setState(
+        () => _error = 'اختر سبب البلاغ',
+      );
       return;
     }
 
-    if (_selected == _otherReason && note.isEmpty) {
-      setState(() => _error = 'اكتب تفاصيل السبب');
+    if (_selected == _otherReason &&
+        note.isEmpty) {
+      setState(
+        () => _error = 'اكتب تفاصيل السبب',
+      );
       return;
     }
 
-    Navigator.pop(context, {'reason': _selected!, 'details': note});
+    Navigator.pop(
+      context,
+      {
+        'reason': _selected!,
+        'details': note,
+      },
+    );
   }
 
   @override
@@ -1506,83 +1976,237 @@ class _ReportSheetState extends State<_ReportSheet> {
       textDirection: TextDirection.rtl,
       child: Padding(
         padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
+          bottom:
+              MediaQuery.of(context)
+                  .viewInsets
+                  .bottom,
         ),
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+          padding:
+              const EdgeInsets.fromLTRB(
+            20,
+            0,
+            20,
+            20,
+          ),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment:
+                CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
-                'الإبلاغ عن الإعلان',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              const SizedBox(height: 6),
+
+              Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: Colors.red
+                          .withValues(alpha: 0.10),
+                      borderRadius:
+                          BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      Icons.flag_outlined,
+                      color:
+                          Colors.red.shade700,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  const Text(
+                    'الإبلاغ عن الإعلان',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight:
+                          FontWeight.w900,
+                      color: AppColors.ink,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 10),
+
+              const SizedBox(height: 14),
 
               ..._reasons.map((reason) {
-                final selected = _selected == reason;
+                final selected =
+                    _selected == reason;
 
-                return InkWell(
-                  borderRadius: BorderRadius.circular(10),
-                  onTap: () {
-                    setState(() {
-                      _selected = reason;
-                      _error = null;
-                    });
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    child: Row(
-                      children: [
-                        Icon(
-                          selected
-                              ? Icons.radio_button_checked
-                              : Icons.radio_button_unchecked,
-                          color: selected
-                              ? Theme.of(context).colorScheme.primary
-                              : null,
-                        ),
-                        const SizedBox(width: 10),
-                        Text(reason),
-                      ],
+                return Container(
+                  margin:
+                      const EdgeInsets.only(
+                    bottom: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? AppColors.brandSoft
+                        : null,
+                    borderRadius:
+                        BorderRadius.circular(12),
+                    border: Border.all(
+                      color: selected
+                          ? AppColors.brand
+                              .withValues(
+                              alpha: 0.20,
+                            )
+                          : Colors.transparent,
+                    ),
+                  ),
+                  child: InkWell(
+                    borderRadius:
+                        BorderRadius.circular(12),
+                    onTap: () {
+                      setState(() {
+                        _selected = reason;
+                        _error = null;
+                      });
+                    },
+                    child: Padding(
+                      padding:
+                          const EdgeInsets
+                              .symmetric(
+                        vertical: 10,
+                        horizontal: 8,
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            selected
+                                ? Icons
+                                    .radio_button_checked
+                                : Icons
+                                    .radio_button_unchecked,
+                            color: selected
+                                ? AppColors.brand
+                                : Colors.grey
+                                    .shade500,
+                          ),
+                          const SizedBox(
+                            width: 10,
+                          ),
+                          Text(
+                            reason,
+                            style: TextStyle(
+                              fontWeight: selected
+                                  ? FontWeight.w800
+                                  : FontWeight.w600,
+                              color:
+                                  AppColors.ink,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 );
               }),
 
-              const SizedBox(height: 6),
+              const SizedBox(height: 8),
 
               TextField(
-                controller: _noteController,
+                controller:
+                    _noteController,
                 maxLines: 3,
                 maxLength: 300,
                 onChanged: (_) {
-                  if (_error != null) setState(() => _error = null);
+                  if (_error != null) {
+                    setState(
+                      () => _error = null,
+                    );
+                  }
                 },
-                decoration: const InputDecoration(
-                  hintText: 'تفاصيل إضافية (اختياري)',
-                  border: OutlineInputBorder(),
+                decoration:
+                    InputDecoration(
+                  hintText:
+                      'تفاصيل إضافية (اختياري)',
+                  filled: true,
+                  fillColor:
+                      AppColors.pageBackground,
+                  border:
+                      OutlineInputBorder(
+                    borderRadius:
+                        BorderRadius.circular(
+                      13,
+                    ),
+                    borderSide: BorderSide(
+                      color: AppColors.brand
+                          .withValues(
+                        alpha: 0.12,
+                      ),
+                    ),
+                  ),
+                  enabledBorder:
+                      OutlineInputBorder(
+                    borderRadius:
+                        BorderRadius.circular(
+                      13,
+                    ),
+                    borderSide: BorderSide(
+                      color: AppColors.brand
+                          .withValues(
+                        alpha: 0.12,
+                      ),
+                    ),
+                  ),
+                  focusedBorder:
+                      OutlineInputBorder(
+                    borderRadius:
+                        BorderRadius.circular(
+                      13,
+                    ),
+                    borderSide:
+                        const BorderSide(
+                      color: AppColors.brand,
+                      width: 1.5,
+                    ),
+                  ),
                 ),
               ),
 
               if (_error != null)
                 Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
+                  padding:
+                      const EdgeInsets.only(
+                    bottom: 8,
+                  ),
                   child: Text(
                     _error!,
                     style: TextStyle(
                       fontSize: 13,
-                      color: Theme.of(context).colorScheme.error,
+                      color:
+                          Colors.red.shade700,
+                      fontWeight:
+                          FontWeight.w700,
                     ),
                   ),
                 ),
 
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
 
-              FilledButton(
-                onPressed: _submit,
-                child: const Text('إرسال البلاغ'),
+              SizedBox(
+                height: 48,
+                child: FilledButton.icon(
+                  onPressed: _submit,
+                  style: FilledButton.styleFrom(
+                    backgroundColor:
+                        AppColors.brand,
+                    shape:
+                        RoundedRectangleBorder(
+                      borderRadius:
+                          BorderRadius.circular(13),
+                    ),
+                  ),
+                  icon: const Icon(
+                    Icons.send_rounded,
+                  ),
+                  label: const Text(
+                    'إرسال البلاغ',
+                    style: TextStyle(
+                      fontWeight:
+                          FontWeight.w900,
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
