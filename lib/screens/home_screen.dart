@@ -26,6 +26,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart' show NumberFormat;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../core/widgets/home_empty_state.dart';
 import '../core/widgets/home_loading.dart';
 import '../core/widgets/home_bottom_navigation.dart';
 import '../core/widgets/categories_section.dart';
@@ -1459,27 +1460,11 @@ class _HomeScreenState extends State<HomeScreen>
             child: HomeLoading(),
           )
         else if (results.isEmpty)
-          Padding(
-            padding:
-                const EdgeInsets.symmetric(
-              vertical: 35,
-              horizontal: 16,
-            ),
-            child: Column(
-              children: [
-                const Icon(
-                  Icons.search_off_outlined,
-                  size: 48,
-                ),
-                const SizedBox(height: 9),
-                Text(
-                  _isSearching
-                      ? 'لم نجد إعلانات تطابق بحثك'
-                      : 'لا توجد إعلانات هنا حالياً',
-                ),
-              ],
-            ),
-          )
+  HomeEmptyState(
+    message: _isSearching
+        ? 'لم نجد إعلانات تطابق بحثك'
+        : 'لا توجد إعلانات هنا حالياً',
+  )
         else
           Padding(
             padding:
