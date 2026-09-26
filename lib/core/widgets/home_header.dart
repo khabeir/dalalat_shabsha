@@ -107,7 +107,7 @@ class HomeHeader extends StatelessWidget {
           Positioned(
             left: 16,
             right: 16,
-            bottom: 42,
+            bottom: 32,
             child: _buildSearchField(context),
           ),
 
