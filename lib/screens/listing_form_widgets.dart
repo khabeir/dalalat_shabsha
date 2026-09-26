@@ -7,6 +7,10 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart' show NumberFormat;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../core/theme/app_colors.dart';
+import '../core/theme/app_decorations.dart';
+import '../core/theme/app_text_styles.dart';
+
 // =============================================================
 // عناصر مشتركة بين شاشة إضافة الإعلان وشاشة تعديله
 // =============================================================
@@ -27,7 +31,6 @@ const Map<String, String> kConditionOptions = {
 // الأرقام والتحقق
 // =========================
 
-// تحويل الأرقام العربية (٠١٢) والفارسية إلى غربية، وفواصلها إلى , و .
 String toWesternDigits(String input) {
   const arabicIndic = '٠١٢٣٤٥٦٧٨٩';
   const easternPersian = '۰۱۲۳۴۵۶۷۸۹';
@@ -37,7 +40,9 @@ String toWesternDigits(String input) {
   for (final char in input.split('')) {
     var index = arabicIndic.indexOf(char);
 
-    if (index == -1) index = easternPersian.indexOf(char);
+    if (index == -1) {
+      index = easternPersian.indexOf(char);
+    }
 
     if (index != -1) {
       buffer.write(index);
@@ -76,8 +81,13 @@ String? validatePriceInput(String? value) {
 
   final price = parsePrice(text);
 
-  if (price == null || price <= 0) return 'أدخل سعراً صحيحاً';
-  if (price > 1000000000000) return 'السعر كبير جداً';
+  if (price == null || price <= 0) {
+    return 'أدخل سعراً صحيحاً';
+  }
+
+  if (price > 1000000000000) {
+    return 'السعر كبير جداً';
+  }
 
   return null;
 }
@@ -86,7 +96,9 @@ String? validateContactPhone(String? value) {
   final digits =
       toWesternDigits(value ?? '').replaceAll(RegExp(r'[^0-9]'), '');
 
-  if (digits.isEmpty) return 'أدخل رقم التواصل';
+  if (digits.isEmpty) {
+    return 'أدخل رقم التواصل';
+  }
 
   if (digits.length < 9 || digits.length > 15) {
     return 'رقم الهاتف غير صحيح';
@@ -98,8 +110,13 @@ String? validateContactPhone(String? value) {
 String? validateListingTitle(String? value) {
   final text = value?.trim() ?? '';
 
-  if (text.isEmpty) return 'أدخل عنوان الإعلان';
-  if (text.length < 3) return 'العنوان قصير جداً';
+  if (text.isEmpty) {
+    return 'أدخل عنوان الإعلان';
+  }
+
+  if (text.length < 3) {
+    return 'العنوان قصير جداً';
+  }
 
   return null;
 }
@@ -112,8 +129,10 @@ String cleanPhone(String value) {
 // =========================
 // الصور
 // =========================
+
 String imageExtension(String path) {
-  final ext = path.contains('.') ? path.split('.').last.toLowerCase() : 'jpg';
+  final ext =
+      path.contains('.') ? path.split('.').last.toLowerCase() : 'jpg';
 
   switch (ext) {
     case 'jpeg':
@@ -144,8 +163,7 @@ String imageContentType(String extension) {
   }
 }
 
-// رفع صورة وتسجيلها في listing_images (مع محاولة ثانية عند تعثر الشبكة).
-// إن فشل التسجيل بعد الرفع يُحذف الملف حتى لا يبقى يتيماً.
+// رفع صورة وتسجيلها في listing_images.
 Future<void> uploadListingImage({
   required SupabaseClient supabase,
   required int listingId,
@@ -176,7 +194,6 @@ Future<void> uploadListingImage({
       lastError = null;
       break;
     } catch (e) {
-      // في المحاولة الثانية قد يكون الرفع الأول نجح فعلاً.
       final alreadyExists = attempt > 0 &&
           e is StorageException &&
           (e.statusCode == '409' ||
@@ -193,7 +210,9 @@ Future<void> uploadListingImage({
     }
   }
 
-  if (lastError != null) throw lastError;
+  if (lastError != null) {
+    throw lastError;
+  }
 
   try {
     await supabase.from('listing_images').insert({
@@ -221,7 +240,23 @@ Future<List<XFile>> pickListingImages(
 
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
+      ..showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: AppColors.ink,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          content: Text(
+            message,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      );
   }
 
   if (remaining <= 0) {
@@ -232,25 +267,55 @@ Future<List<XFile>> pickListingImages(
   final source = await showModalBottomSheet<ImageSource>(
     context: context,
     showDragHandle: true,
+    backgroundColor: Theme.of(context).colorScheme.surface,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(
+        top: Radius.circular(24),
+      ),
+    ),
     builder: (sheetContext) {
       return Directionality(
         textDirection: TextDirection.rtl,
         child: SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.photo_camera_outlined),
-                title: const Text('التقاط صورة بالكاميرا'),
-                onTap: () => Navigator.pop(sheetContext, ImageSource.camera),
-              ),
-              ListTile(
-                leading: const Icon(Icons.photo_library_outlined),
-                title: const Text('اختيار من المعرض'),
-                onTap: () => Navigator.pop(sheetContext, ImageSource.gallery),
-              ),
-              const SizedBox(height: 8),
-            ],
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'إضافة صور الإعلان',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.ink,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'اختر مصدر الصور',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.black54,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _ImageSourceTile(
+                  icon: Icons.photo_camera_outlined,
+                  title: 'التقاط صورة بالكاميرا',
+                  subtitle: 'التقاط صورة جديدة الآن',
+                  onTap: () =>
+                      Navigator.pop(sheetContext, ImageSource.camera),
+                ),
+                const SizedBox(height: 8),
+                _ImageSourceTile(
+                  icon: Icons.photo_library_outlined,
+                  title: 'اختيار من المعرض',
+                  subtitle: 'اختيار صور موجودة في الهاتف',
+                  onTap: () =>
+                      Navigator.pop(sheetContext, ImageSource.gallery),
+                ),
+              ],
+            ),
           ),
         ),
       );
@@ -278,7 +343,10 @@ Future<List<XFile>> pickListingImages(
     );
 
     if (images.length > remaining) {
-      snack('تمت إضافة $remaining صور فقط، فالحد الأقصى $kMaxListingImages');
+      snack(
+        'تمت إضافة $remaining صور فقط، '
+        'فالحد الأقصى $kMaxListingImages',
+      );
     }
 
     return images.take(remaining).toList();
@@ -312,13 +380,13 @@ class ListingImageItem {
 
   bool get isLocal => file != null;
 
-  // مفتاح ثابت لمقارنة الحالة قبل التعديل وبعده.
   String get key => isLocal ? 'new:${file!.path}' : 'img:$id';
 }
 
 // =========================
 // شكل الحقول والأقسام
 // =========================
+
 InputDecoration listingInputDecoration(
   BuildContext context, {
   required String label,
@@ -329,43 +397,96 @@ InputDecoration listingInputDecoration(
 }) {
   final colorScheme = Theme.of(context).colorScheme;
 
+  final enabledBorder = OutlineInputBorder(
+    borderRadius: BorderRadius.circular(14),
+    borderSide: BorderSide(
+      color: AppColors.brand.withValues(alpha: 0.14),
+      width: 1,
+    ),
+  );
+
+  final focusedBorder = OutlineInputBorder(
+    borderRadius: BorderRadius.circular(14),
+    borderSide: const BorderSide(
+      color: AppColors.brand,
+      width: 1.7,
+    ),
+  );
+
   return InputDecoration(
     labelText: label,
     hintText: hint,
     helperText: helper,
     alignLabelWithHint: alignLabelWithHint,
-    prefixIcon: Icon(icon, size: 21),
-    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-    enabledBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(12),
-      borderSide: BorderSide(color: colorScheme.outlineVariant),
+    prefixIcon: Icon(
+      icon,
+      size: 21,
+      color: colorScheme.onSurfaceVariant,
     ),
-    focusedBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(12),
-      borderSide: BorderSide(color: colorScheme.primary, width: 1.5),
+    filled: true,
+    fillColor: Colors.white,
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: BorderSide.none,
     ),
-    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-    labelStyle: const TextStyle(fontSize: 14),
-    hintStyle: TextStyle(fontSize: 13, color: colorScheme.onSurfaceVariant),
+    enabledBorder: enabledBorder,
+    focusedBorder: focusedBorder,
+    errorBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: BorderSide(
+        color: colorScheme.error.withValues(alpha: 0.65),
+      ),
+    ),
+    focusedErrorBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: BorderSide(
+        color: colorScheme.error,
+        width: 1.7,
+      ),
+    ),
+    contentPadding: const EdgeInsets.symmetric(
+      horizontal: 14,
+      vertical: 14,
+    ),
+    labelStyle: const TextStyle(
+      fontSize: 14,
+      fontWeight: FontWeight.w600,
+      color: AppColors.ink,
+    ),
+    floatingLabelStyle: const TextStyle(
+      fontSize: 14,
+      fontWeight: FontWeight.w800,
+      color: AppColors.brand,
+    ),
+    hintStyle: TextStyle(
+      fontSize: 13,
+      color: colorScheme.onSurfaceVariant.withValues(alpha: 0.75),
+    ),
+    helperStyle: const TextStyle(
+      fontSize: 11.5,
+      color: AppColors.ink,
+    ),
+    errorStyle: TextStyle(
+      fontSize: 11.5,
+      color: colorScheme.error,
+      fontWeight: FontWeight.w600,
+    ),
   );
 }
 
 class ListingSectionCard extends StatelessWidget {
   final Widget child;
 
-  const ListingSectionCard({super.key, required this.child});
+  const ListingSectionCard({
+    super.key,
+    required this.child,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(17),
-        border: Border.all(color: colorScheme.outlineVariant),
-      ),
+      decoration: AppDecorations.card(),
       child: child,
     );
   }
@@ -379,25 +500,41 @@ class ListingSectionTitle extends StatelessWidget {
   const ListingSectionTitle({
     super.key,
     required this.icon,
-    required this.title,
     this.subtitle,
+    required this.title,
   });
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          width: 34,
-          height: 34,
+          width: 36,
+          height: 36,
           decoration: BoxDecoration(
-            color: colorScheme.primary.withValues(alpha: 0.10),
-            borderRadius: BorderRadius.circular(10),
+            gradient: const LinearGradient(
+              colors: [
+                AppColors.brand,
+                AppColors.brandDark,
+              ],
+              begin: Alignment.topRight,
+              end: Alignment.bottomLeft,
+            ),
+            borderRadius: BorderRadius.circular(11),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.brand.withValues(alpha: 0.16),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
+              ),
+            ],
           ),
-          child: Icon(icon, size: 19, color: colorScheme.primary),
+          child: Icon(
+            icon,
+            size: 20,
+            color: Colors.white,
+          ),
         ),
         const SizedBox(width: 10),
         Expanded(
@@ -408,16 +545,20 @@ class ListingSectionTitle extends StatelessWidget {
                 title,
                 style: const TextStyle(
                   fontSize: 16,
-                  fontWeight: FontWeight.bold,
+                  height: 1.25,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.ink,
                 ),
               ),
               if (subtitle != null) ...[
-                const SizedBox(height: 2),
+                const SizedBox(height: 3),
                 Text(
                   subtitle!,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: colorScheme.onSurfaceVariant,
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    height: 1.35,
+                    color: Colors.black54,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ],
@@ -432,6 +573,7 @@ class ListingSectionTitle extends StatelessWidget {
 // =========================
 // حقل التصنيف
 // =========================
+
 class ListingCategoryField extends StatelessWidget {
   final List<Map<String, dynamic>> categories;
   final int? value;
@@ -456,8 +598,13 @@ class ListingCategoryField extends StatelessWidget {
         context,
         label: 'التصنيف',
         icon: Icons.category_outlined,
+        hint: 'اختر تصنيف الإعلان',
       ),
-      items: categories.where((category) => category['id'] is int).map((c) {
+      dropdownColor: Colors.white,
+      borderRadius: BorderRadius.circular(14),
+      items: categories
+          .where((category) => category['id'] is int)
+          .map((c) {
         final icon = c['icon']?.toString().trim() ?? '';
         final name = c['name']?.toString() ?? '';
 
@@ -466,7 +613,11 @@ class ListingCategoryField extends StatelessWidget {
           child: Text(
             icon.isEmpty ? name : '$icon $name',
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 14),
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: AppColors.ink,
+            ),
           ),
         );
       }).toList(),
@@ -479,6 +630,7 @@ class ListingCategoryField extends StatelessWidget {
 // =========================
 // قسم السعر
 // =========================
+
 class ListingPriceSection extends StatelessWidget {
   final String priceType;
   final ValueChanged<String> onPriceTypeChanged;
@@ -512,30 +664,7 @@ class ListingPriceSection extends StatelessWidget {
           subtitle: 'حدد طريقة عرض السعر',
         ),
         const SizedBox(height: 12),
-        SizedBox(
-          width: double.infinity,
-          child: SegmentedButton<String>(
-            segments: const [
-              ButtonSegment(
-                value: 'fixed',
-                label: Text('ثابت', style: TextStyle(fontSize: 12)),
-              ),
-              ButtonSegment(
-                value: 'negotiable',
-                label: Text('قابل للتفاوض', style: TextStyle(fontSize: 12)),
-              ),
-              ButtonSegment(
-                value: 'contact',
-                label: Text('عند التواصل', style: TextStyle(fontSize: 12)),
-              ),
-            ],
-            selected: {priceType},
-            showSelectedIcon: false,
-            onSelectionChanged: (selection) {
-              onPriceTypeChanged(selection.first);
-            },
-          ),
-        ),
+        _buildSegmentedButton(context),
         if (priceType != 'contact') ...[
           const SizedBox(height: 12),
           ValueListenableBuilder<TextEditingValue>(
@@ -567,11 +696,92 @@ class ListingPriceSection extends StatelessWidget {
       ],
     );
   }
+
+  Widget _buildSegmentedButton(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: SegmentedButton<String>(
+        segments: const [
+          ButtonSegment(
+            value: 'fixed',
+            label: Text(
+              'ثابت',
+              style: TextStyle(fontSize: 12),
+            ),
+          ),
+          ButtonSegment(
+            value: 'negotiable',
+            label: Text(
+              'قابل للتفاوض',
+              style: TextStyle(fontSize: 12),
+            ),
+          ),
+          ButtonSegment(
+            value: 'contact',
+            label: Text(
+              'عند التواصل',
+              style: TextStyle(fontSize: 12),
+            ),
+          ),
+        ],
+        selected: {priceType},
+        showSelectedIcon: false,
+        style: ButtonStyle(
+          side: WidgetStateProperty.resolveWith(
+            (states) {
+              if (states.contains(WidgetState.selected)) {
+                return const BorderSide(
+                  color: AppColors.brand,
+                  width: 1.2,
+                );
+              }
+
+              return BorderSide(
+                color: AppColors.brand.withValues(alpha: 0.15),
+              );
+            },
+          ),
+          backgroundColor: WidgetStateProperty.resolveWith(
+            (states) {
+              if (states.contains(WidgetState.selected)) {
+                return AppColors.brandSoft;
+              }
+
+              return Colors.white;
+            },
+          ),
+          foregroundColor: WidgetStateProperty.resolveWith(
+            (states) {
+              if (states.contains(WidgetState.selected)) {
+                return AppColors.brandDark;
+              }
+
+              return AppColors.ink;
+            },
+          ),
+          textStyle: WidgetStateProperty.all(
+            const TextStyle(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          shape: WidgetStateProperty.all(
+            RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(11),
+            ),
+          ),
+        ),
+        onSelectionChanged: (selection) {
+          onPriceTypeChanged(selection.first);
+        },
+      ),
+    );
+  }
 }
 
 // =========================
 // قسم حالة السلعة
 // =========================
+
 class ListingConditionSection extends StatelessWidget {
   final String condition;
   final ValueChanged<String> onChanged;
@@ -605,13 +815,57 @@ class ListingConditionSection extends StatelessWidget {
                   value: option.key,
                   label: Text(
                     option.value,
-                    style: const TextStyle(fontSize: 13),
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
             ],
             selected: {selected},
             showSelectedIcon: false,
-            onSelectionChanged: (selection) => onChanged(selection.first),
+            style: ButtonStyle(
+              side: WidgetStateProperty.resolveWith(
+                (states) {
+                  if (states.contains(WidgetState.selected)) {
+                    return const BorderSide(
+                      color: AppColors.brand,
+                      width: 1.2,
+                    );
+                  }
+
+                  return BorderSide(
+                    color: AppColors.brand.withValues(alpha: 0.15),
+                  );
+                },
+              ),
+              backgroundColor: WidgetStateProperty.resolveWith(
+                (states) {
+                  if (states.contains(WidgetState.selected)) {
+                    return AppColors.brandSoft;
+                  }
+
+                  return Colors.white;
+                },
+              ),
+              foregroundColor: WidgetStateProperty.resolveWith(
+                (states) {
+                  if (states.contains(WidgetState.selected)) {
+                    return AppColors.brandDark;
+                  }
+
+                  return AppColors.ink;
+                },
+              ),
+              shape: WidgetStateProperty.all(
+                RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(11),
+                ),
+              ),
+            ),
+            onSelectionChanged: (selection) {
+              onChanged(selection.first);
+            },
           ),
         ),
       ],
@@ -622,6 +876,7 @@ class ListingConditionSection extends StatelessWidget {
 // =========================
 // قسم الصور
 // =========================
+
 class ListingImagesSection extends StatelessWidget {
   final List<ListingImageItem> items;
   final bool enabled;
@@ -642,15 +897,18 @@ class ListingImagesSection extends StatelessWidget {
 
   static const double _size = 96;
 
-  Widget _buildImage(BuildContext context, ListingImageItem item) {
+  Widget _buildImage(
+    BuildContext context,
+    ListingImageItem item,
+  ) {
     final colorScheme = Theme.of(context).colorScheme;
 
     Widget placeholder() {
       return Container(
-        color: colorScheme.surfaceContainerHighest,
-        child: Icon(
+        color: AppColors.brandSoft,
+        child: const Icon(
           Icons.broken_image_outlined,
-          color: colorScheme.onSurfaceVariant,
+          color: AppColors.brand,
         ),
       );
     }
@@ -674,14 +932,27 @@ class ListingImagesSection extends StatelessWidget {
       memCacheWidth: 300,
       placeholder: (_, __) => Container(
         color: colorScheme.surfaceContainerHighest,
+        child: const Center(
+          child: SizedBox(
+            width: 22,
+            height: 22,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: AppColors.brand,
+            ),
+          ),
+        ),
       ),
       errorWidget: (_, __, ___) => placeholder(),
     );
   }
 
-  Widget _buildThumb(BuildContext context, int index) {
-    final colorScheme = Theme.of(context).colorScheme;
+  Widget _buildThumb(
+    BuildContext context,
+    int index,
+  ) {
     final item = items[index];
+    final isCover = index == 0;
 
     return SizedBox(
       width: _size,
@@ -692,13 +963,23 @@ class ListingImagesSection extends StatelessWidget {
           Positioned.fill(
             child: Container(
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
                 border: Border.all(
-                  color: index == 0
-                      ? colorScheme.primary
-                      : colorScheme.outlineVariant,
-                  width: index == 0 ? 2 : 1,
+                  color: isCover
+                      ? AppColors.brand
+                      : AppColors.brand.withValues(alpha: 0.16),
+                  width: isCover ? 2.2 : 1,
                 ),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.brand.withValues(
+                      alpha: isCover ? 0.12 : 0.05,
+                    ),
+                    blurRadius: isCover ? 8 : 5,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
               clipBehavior: Clip.antiAlias,
               child: _buildImage(context, item),
@@ -710,7 +991,7 @@ class ListingImagesSection extends StatelessWidget {
             top: -6,
             right: -6,
             child: Material(
-              color: Colors.red,
+              color: Colors.red.shade600,
               shape: const CircleBorder(),
               elevation: 2,
               child: InkWell(
@@ -718,31 +999,40 @@ class ListingImagesSection extends StatelessWidget {
                 onTap: enabled ? () => onRemove(index) : null,
                 child: const Padding(
                   padding: EdgeInsets.all(4),
-                  child: Icon(Icons.close, color: Colors.white, size: 16),
+                  child: Icon(
+                    Icons.close,
+                    color: Colors.white,
+                    size: 16,
+                  ),
                 ),
               ),
             ),
           ),
 
           // الغلاف أو زر تعيين الغلاف
-          if (index == 0)
+          if (isCover)
             Positioned(
               bottom: 4,
               left: 4,
               right: 4,
               child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 2),
+                padding: const EdgeInsets.symmetric(vertical: 3),
                 decoration: BoxDecoration(
-                  color: colorScheme.primary,
+                  gradient: const LinearGradient(
+                    colors: [
+                      AppColors.brandDark,
+                      AppColors.brand,
+                    ],
+                  ),
                   borderRadius: BorderRadius.circular(7),
                 ),
-                child: Text(
+                child: const Text(
                   'الغلاف',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: colorScheme.onPrimary,
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
               ),
@@ -754,7 +1044,7 @@ class ListingImagesSection extends StatelessWidget {
               child: Tooltip(
                 message: 'تعيين كصورة غلاف',
                 child: Material(
-                  color: Colors.black54,
+                  color: AppColors.ink.withValues(alpha: 0.72),
                   shape: const CircleBorder(),
                   child: InkWell(
                     customBorder: const CircleBorder(),
@@ -777,9 +1067,12 @@ class ListingImagesSection extends StatelessWidget {
               top: 4,
               left: 4,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 6,
+                  vertical: 2,
+                ),
                 decoration: BoxDecoration(
-                  color: Colors.green.shade700,
+                  color: AppColors.orange,
                   borderRadius: BorderRadius.circular(7),
                 ),
                 child: const Text(
@@ -787,7 +1080,7 @@ class ListingImagesSection extends StatelessWidget {
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 10,
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
               ),
@@ -798,31 +1091,35 @@ class ListingImagesSection extends StatelessWidget {
   }
 
   Widget _buildAddTile(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return InkWell(
       onTap: enabled ? onAdd : null,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(14),
       child: Container(
         width: _size,
         height: _size,
         decoration: BoxDecoration(
-          color: colorScheme.primary.withValues(alpha: 0.06),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: colorScheme.outlineVariant),
+          color: AppColors.brandSoft.withValues(alpha: 0.65),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: AppColors.brand.withValues(alpha: 0.22),
+          ),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
+            const Icon(
               Icons.add_photo_alternate_outlined,
               size: 28,
-              color: colorScheme.primary,
+              color: AppColors.brand,
             ),
             const SizedBox(height: 4),
-            Text(
+            const Text(
               'إضافة',
-              style: TextStyle(fontSize: 12, color: colorScheme.primary),
+              style: TextStyle(
+                fontSize: 12,
+                color: AppColors.brandDark,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ],
         ),
@@ -837,47 +1134,63 @@ class ListingImagesSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        ListingSectionTitle(
+        const ListingSectionTitle(
           icon: Icons.photo_library_outlined,
           title: 'صور الإعلان',
           subtitle: 'أضف حتى $kMaxListingImages صور، والأولى تظهر كغلاف',
         ),
         const SizedBox(height: 14),
-
         if (items.isEmpty)
           InkWell(
             onTap: enabled ? onAdd : null,
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(15),
             child: Container(
               height: 120,
               width: double.infinity,
               decoration: BoxDecoration(
-                color: colorScheme.primary.withValues(alpha: 0.05),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: colorScheme.outlineVariant),
+                color: AppColors.brandSoft.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(15),
+                border: Border.all(
+                  color: AppColors.brand.withValues(alpha: 0.18),
+                ),
               ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
-                    Icons.add_photo_alternate_outlined,
-                    size: 36,
-                    color: colorScheme.primary,
+                  Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.brand.withValues(alpha: 0.10),
+                          blurRadius: 10,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.add_photo_alternate_outlined,
+                      size: 30,
+                      color: AppColors.brand,
+                    ),
                   ),
-                  const SizedBox(height: 6),
-                  Text(
+                  const SizedBox(height: 7),
+                  const Text(
                     'اضغط لإضافة صور',
                     style: TextStyle(
                       fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: colorScheme.primary,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.brandDark,
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     'الإعلانات المصورة تحصل على تواصل أكثر',
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 11.5,
                       color: colorScheme.onSurfaceVariant,
                     ),
                   ),
@@ -891,24 +1204,41 @@ class ListingImagesSection extends StatelessWidget {
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               clipBehavior: Clip.none,
-              padding: const EdgeInsets.only(top: 8, right: 6, left: 6),
+              padding: const EdgeInsets.only(
+                top: 8,
+                right: 6,
+                left: 6,
+              ),
               itemCount:
                   items.length + (items.length < kMaxListingImages ? 1 : 0),
               separatorBuilder: (_, __) => const SizedBox(width: 10),
               itemBuilder: (context, index) {
-                if (index == items.length) return _buildAddTile(context);
+                if (index == items.length) {
+                  return _buildAddTile(context);
+                }
 
                 return _buildThumb(context, index);
               },
             ),
           ),
           const SizedBox(height: 8),
-          Text(
-            '${items.length} / $kMaxListingImages صور',
-            style: TextStyle(
-              fontSize: 12,
-              color: colorScheme.onSurfaceVariant,
-            ),
+          Row(
+            children: [
+              const Icon(
+                Icons.photo_library_outlined,
+                size: 15,
+                color: AppColors.brand,
+              ),
+              const SizedBox(width: 5),
+              Text(
+                '${items.length} / $kMaxListingImages صور',
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.ink,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
           ),
         ],
       ],
@@ -917,8 +1247,87 @@ class ListingImagesSection extends StatelessWidget {
 }
 
 // =========================
+// حوار مصدر الصور
+// =========================
+
+class _ImageSourceTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  const _ImageSourceTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.brandSoft.withValues(alpha: 0.55),
+      borderRadius: BorderRadius.circular(15),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(15),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                child: Icon(
+                  icon,
+                  color: AppColors.brand,
+                  size: 23,
+                ),
+              ),
+              const SizedBox(width: 11),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.ink,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Colors.black54,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(
+                Icons.chevron_left_rounded,
+                color: AppColors.brand,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// =========================
 // حوارات مشتركة
 // =========================
+
 Future<bool> confirmListingDialog(
   BuildContext context, {
   required String title,
@@ -929,24 +1338,97 @@ Future<bool> confirmListingDialog(
   final result = await showDialog<bool>(
     context: context,
     builder: (dialogContext) {
+      final colorScheme = Theme.of(dialogContext).colorScheme;
+
       return Directionality(
         textDirection: TextDirection.rtl,
         child: AlertDialog(
-          title: Text(title),
-          content: Text(message),
+          backgroundColor: Colors.white,
+          surfaceTintColor: AppColors.brandSoft,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(22),
+          ),
+          titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+          contentPadding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
+          actionsPadding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
+          title: Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: destructive
+                      ? colorScheme.errorContainer
+                      : AppColors.brandSoft,
+                  borderRadius: BorderRadius.circular(11),
+                ),
+                child: Icon(
+                  destructive
+                      ? Icons.warning_amber_rounded
+                      : Icons.help_outline_rounded,
+                  size: 21,
+                  color: destructive
+                      ? colorScheme.onErrorContainer
+                      : AppColors.brand,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.ink,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Text(
+            message,
+            style: const TextStyle(
+              fontSize: 13,
+              height: 1.5,
+              color: Colors.black87,
+            ),
+          ),
           actions: [
             TextButton(
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.ink,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(11),
+                ),
+              ),
               onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('إلغاء'),
+              child: const Text(
+                'إلغاء',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ),
             FilledButton(
-              style: destructive
-                  ? FilledButton.styleFrom(
-                      backgroundColor: Colors.red.shade700,
-                    )
-                  : null,
+              style: FilledButton.styleFrom(
+                backgroundColor:
+                    destructive ? colorScheme.error : AppColors.brand,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 11,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(11),
+                ),
+              ),
               onPressed: () => Navigator.pop(dialogContext, true),
-              child: Text(confirmLabel),
+              child: Text(
+                confirmLabel,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
             ),
           ],
         ),
