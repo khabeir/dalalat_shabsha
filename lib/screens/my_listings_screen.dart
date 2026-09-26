@@ -362,39 +362,35 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
       ),
     ),
   );
-
-  if (mounted) {
-    _loadListings();
-  }
 }
 
-Future<void> _addListing() async {
-  await Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => const AddListingScreen(),
-    ),
-  );
-
-  if (mounted) {
-    _loadListings();
-  }
-}
-
-Future<void> _editListing(Map<String, dynamic> listing) async {
-  await Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => EditListingScreen(
-        listing: listing,
+  Future<void> _addListing() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const AddListingScreen(),
       ),
-    ),
-  );
+    );
 
-  if (mounted) {
-    _loadListings();
+    if (mounted) {
+      _loadListings();
+    }
   }
-}
+
+  Future<void> _editListing(Map<String, dynamic> listing) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => EditListingScreen(
+          listing: listing,
+        ),
+      ),
+    );
+
+    if (mounted) {
+      _loadListings();
+    }
+  }
 
   Future<void> _confirmChangeStatus(
     Map<String, dynamic> listing,
