@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_decorations.dart';
+import 'admin_banners_screen.dart';
 import 'listing_details_screen.dart';
 
 // مجموعة بلاغات على إعلان واحد.
@@ -2273,6 +2274,20 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
               ),
             ),
             centerTitle: false,
+            actions: [
+              IconButton(
+                tooltip: 'البنر الإعلاني',
+                icon: const Icon(Icons.campaign_outlined),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const AdminBannersScreen(),
+                    ),
+                  );
+                },
+              ),
+            ],
             bottom: showTabs
                 ? TabBar(
                     indicatorColor:
