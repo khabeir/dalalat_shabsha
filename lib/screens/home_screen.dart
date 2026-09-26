@@ -26,6 +26,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart' show NumberFormat;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../core/widgets/home_error_state.dart';
 import '../core/widgets/home_empty_state.dart';
 import '../core/widgets/home_loading.dart';
 import '../core/widgets/home_bottom_navigation.dart';
@@ -1531,31 +1532,10 @@ class _HomeScreenState extends State<HomeScreen>
         child: HomeLoading(),
       );
     } else if (_error != null) {
-      content = Padding(
-        padding:
-            const EdgeInsets.all(24),
-        child: Column(
-          children: [
-            const Icon(
-              Icons.wifi_off,
-              size: 44,
-            ),
-            const SizedBox(height: 10),
-            Text(
-              _error!,
-              textAlign:
-                  TextAlign.center,
-            ),
-            const SizedBox(height: 14),
-            FilledButton(
-              onPressed: _loadAll,
-              child: const Text(
-                'إعادة المحاولة',
-              ),
-            ),
-          ],
-        ),
-      );
+  content = HomeErrorState(
+    message: _error!,
+    onRetry: _loadAll,
+  );
     } else {
       final user =
           _supabase.auth.currentUser;
