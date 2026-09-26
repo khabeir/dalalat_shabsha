@@ -1515,11 +1515,11 @@ class _HomeScreenState extends State<HomeScreen>
               },
             ),
           ),
-        if (_loadingMore)
-          const Padding(
-            padding: EdgeInsets.all(16),
-            child: const HomeLoading(),
-            ),
+       if (_loadingMore)
+  const Padding(
+    padding: EdgeInsets.all(16),
+    child: HomeLoading(),
+  ),
       ],
     );
   }
