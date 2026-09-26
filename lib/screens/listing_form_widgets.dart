@@ -9,7 +9,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_decorations.dart';
-import '../core/theme/app_text_styles.dart';
 
 // =============================================================
 // عناصر مشتركة بين شاشة إضافة الإعلان وشاشة تعديله
