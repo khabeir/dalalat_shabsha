@@ -4,7 +4,6 @@ import 'categories_section.dart';
 import 'home_error_state.dart';
 import 'home_greeting.dart';
 import 'home_loading.dart';
-import 'home_search_results.dart';
 import 'listing_section.dart';
 
 class HomeBody extends StatelessWidget {
