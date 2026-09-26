@@ -96,7 +96,9 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
     }
   }
 
-  Future<Map<String, String?>> _loadImageUrls(List<String> listingIds) async {
+  Future<Map<String, String?>> _loadImageUrls(
+    List<String> listingIds,
+  ) async {
     if (listingIds.isEmpty) return {};
 
     try {
@@ -164,8 +166,7 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
             ),
           ),
           behavior: SnackBarBehavior.floating,
-          backgroundColor:
-              isError ? Colors.red.shade700 : AppColors.ink,
+          backgroundColor: isError ? Colors.red.shade700 : AppColors.ink,
           margin: const EdgeInsets.all(14),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
@@ -342,20 +343,20 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
     return 'منذ ${(difference.inDays / 365).floor()} سنة';
   }
 
-  Future<void> _openListing(Map<String, dynamic> listing) async {
-  await Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => ListingDetailsScreen(
-        listing: listing,
+  Future<void> _openListing(String listingId) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ListingDetailsScreen(
+          listingId: listingId,
+        ),
       ),
-    ),
-  );
+    );
 
-  if (mounted) {
-    _loadListings();
+    if (mounted) {
+      _loadListings();
+    }
   }
-}
 
   Future<void> _addListing() async {
     await Navigator.push(
@@ -371,17 +372,18 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
   }
 
   Future<void> _editListing(Map<String, dynamic> listing) async {
-  await Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => EditListingScreen(
-        listing: listing,
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => EditListingScreen(
+          listing: listing,
+        ),
       ),
-    ),
-  );
+    );
 
-  if (mounted) {
-    _loadListings();
+    if (mounted) {
+      _loadListings();
+    }
   }
 
   Future<void> _confirmChangeStatus(
@@ -399,20 +401,17 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
 
     switch (newStatus) {
       case 'sold':
-        message =
-            'هل تريد تحديد الإعلان "$title" على أنه تم بيعه؟';
+        message = 'هل تريد تحديد الإعلان "$title" على أنه تم بيعه؟';
         confirmText = 'تم البيع';
         break;
 
       case 'archived':
-        message =
-            'هل تريد أرشفة الإعلان "$title"؟';
+        message = 'هل تريد أرشفة الإعلان "$title"؟';
         confirmText = 'أرشفة';
         break;
 
       case 'approved':
-        message =
-            'هل تريد إعادة نشر الإعلان "$title"؟';
+        message = 'هل تريد إعادة نشر الإعلان "$title"؟';
         confirmText = 'نشر';
         break;
 
@@ -470,9 +469,7 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
         _filter = _normalizeFilter(_filter);
       });
 
-      _showSnack(
-        'تم تحديث حالة الإعلان بنجاح',
-      );
+      _showSnack('تم تحديث حالة الإعلان بنجاح');
     } catch (e) {
       if (!mounted) return;
 
@@ -531,9 +528,7 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
         _filter = _normalizeFilter(_filter);
       });
 
-      _showSnack(
-        'تم حذف الإعلان بنجاح',
-      );
+      _showSnack('تم حذف الإعلان بنجاح');
     } catch (e) {
       if (!mounted) return;
 
@@ -592,17 +587,13 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
       case 'view':
         final id = listing['id']?.toString();
 
-        if (id != null) {
-          _openListing(listing);
+        if (id != null && id.isNotEmpty) {
+          _openListing(id);
         }
         break;
 
       case 'edit':
-        final id = listing['id']?.toString();
-
-        if (id != null) {
-          _openListing(listing);
-        }
+        _editListing(listing);
         break;
 
       case 'sold':
@@ -673,9 +664,7 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
     );
   }
 
-  Widget _buildThumbnail(
-    String listingId,
-  ) {
+  Widget _buildThumbnail(String listingId) {
     final imageUrl = _imageUrls[listingId];
 
     return Container(
@@ -831,7 +820,7 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
           borderRadius: BorderRadius.circular(18),
           onTap: busy || listingId.isEmpty
               ? null
-              : () => _openListing(listing),
+              : () => _openListing(listingId),
           child: Padding(
             padding: const EdgeInsets.all(12),
             child: Column(
@@ -1184,7 +1173,7 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
             Container(
               width: 94,
               height: 94,
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: AppColors.brandSoft,
                 shape: BoxShape.circle,
               ),
@@ -1233,9 +1222,7 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
                     borderRadius: BorderRadius.circular(14),
                   ),
                 ),
-                icon: const Icon(
-                  Icons.add_rounded,
-                ),
+                icon: const Icon(Icons.add_rounded),
                 label: const Text(
                   'إضافة إعلان',
                   style: TextStyle(
@@ -1317,9 +1304,7 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
                     borderRadius: BorderRadius.circular(13),
                   ),
                 ),
-                icon: const Icon(
-                  Icons.refresh_rounded,
-                ),
+                icon: const Icon(Icons.refresh_rounded),
                 label: const Text(
                   'إعادة المحاولة',
                   style: TextStyle(
@@ -1412,8 +1397,7 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
-                    crossAxisAlignment:
-                        CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
                         'إعلاناتك',
@@ -1492,9 +1476,7 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
           backgroundColor: AppColors.brand,
           foregroundColor: Colors.white,
           elevation: 5,
-          icon: const Icon(
-            Icons.add_rounded,
-          ),
+          icon: const Icon(Icons.add_rounded),
           label: const Text(
             'إعلان جديد',
             style: TextStyle(
