@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart' show NumberFormat;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../core/theme/app_colors.dart';
+import '../core/theme/app_decorations.dart';
 import 'listing_details_screen.dart';
 
 // مجموعة بلاغات على إعلان واحد.
@@ -83,16 +85,32 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
   // =========================
   // أدوات مساعدة
   // =========================
-  void _showSnack(String message, {SnackBarAction? action, int seconds = 4}) {
+
+  void _showSnack(
+    String message, {
+    SnackBarAction? action,
+    int seconds = 4,
+  }) {
     if (!mounted) return;
 
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
-          content: Text(message),
+          content: Text(
+            message,
+            style: const TextStyle(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           action: action,
           duration: Duration(seconds: seconds),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: AppColors.ink,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          margin: const EdgeInsets.all(14),
         ),
       );
   }
@@ -109,8 +127,31 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
         return Directionality(
           textDirection: TextDirection.rtl,
           child: AlertDialog(
-            title: Text(title),
-            content: Text(message),
+            backgroundColor: Theme.of(dialogContext).colorScheme.surface,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(22),
+            ),
+            title: Row(
+              children: [
+                Icon(
+                  destructive
+                      ? Icons.warning_amber_rounded
+                      : Icons.help_outline_rounded,
+                  color: destructive
+                      ? Colors.red.shade700
+                      : AppColors.brand,
+                ),
+                const SizedBox(width: 10),
+                Expanded(child: Text(title)),
+              ],
+            ),
+            content: Text(
+              message,
+              style: const TextStyle(
+                fontSize: 14,
+                height: 1.6,
+              ),
+            ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(dialogContext, false),
@@ -121,7 +162,9 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
                     ? FilledButton.styleFrom(
                         backgroundColor: Colors.red.shade700,
                       )
-                    : null,
+                    : FilledButton.styleFrom(
+                        backgroundColor: AppColors.brand,
+                      ),
                 onPressed: () => Navigator.pop(dialogContext, true),
                 child: Text(confirmLabel),
               ),
@@ -228,13 +271,16 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
 
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => ListingDetailsScreen(listingId: id)),
+      MaterialPageRoute(
+        builder: (_) => ListingDetailsScreen(listingId: id),
+      ),
     );
   }
 
   // =========================
   // تحميل البيانات
   // =========================
+
   Future<void> _init() async {
     try {
       final user = _supabase.auth.currentUser;
@@ -271,7 +317,10 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
 
       for (final row in List<Map<String, dynamic>>.from(response)) {
         final id = row['id'];
-        if (id is int) names[id] = row['name']?.toString() ?? '';
+
+        if (id is int) {
+          names[id] = row['name']?.toString() ?? '';
+        }
       }
 
       _categoryNames = names;
@@ -281,7 +330,9 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
   }
 
   Future<void> _loadAll({bool showSpinner = true}) async {
-    if (showSpinner && mounted) setState(() => _loading = true);
+    if (showSpinner && mounted) {
+      setState(() => _loading = true);
+    }
 
     _loadFailed = false;
 
@@ -296,12 +347,15 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
 
     setState(() => _loading = false);
 
-    if (_loadFailed) _showSnack('تعذر تحميل بعض البيانات، اسحب للتحديث');
+    if (_loadFailed) {
+      _showSnack('تعذر تحميل بعض البيانات، اسحب للتحديث');
+    }
   }
 
   // صور وأسماء بائعين للبطاقات.
   Future<void> _loadMeta(List<Map<String, dynamic>> listings) async {
-    final listingIds = listings.map((l) => l['id']).whereType<int>().toList();
+    final listingIds =
+        listings.map((l) => l['id']).whereType<int>().toList();
 
     final sellerIds = listings
         .map((l) => l['seller_id']?.toString())
@@ -358,7 +412,9 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
       for (final row in List<Map<String, dynamic>>.from(response)) {
         final name = row['full_name']?.toString().trim() ?? '';
 
-        if (name.isNotEmpty) _sellerNames[row['id'].toString()] = name;
+        if (name.isNotEmpty) {
+          _sellerNames[row['id'].toString()] = name;
+        }
       }
     } catch (e) {
       debugPrint('admin sellers error: $e');
@@ -371,7 +427,7 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
           .from('listings')
           .select()
           .eq('status', 'pending')
-          .order('created_at', ascending: true); // الأقدم أولاً
+          .order('created_at', ascending: true);
 
       final rows = List<Map<String, dynamic>>.from(response);
 
@@ -388,21 +444,27 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
 
   // آخر سجل ترويج لكل إعلان في الصفحة.
   Future<void> _attachPromotions(List<Map<String, dynamic>> listings) async {
-    final ids = listings.map((l) => l['id']).where((id) => id != null).toList();
+    final ids =
+        listings.map((l) => l['id']).where((id) => id != null).toList();
 
     if (ids.isEmpty) return;
 
     try {
       final response = await _supabase
           .from('promoted_listings')
-          .select('id, listing_id, start_at, end_at, is_active, created_by')
+          .select(
+            'id, listing_id, start_at, end_at, is_active, created_by',
+          )
           .inFilter('listing_id', ids)
           .order('id', ascending: false);
 
       final latest = <dynamic, Map<String, dynamic>>{};
 
       for (final promotion in List<Map<String, dynamic>>.from(response)) {
-        latest.putIfAbsent(promotion['listing_id'], () => promotion);
+        latest.putIfAbsent(
+          promotion['listing_id'],
+          () => promotion,
+        );
       }
 
       for (final listing in listings) {
@@ -426,10 +488,13 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
     final page = reset ? 0 : _approvedPage;
     final query = _approvedQuery;
 
-    if (!reset && mounted) setState(() => _approvedLoadingMore = true);
+    if (!reset && mounted) {
+      setState(() => _approvedLoadingMore = true);
+    }
 
     try {
-      var request = _supabase.from('listings').select().eq('status', 'approved');
+      var request =
+          _supabase.from('listings').select().eq('status', 'approved');
 
       if (query.isNotEmpty) {
         request = request.ilike('title', '%$query%');
@@ -443,7 +508,10 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
 
       final rows = List<Map<String, dynamic>>.from(response);
 
-      await Future.wait([_attachPromotions(rows), _loadMeta(rows)]);
+      await Future.wait([
+        _attachPromotions(rows),
+        _loadMeta(rows),
+      ]);
 
       // بحث أحدث بدأ أثناء الانتظار، نتجاهل هذه النتيجة.
       if (!mounted || query != _approvedQuery) return;
@@ -458,7 +526,9 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
       debugPrint('loadApproved error: $e');
       _loadFailed = true;
 
-      if (mounted) setState(() => _approvedLoadingMore = false);
+      if (mounted) {
+        setState(() => _approvedLoadingMore = false);
+      }
     }
   }
 
@@ -483,12 +553,15 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
 
       final promotionsResponse = await _supabase
           .from('promoted_listings')
-          .select('id, listing_id, start_at, end_at, is_active, created_by')
+          .select(
+            'id, listing_id, start_at, end_at, is_active, created_by',
+          )
           .eq('is_active', true)
           .gt('end_at', now)
           .order('end_at', ascending: true);
 
-      final promotions = List<Map<String, dynamic>>.from(promotionsResponse);
+      final promotions =
+          List<Map<String, dynamic>>.from(promotionsResponse);
 
       final ids = promotions
           .map((p) => p['listing_id'])
@@ -496,7 +569,9 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
           .toList();
 
       if (ids.isEmpty) {
-        if (mounted) setState(() => _promotions = []);
+        if (mounted) {
+          setState(() => _promotions = []);
+        }
         return;
       }
 
@@ -505,7 +580,8 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
 
       final byId = <dynamic, Map<String, dynamic>>{};
 
-      for (final listing in List<Map<String, dynamic>>.from(listingsResponse)) {
+      for (final listing
+          in List<Map<String, dynamic>>.from(listingsResponse)) {
         byId[listing['id']] = listing;
       }
 
@@ -537,7 +613,7 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
     }
   }
 
-  // البلاغات مجمّعة حسب الإعلان (الإعلانات المتاحة أو المعلقة فقط).
+  // البلاغات مجمّعة حسب الإعلان.
   Future<void> _loadReports() async {
     try {
       final response = await _supabase
@@ -550,8 +626,12 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
 
       // الأحدث أولاً إن وُجد عمود created_at.
       reports.sort((a, b) {
-        final da = DateTime.tryParse(a['created_at']?.toString() ?? '');
-        final db = DateTime.tryParse(b['created_at']?.toString() ?? '');
+        final da = DateTime.tryParse(
+          a['created_at']?.toString() ?? '',
+        );
+        final db = DateTime.tryParse(
+          b['created_at']?.toString() ?? '',
+        );
 
         if (da == null || db == null) return 0;
 
@@ -563,7 +643,9 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
       for (final report in reports) {
         final id = report['listing_id'];
 
-        if (id is int) grouped.putIfAbsent(id, () => []).add(report);
+        if (id is int) {
+          grouped.putIfAbsent(id, () => []).add(report);
+        }
       }
 
       if (grouped.isEmpty) {
@@ -581,9 +663,14 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
           .select()
           .inFilter('id', grouped.keys.toList());
 
-      final listings = List<Map<String, dynamic>>.from(listingsResponse)
-          .where((l) => l['status'] == 'approved' || l['status'] == 'pending')
-          .toList();
+      final listings =
+          List<Map<String, dynamic>>.from(listingsResponse)
+              .where(
+                (l) =>
+                    l['status'] == 'approved' ||
+                    l['status'] == 'pending',
+              )
+              .toList();
 
       await _loadMeta(listings);
 
@@ -603,7 +690,9 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
         );
       }
 
-      groups.sort((a, b) => b.reporterCount.compareTo(a.reporterCount));
+      groups.sort(
+        (a, b) => b.reporterCount.compareTo(a.reporterCount),
+      );
 
       if (!mounted) return;
 
@@ -625,8 +714,9 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
   }
 
   // =========================
-  // المراجعة (موافقة / رفض)
+  // المراجعة
   // =========================
+
   Future<void> _approve(Map<String, dynamic> listing) async {
     await _moderate(listing, 'approved');
   }
@@ -637,13 +727,18 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
   }) async {
     final reason = await showDialog<String>(
       context: context,
-      builder: (_) => _RejectReasonDialog(initialReason: initialReason),
+      builder: (_) => _RejectReasonDialog(
+        initialReason: initialReason,
+      ),
     );
 
-    // null = ألغى الأدمن العملية.
     if (reason == null || !mounted) return;
 
-    await _moderate(listing, 'rejected', reason: reason);
+    await _moderate(
+      listing,
+      'rejected',
+      reason: reason,
+    );
   }
 
   Future<void> _moderate(
@@ -655,30 +750,38 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
 
     if (id is! int || _busyIds.contains(id)) return;
 
-    // العمود اختياري: لا نكتب فيه إلا إن كان موجوداً في الجدول.
     final hasReasonColumn = listing.containsKey('rejection_reason');
     final cleanReason = reason?.trim() ?? '';
 
-    final payload = <String, dynamic>{'status': status};
+    final payload = <String, dynamic>{
+      'status': status,
+    };
 
     if (hasReasonColumn) {
       payload['rejection_reason'] =
-          (status == 'rejected' && cleanReason.isNotEmpty) ? cleanReason : null;
+          (status == 'rejected' && cleanReason.isNotEmpty)
+              ? cleanReason
+              : null;
     }
 
     setState(() => _busyIds.add(id));
 
     try {
-      await _supabase.from('listings').update(payload).eq('id', id);
+      await _supabase
+          .from('listings')
+          .update(payload)
+          .eq('id', id);
 
-      // رفض الإعلان يُغلق بلاغاته (اختياري، لا يوقف العملية إن فشل).
       if (status == 'rejected') {
         try {
           await _supabase
               .from('reports')
               .update({'status': 'resolved'})
               .eq('listing_id', id)
-              .inFilter('status', ['pending', 'reviewing']);
+              .inFilter(
+                'status',
+                ['pending', 'reviewing'],
+              );
         } catch (e) {
           debugPrint('resolve reports error: $e');
         }
@@ -686,8 +789,9 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
 
       if (!mounted) return;
 
-      final reasonLost =
-          status == 'rejected' && cleanReason.isNotEmpty && !hasReasonColumn;
+      final reasonLost = status == 'rejected' &&
+          cleanReason.isNotEmpty &&
+          !hasReasonColumn;
 
       final message = status == 'approved'
           ? 'تمت الموافقة على الإعلان'
@@ -700,7 +804,10 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
         seconds: 7,
         action: SnackBarAction(
           label: 'تراجع',
-          onPressed: () => _undoModeration(id, hasReasonColumn),
+          onPressed: () => _undoModeration(
+            id,
+            hasReasonColumn,
+          ),
         ),
       );
 
@@ -709,12 +816,17 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
       debugPrint('moderate error: $e');
       _showSnack('تعذر تحديث حالة الإعلان');
     } finally {
-      if (mounted) setState(() => _busyIds.remove(id));
+      if (mounted) {
+        setState(() => _busyIds.remove(id));
+      }
     }
   }
 
-  // التراجع يعيد الإعلان إلى "قيد المراجعة".
-  Future<void> _undoModeration(int id, bool hasReasonColumn) async {
+  // التراجع يعيد الإعلان إلى قيد المراجعة.
+  Future<void> _undoModeration(
+    int id,
+    bool hasReasonColumn,
+  ) async {
     try {
       await _supabase.from('listings').update({
         'status': 'pending',
@@ -733,10 +845,12 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
   // =========================
   // البلاغات
   // =========================
+
   Future<void> _dismissReports(_ReportGroup group) async {
     final confirmed = await _confirm(
       title: 'تجاهل البلاغات',
-      message: 'سيتم إغلاق ${group.reports.length} بلاغ على هذا الإعلان '
+      message:
+          'سيتم إغلاق ${group.reports.length} بلاغ على هذا الإعلان '
           'وإبقاء الإعلان منشوراً. متابعة؟',
       confirmLabel: 'تجاهل',
     );
@@ -748,7 +862,10 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
           .from('reports')
           .update({'status': 'dismissed'})
           .eq('listing_id', group.listingId)
-          .inFilter('status', ['pending', 'reviewing']);
+          .inFilter(
+            'status',
+            ['pending', 'reviewing'],
+          );
 
       _showSnack('تم تجاهل البلاغات');
 
@@ -762,6 +879,7 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
   // =========================
   // الإعلانات التجارية
   // =========================
+
   Future<void> _promote(Map<String, dynamic> listing) async {
     final listingId = listing['id'];
     final currentUser = _supabase.auth.currentUser;
@@ -774,9 +892,14 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
         Widget option(int days, String label) {
           return SizedBox(
             width: double.infinity,
-            child: OutlinedButton(
-              onPressed: () => Navigator.pop(dialogContext, days),
-              child: Text(label),
+            child: OutlinedButton.icon(
+              onPressed: () =>
+                  Navigator.pop(dialogContext, days),
+              icon: const Icon(
+                Icons.schedule_outlined,
+                size: 18,
+              ),
+              label: Text(label),
             ),
           );
         }
@@ -784,17 +907,48 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
         return Directionality(
           textDirection: TextDirection.rtl,
           child: AlertDialog(
-            title: const Text('إعلان تجاري'),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(22),
+            ),
+            title: Row(
+              children: const [
+                Icon(
+                  Icons.campaign_outlined,
+                  color: AppColors.orange,
+                ),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text('إعلان تجاري'),
+                ),
+              ],
+            ),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  listing['title']?.toString() ?? 'بدون عنوان',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                  textAlign: TextAlign.center,
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: AppDecorations.softCard(),
+                  child: Text(
+                    listing['title']?.toString() ??
+                        'بدون عنوان',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.ink,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
                 ),
                 const SizedBox(height: 16),
-                const Text('اختر مدة الترويج:'),
+                const Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    'اختر مدة الترويج:',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 10),
                 option(1, 'يوم واحد'),
                 option(3, '3 أيام'),
@@ -805,7 +959,8 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.pop(dialogContext),
+                onPressed: () =>
+                    Navigator.pop(dialogContext),
                 child: const Text('إلغاء'),
               ),
             ],
@@ -818,7 +973,9 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
 
     try {
       final startAt = DateTime.now().toUtc();
-      final endAt = startAt.add(Duration(days: days));
+      final endAt = startAt.add(
+        Duration(days: days),
+      );
 
       final values = {
         'start_at': startAt.toIso8601String(),
@@ -827,9 +984,9 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
         'created_by': currentUser.id,
       };
 
-      final promotionId = listing['promoted_listing_id'];
+      final promotionId =
+          listing['promoted_listing_id'];
 
-      // نعيد استخدام السجل السابق بدل إنشاء سجل مكرر.
       if (promotionId != null) {
         await _supabase
             .from('promoted_listings')
@@ -838,10 +995,15 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
       } else {
         await _supabase
             .from('promoted_listings')
-            .insert({'listing_id': listingId, ...values});
+            .insert({
+          'listing_id': listingId,
+          ...values,
+        });
       }
 
-      _showSnack('تم تفعيل الإعلان التجاري لمدة $days يوم');
+      _showSnack(
+        'تم تفعيل الإعلان التجاري لمدة $days يوم',
+      );
 
       await _loadAll(showSpinner: false);
     } catch (e) {
@@ -850,14 +1012,18 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
     }
   }
 
-  Future<void> _stopPromotion(Map<String, dynamic> listing) async {
-    final promotionId = listing['promoted_listing_id'];
+  Future<void> _stopPromotion(
+    Map<String, dynamic> listing,
+  ) async {
+    final promotionId =
+        listing['promoted_listing_id'];
 
     if (promotionId == null) return;
 
     final confirmed = await _confirm(
       title: 'إيقاف الإعلان التجاري',
-      message: 'هل تريد إيقاف الترويج لهذا الإعلان؟',
+      message:
+          'هل تريد إيقاف الترويج لهذا الإعلان؟',
       confirmLabel: 'إيقاف',
       destructive: true,
     );
@@ -867,64 +1033,79 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
     try {
       await _supabase
           .from('promoted_listings')
-          .update({'is_active': false}).eq('id', promotionId);
+          .update({'is_active': false})
+          .eq('id', promotionId);
 
       _showSnack('تم إيقاف الإعلان التجاري');
 
       await _loadAll(showSpinner: false);
     } catch (e) {
       debugPrint('stopPromotion error: $e');
-      _showSnack('تعذر إيقاف الإعلان التجاري');
+      _showSnack(
+        'تعذر إيقاف الإعلان التجاري',
+      );
     }
   }
 
   // =========================
-  // مكوّنات الواجهة
+  // مكونات الواجهة
   // =========================
-  Widget _thumb(String? url, double size) {
-    final colorScheme = Theme.of(context).colorScheme;
 
+  Widget _thumb(String? url, double size) {
     Widget placeholder(IconData icon) {
       return Container(
-        color: colorScheme.surfaceContainerHighest,
-        child: Icon(icon, color: colorScheme.onSurfaceVariant),
+        color: AppColors.brandSoft,
+        child: Icon(
+          icon,
+          color: AppColors.brand,
+        ),
       );
     }
 
     return ClipRRect(
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(12),
       child: SizedBox(
         width: size,
         height: size,
         child: url == null
-            ? placeholder(Icons.image_not_supported_outlined)
+            ? placeholder(
+                Icons.image_not_supported_outlined,
+              )
             : CachedNetworkImage(
                 imageUrl: url,
                 fit: BoxFit.cover,
                 memCacheWidth: 300,
-                placeholder: (_, __) => placeholder(Icons.image_outlined),
+                placeholder: (_, __) =>
+                    placeholder(Icons.image_outlined),
                 errorWidget: (_, __, ___) =>
-                    placeholder(Icons.broken_image_outlined),
+                    placeholder(
+                  Icons.broken_image_outlined,
+                ),
               ),
       ),
     );
   }
 
-  Widget _badge(String text, {Color? background, Color? foreground}) {
-    final colorScheme = Theme.of(context).colorScheme;
-
+  Widget _badge(
+    String text, {
+    Color? background,
+    Color? foreground,
+  }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 9,
+        vertical: 4,
+      ),
       decoration: BoxDecoration(
-        color: background ?? colorScheme.primary,
+        color: background ?? AppColors.brand,
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
         text,
         style: TextStyle(
-          color: foreground ?? colorScheme.onPrimary,
+          color: foreground ?? Colors.white,
           fontSize: 11.5,
-          fontWeight: FontWeight.bold,
+          fontWeight: FontWeight.w800,
         ),
       ),
     );
@@ -934,35 +1115,59 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
     final children = <Widget>[];
 
     for (var i = 0; i < buttons.length; i++) {
-      if (i > 0) children.add(const SizedBox(width: 8));
-      children.add(Expanded(child: buttons[i]));
+      if (i > 0) {
+        children.add(
+          const SizedBox(width: 8),
+        );
+      }
+
+      children.add(
+        Expanded(child: buttons[i]),
+      );
     }
 
     return Row(children: children);
   }
 
-  // بطاقة إعلان مشتركة بين كل التبويبات.
   Widget _buildCard(
     Map<String, dynamic> listing, {
     required List<Widget> actions,
     bool showAllImages = false,
     Widget? footer,
   }) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     final id = listing['id'];
-    final images = id is int ? (_imageUrls[id] ?? const <String>[]) : const <String>[];
-    final busy = id is int && _busyIds.contains(id);
 
-    final title = listing['title']?.toString().trim() ?? '';
-    final description = listing['description']?.toString().trim() ?? '';
-    final area = listing['area']?.toString().trim() ?? '';
-    final phone = listing['contact_phone']?.toString().trim() ?? '';
-    final seller = _sellerNames[listing['seller_id']?.toString()];
+    final images = id is int
+        ? (_imageUrls[id] ?? const <String>[])
+        : const <String>[];
+
+    final busy =
+        id is int && _busyIds.contains(id);
+
+    final title =
+        listing['title']?.toString().trim() ?? '';
+
+    final description =
+        listing['description']?.toString().trim() ?? '';
+
+    final area =
+        listing['area']?.toString().trim() ?? '';
+
+    final phone =
+        listing['contact_phone']?.toString().trim() ?? '';
+
+    final seller =
+        _sellerNames[listing['seller_id']?.toString()];
 
     final categoryId = listing['category_id'];
-    final category = categoryId is int ? _categoryNames[categoryId] : null;
-    final condition = _conditionText(listing['condition']);
+
+    final category =
+        categoryId is int
+            ? _categoryNames[categoryId]
+            : null;
+
+    final condition =
+        _conditionText(listing['condition']);
 
     final meta = [
       if (area.isNotEmpty) area,
@@ -970,67 +1175,98 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
     ].where((part) => part.isNotEmpty).join(' · ');
 
     final tags = [
-      if (category != null && category.isNotEmpty) category,
+      if (category != null && category.isNotEmpty)
+        category,
       if (condition.isNotEmpty) condition,
     ];
 
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      elevation: 0,
+      decoration: AppDecorations.card(),
       clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: colorScheme.outlineVariant),
-      ),
       child: InkWell(
-        onTap: busy ? null : () => _openListing(listing),
+        onTap: busy
+            ? null
+            : () => _openListing(listing),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+          crossAxisAlignment:
+              CrossAxisAlignment.stretch,
           children: [
-            if (busy) const LinearProgressIndicator(minHeight: 3),
+            if (busy)
+              const LinearProgressIndicator(
+                minHeight: 3,
+                color: AppColors.orange,
+              ),
 
             Padding(
               padding: const EdgeInsets.all(12),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+                crossAxisAlignment:
+                    CrossAxisAlignment.stretch,
                 children: [
                   Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment:
+                        CrossAxisAlignment.start,
                     children: [
-                      _thumb(images.isEmpty ? null : images.first, 88),
+                      _thumb(
+                        images.isEmpty
+                            ? null
+                            : images.first,
+                        88,
+                      ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                          crossAxisAlignment:
+                              CrossAxisAlignment.start,
                           children: [
                             Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                              crossAxisAlignment:
+                                  CrossAxisAlignment.start,
                               children: [
                                 Expanded(
                                   child: Text(
-                                    title.isEmpty ? 'بدون عنوان' : title,
+                                    title.isEmpty
+                                        ? 'بدون عنوان'
+                                        : title,
                                     maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
+                                    overflow:
+                                        TextOverflow
+                                            .ellipsis,
+                                    style:
+                                        const TextStyle(
                                       fontSize: 16,
-                                      fontWeight: FontWeight.bold,
+                                      fontWeight:
+                                          FontWeight.w900,
                                       height: 1.3,
+                                      color:
+                                          AppColors.ink,
                                     ),
                                   ),
                                 ),
-                                if (_isPromotionActive(listing)) ...[
+                                if (_isPromotionActive(
+                                  listing,
+                                )) ...[
                                   const SizedBox(width: 6),
-                                  _badge('تجاري'),
+                                  _badge(
+                                    'تجاري',
+                                    background:
+                                        AppColors.orange,
+                                    foreground:
+                                        Colors.white,
+                                  ),
                                 ],
                               ],
                             ),
-                            const SizedBox(height: 4),
+                            const SizedBox(height: 5),
                             Text(
                               _priceText(listing),
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontSize: 14.5,
-                                fontWeight: FontWeight.w800,
-                                color: colorScheme.primary,
+                                fontWeight:
+                                    FontWeight.w900,
+                                color:
+                                    AppColors.brand,
                               ),
                             ),
                             if (meta.isNotEmpty) ...[
@@ -1039,7 +1275,10 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
                                 meta,
                                 style: TextStyle(
                                   fontSize: 12.5,
-                                  color: colorScheme.onSurfaceVariant,
+                                  color: Colors.grey
+                                      .shade700,
+                                  fontWeight:
+                                      FontWeight.w500,
                                 ),
                               ),
                             ],
@@ -1049,7 +1288,10 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
                                 'البائع: $seller',
                                 style: TextStyle(
                                   fontSize: 12.5,
-                                  color: colorScheme.onSurfaceVariant,
+                                  color: Colors.grey
+                                      .shade700,
+                                  fontWeight:
+                                      FontWeight.w600,
                                 ),
                               ),
                             ],
@@ -1059,15 +1301,26 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
                     ],
                   ),
 
-                  if (showAllImages && images.length > 1) ...[
+                  if (showAllImages &&
+                      images.length > 1) ...[
                     const SizedBox(height: 10),
                     SizedBox(
                       height: 64,
                       child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: images.length - 1,
-                        separatorBuilder: (_, __) => const SizedBox(width: 8),
-                        itemBuilder: (_, index) => _thumb(images[index + 1], 64),
+                        scrollDirection:
+                            Axis.horizontal,
+                        itemCount:
+                            images.length - 1,
+                        separatorBuilder:
+                            (_, __) =>
+                                const SizedBox(
+                          width: 8,
+                        ),
+                        itemBuilder: (_, index) =>
+                            _thumb(
+                          images[index + 1],
+                          64,
+                        ),
                       ),
                     ),
                   ],
@@ -1077,31 +1330,42 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
                     Text(
                       description,
                       maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 13.5, height: 1.5),
+                      overflow:
+                          TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 13.5,
+                        height: 1.5,
+                      ),
                     ),
                   ],
 
-                  if (tags.isNotEmpty || phone.isNotEmpty) ...[
+                  if (tags.isNotEmpty ||
+                      phone.isNotEmpty) ...[
                     const SizedBox(height: 10),
                     Wrap(
                       spacing: 8,
                       runSpacing: 6,
-                      crossAxisAlignment: WrapCrossAlignment.center,
+                      crossAxisAlignment:
+                          WrapCrossAlignment.center,
                       children: [
                         for (final tag in tags)
                           _badge(
                             tag,
-                            background: colorScheme.surfaceContainerHighest,
-                            foreground: colorScheme.onSurfaceVariant,
+                            background:
+                                AppColors.brandSoft,
+                            foreground:
+                                AppColors.ink,
                           ),
                         if (phone.isNotEmpty)
                           SelectableText(
                             phone,
-                            textDirection: TextDirection.ltr,
-                            style: const TextStyle(
+                            textDirection:
+                                TextDirection.ltr,
+                            style:
+                                const TextStyle(
                               fontSize: 13,
-                              fontWeight: FontWeight.w600,
+                              fontWeight:
+                                  FontWeight.w700,
                             ),
                           ),
                       ],
@@ -1126,26 +1390,64 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
   }
 
   ButtonStyle get _compactStyle {
-    return ButtonStyle(
-      visualDensity: VisualDensity.compact,
-      padding: WidgetStateProperty.all(
-        const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+    return FilledButton.styleFrom(
+      minimumSize: const Size(0, 42),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 6,
+        vertical: 10,
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(11),
+      ),
+      textStyle: const TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.w800,
       ),
     );
   }
 
-  Widget _viewButton(Map<String, dynamic> listing) {
+  ButtonStyle get _compactOutlinedStyle {
+    return OutlinedButton.styleFrom(
+      minimumSize: const Size(0, 42),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 6,
+        vertical: 10,
+      ),
+      side: const BorderSide(
+        color: AppColors.brand,
+        width: 1,
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(11),
+      ),
+      textStyle: const TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.w800,
+      ),
+      foregroundColor: AppColors.brand,
+    );
+  }
+
+  Widget _viewButton(
+    Map<String, dynamic> listing,
+  ) {
     return OutlinedButton.icon(
-      style: _compactStyle,
+      style: _compactOutlinedStyle,
       onPressed: () => _openListing(listing),
-      icon: const Icon(Icons.visibility_outlined, size: 18),
+      icon: const Icon(
+        Icons.visibility_outlined,
+        size: 18,
+      ),
       label: const Text('عرض'),
     );
   }
 
-  Widget _buildPendingCard(Map<String, dynamic> listing) {
+  Widget _buildPendingCard(
+    Map<String, dynamic> listing,
+  ) {
     final id = listing['id'];
-    final busy = id is int && _busyIds.contains(id);
+    final busy =
+        id is int && _busyIds.contains(id);
 
     return _buildCard(
       listing,
@@ -1153,39 +1455,76 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
       actions: [
         _viewButton(listing),
         FilledButton.icon(
-          style: _compactStyle,
-          onPressed: busy ? null : () => _approve(listing),
-          icon: const Icon(Icons.check, size: 18),
+          style: _compactStyle.copyWith(
+            backgroundColor:
+                WidgetStateProperty.all(
+              AppColors.brand,
+            ),
+          ),
+          onPressed:
+              busy ? null : () => _approve(listing),
+          icon: const Icon(
+            Icons.check,
+            size: 18,
+          ),
           label: const Text('موافقة'),
         ),
         OutlinedButton.icon(
-          style: _compactStyle.copyWith(
-            foregroundColor: WidgetStateProperty.all(Colors.red.shade700),
+          style: _compactOutlinedStyle.copyWith(
+            foregroundColor:
+                WidgetStateProperty.all(
+              Colors.red.shade700,
+            ),
+            side: WidgetStateProperty.all(
+              BorderSide(
+                color: Colors.red.shade300,
+              ),
+            ),
           ),
-          onPressed: busy ? null : () => _reject(listing),
-          icon: const Icon(Icons.close, size: 18),
+          onPressed:
+              busy ? null : () => _reject(listing),
+          icon: const Icon(
+            Icons.close,
+            size: 18,
+          ),
           label: const Text('رفض'),
         ),
       ],
     );
   }
 
-  Widget _buildApprovedCard(Map<String, dynamic> listing) {
+  Widget _buildApprovedCard(
+    Map<String, dynamic> listing,
+  ) {
     final id = listing['id'];
-    final busy = id is int && _busyIds.contains(id);
-    final active = _isPromotionActive(listing);
-    final hasPromotion = _hasPromotion(listing);
+    final busy =
+        id is int && _busyIds.contains(id);
+
+    final active =
+        _isPromotionActive(listing);
+
+    final hasPromotion =
+        _hasPromotion(listing);
 
     return _buildCard(
       listing,
       footer: active
-          ? Text(
-              'ينتهي الترويج: ${_formatDate(listing['promotion_end_at'])} '
-              '(${_remaining(listing['promotion_end_at'])})',
-              style: TextStyle(
-                fontSize: 12.5,
-                fontWeight: FontWeight.w600,
-                color: Theme.of(context).colorScheme.primary,
+          ? Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 11,
+                vertical: 9,
+              ),
+              decoration:
+                  AppDecorations.softCard(),
+              child: Text(
+                'ينتهي الترويج: '
+                '${_formatDate(listing['promotion_end_at'])} '
+                '(${_remaining(listing['promotion_end_at'])})',
+                style: const TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.ink,
+                ),
               ),
             )
           : null,
@@ -1193,78 +1532,155 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
         _viewButton(listing),
         if (active)
           FilledButton.icon(
-            style: _compactStyle,
-            onPressed: () => _stopPromotion(listing),
-            icon: const Icon(Icons.stop_circle_outlined, size: 18),
+            style: _compactStyle.copyWith(
+              backgroundColor:
+                  WidgetStateProperty.all(
+                AppColors.orange,
+              ),
+            ),
+            onPressed: () =>
+                _stopPromotion(listing),
+            icon: const Icon(
+              Icons.stop_circle_outlined,
+              size: 18,
+            ),
             label: const Text('إيقاف الترويج'),
           )
         else
           OutlinedButton.icon(
-            style: _compactStyle,
-            onPressed: () => _promote(listing),
+            style: _compactOutlinedStyle.copyWith(
+              foregroundColor:
+                  WidgetStateProperty.all(
+                AppColors.orange,
+              ),
+              side: WidgetStateProperty.all(
+                const BorderSide(
+                  color: AppColors.orange,
+                ),
+              ),
+            ),
+            onPressed: () =>
+                _promote(listing),
             icon: Icon(
-              hasPromotion ? Icons.refresh : Icons.campaign_outlined,
+              hasPromotion
+                  ? Icons.refresh
+                  : Icons.campaign_outlined,
               size: 18,
             ),
-            label: Text(hasPromotion ? 'إعادة التفعيل' : 'إعلان تجاري'),
+            label: Text(
+              hasPromotion
+                  ? 'إعادة التفعيل'
+                  : 'إعلان تجاري',
+            ),
           ),
         OutlinedButton.icon(
-          style: _compactStyle.copyWith(
-            foregroundColor: WidgetStateProperty.all(Colors.red.shade700),
+          style: _compactOutlinedStyle.copyWith(
+            foregroundColor:
+                WidgetStateProperty.all(
+              Colors.red.shade700,
+            ),
+            side: WidgetStateProperty.all(
+              BorderSide(
+                color: Colors.red.shade300,
+              ),
+            ),
           ),
-          onPressed: busy ? null : () => _reject(listing),
-          icon: const Icon(Icons.visibility_off_outlined, size: 18),
+          onPressed:
+              busy ? null : () => _reject(listing),
+          icon: const Icon(
+            Icons.visibility_off_outlined,
+            size: 18,
+          ),
           label: const Text('إخفاء'),
         ),
       ],
     );
   }
 
-  Widget _buildPromotionCard(Map<String, dynamic> listing) {
+  Widget _buildPromotionCard(
+    Map<String, dynamic> listing,
+  ) {
     return _buildCard(
       listing,
-      footer: Text(
-        'بدأ: ${_formatDate(listing['promotion_start_at'])}\n'
-        'ينتهي: ${_formatDate(listing['promotion_end_at'])} '
-        '(${_remaining(listing['promotion_end_at'])})',
-        style: TextStyle(
-          fontSize: 12.5,
-          height: 1.6,
-          fontWeight: FontWeight.w600,
-          color: Theme.of(context).colorScheme.primary,
+      footer: Container(
+        padding: const EdgeInsets.all(11),
+        decoration: AppDecorations.softCard(),
+        child: Text(
+          'بدأ: ${_formatDate(listing['promotion_start_at'])}\n'
+          'ينتهي: ${_formatDate(listing['promotion_end_at'])} '
+          '(${_remaining(listing['promotion_end_at'])})',
+          style: const TextStyle(
+            fontSize: 12.5,
+            height: 1.6,
+            fontWeight: FontWeight.w700,
+            color: AppColors.ink,
+          ),
         ),
       ),
       actions: [
         _viewButton(listing),
         OutlinedButton.icon(
-          style: _compactStyle,
+          style: _compactOutlinedStyle.copyWith(
+            foregroundColor:
+                WidgetStateProperty.all(
+              AppColors.orange,
+            ),
+            side: WidgetStateProperty.all(
+              const BorderSide(
+                color: AppColors.orange,
+              ),
+            ),
+          ),
           onPressed: () => _promote(listing),
-          icon: const Icon(Icons.update, size: 18),
+          icon: const Icon(
+            Icons.update,
+            size: 18,
+          ),
           label: const Text('تجديد'),
         ),
         FilledButton.icon(
-          style: _compactStyle,
-          onPressed: () => _stopPromotion(listing),
-          icon: const Icon(Icons.stop_circle_outlined, size: 18),
+          style: _compactStyle.copyWith(
+            backgroundColor:
+                WidgetStateProperty.all(
+              Colors.red.shade700,
+            ),
+          ),
+          onPressed: () =>
+              _stopPromotion(listing),
+          icon: const Icon(
+            Icons.stop_circle_outlined,
+            size: 18,
+          ),
           label: const Text('إيقاف'),
         ),
       ],
     );
   }
 
-  Widget _buildReportCard(_ReportGroup group) {
-    final colorScheme = Theme.of(context).colorScheme;
+  Widget _buildReportCard(
+    _ReportGroup group,
+  ) {
     final listing = group.listing;
 
     final id = listing['id'];
-    final busy = id is int && _busyIds.contains(id);
+    final busy =
+        id is int && _busyIds.contains(id);
 
-    final shown = group.reports.take(5).toList();
-    final more = group.reports.length - shown.length;
+    final shown =
+        group.reports.take(5).toList();
+
+    final more =
+        group.reports.length - shown.length;
 
     final reasonsSummary = group.reports
-        .map((r) => r['reason']?.toString().trim() ?? '')
-        .where((reason) => reason.isNotEmpty)
+        .map(
+          (r) =>
+              r['reason']?.toString().trim() ??
+              '',
+        )
+        .where(
+          (reason) => reason.isNotEmpty,
+        )
         .toSet()
         .take(3)
         .join(' | ');
@@ -1272,35 +1688,43 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
     return _buildCard(
       listing,
       footer: Container(
-        padding: const EdgeInsets.all(10),
+        padding: const EdgeInsets.all(11),
         decoration: BoxDecoration(
-          color: colorScheme.errorContainer.withValues(alpha: 0.5),
-          borderRadius: BorderRadius.circular(12),
+          color: Colors.red.shade50,
+          borderRadius:
+              BorderRadius.circular(14),
+          border: Border.all(
+            color: Colors.red.shade100,
+          ),
         ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment:
+              CrossAxisAlignment.start,
           children: [
             Row(
               children: [
                 Icon(
                   Icons.flag_outlined,
-                  size: 18,
-                  color: colorScheme.onErrorContainer,
+                  size: 19,
+                  color: Colors.red.shade700,
                 ),
                 const SizedBox(width: 6),
                 Text(
                   '${group.reporterCount} بلاغ',
                   style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: colorScheme.onErrorContainer,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.red.shade800,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 7),
             for (final report in shown)
               Padding(
-                padding: const EdgeInsets.only(bottom: 4),
+                padding:
+                    const EdgeInsets.only(
+                  bottom: 4,
+                ),
                 child: Text(
                   '• ${(report['reason']?.toString().trim().isNotEmpty ?? false) ? report['reason'] : 'بدون سبب'}'
                   '${(report['details']?.toString().trim().isNotEmpty ?? false) ? ' — ${report['details']}' : ''}'
@@ -1308,7 +1732,7 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
                   style: TextStyle(
                     fontSize: 13,
                     height: 1.5,
-                    color: colorScheme.onErrorContainer,
+                    color: Colors.red.shade900,
                   ),
                 ),
               ),
@@ -1317,7 +1741,9 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
                 'و$more بلاغات أخرى',
                 style: TextStyle(
                   fontSize: 12.5,
-                  color: colorScheme.onErrorContainer,
+                  color: Colors.red.shade700,
+                  fontWeight:
+                      FontWeight.w600,
                 ),
               ),
           ],
@@ -1326,38 +1752,72 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
       actions: [
         _viewButton(listing),
         OutlinedButton.icon(
-          style: _compactStyle,
-          onPressed: () => _dismissReports(group),
-          icon: const Icon(Icons.done_all, size: 18),
+          style: _compactOutlinedStyle,
+          onPressed: () =>
+              _dismissReports(group),
+          icon: const Icon(
+            Icons.done_all,
+            size: 18,
+          ),
           label: const Text('تجاهل'),
         ),
         FilledButton.icon(
           style: _compactStyle.copyWith(
-            backgroundColor: WidgetStateProperty.all(Colors.red.shade700),
+            backgroundColor:
+                WidgetStateProperty.all(
+              Colors.red.shade700,
+            ),
           ),
           onPressed: busy
               ? null
-              : () => _reject(listing, initialReason: reasonsSummary),
-          icon: const Icon(Icons.visibility_off_outlined, size: 18),
+              : () => _reject(
+                    listing,
+                    initialReason:
+                        reasonsSummary,
+                  ),
+          icon: const Icon(
+            Icons.visibility_off_outlined,
+            size: 18,
+          ),
           label: const Text('إخفاء'),
         ),
       ],
     );
   }
 
-  Widget _emptyState(IconData icon, String message) {
-    final colorScheme = Theme.of(context).colorScheme;
-
+  Widget _emptyState(
+    IconData icon,
+    String message,
+  ) {
     return ListView(
-      physics: const AlwaysScrollableScrollPhysics(),
+      physics:
+          const AlwaysScrollableScrollPhysics(),
       children: [
-        const SizedBox(height: 130),
-        Icon(icon, size: 64, color: colorScheme.onSurfaceVariant),
-        const SizedBox(height: 14),
+        const SizedBox(height: 110),
+        Container(
+          width: 88,
+          height: 88,
+          margin:
+              const EdgeInsets.symmetric(
+            horizontal: 24,
+          ),
+          decoration:
+              AppDecorations.softCard(),
+          child: Icon(
+            icon,
+            size: 46,
+            color: AppColors.brand,
+          ),
+        ),
+        const SizedBox(height: 16),
         Text(
           message,
           textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 17),
+          style: const TextStyle(
+            fontSize: 17,
+            fontWeight: FontWeight.w700,
+            color: AppColors.ink,
+          ),
         ),
       ],
     );
@@ -1365,24 +1825,61 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
 
   Widget _buildPendingTab() {
     return RefreshIndicator(
-      onRefresh: () => _loadAll(showSpinner: false),
+      color: AppColors.brand,
+      onRefresh: () =>
+          _loadAll(showSpinner: false),
       child: _pending.isEmpty
-          ? _emptyState(Icons.check_circle_outline, 'لا توجد إعلانات للمراجعة')
+          ? _emptyState(
+              Icons.check_circle_outline,
+              'لا توجد إعلانات للمراجعة',
+            )
           : ListView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(12),
+              physics:
+                  const AlwaysScrollableScrollPhysics(),
+              padding:
+                  const EdgeInsets.fromLTRB(
+                12,
+                12,
+                12,
+                24,
+              ),
               children: [
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: Text(
-                    'الأقدم أولاً · اضغط على أي بطاقة لعرض التفاصيل',
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
+                Container(
+                  padding:
+                      const EdgeInsets.all(11),
+                  margin:
+                      const EdgeInsets.only(
+                    bottom: 10,
+                  ),
+                  decoration:
+                      AppDecorations.softCard(),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.info_outline,
+                        size: 19,
+                        color: AppColors.brand,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'الأقدم أولاً · اضغط على أي بطاقة لعرض التفاصيل',
+                          style:
+                              const TextStyle(
+                            fontSize: 12.5,
+                            color:
+                                AppColors.ink,
+                            fontWeight:
+                                FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                ..._pending.map(_buildPendingCard),
+                ..._pending.map(
+                  _buildPendingCard,
+                ),
               ],
             ),
     );
@@ -1391,28 +1888,75 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
   Widget _buildReportsTab() {
     if (_reportsError != null) {
       return RefreshIndicator(
-        onRefresh: () => _loadAll(showSpinner: false),
+        color: AppColors.brand,
+        onRefresh: () =>
+            _loadAll(showSpinner: false),
         child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(24),
+          physics:
+              const AlwaysScrollableScrollPhysics(),
+          padding:
+              const EdgeInsets.all(24),
           children: [
-            const SizedBox(height: 100),
-            const Icon(Icons.lock_outline, size: 56),
-            const SizedBox(height: 12),
-            Text(_reportsError!, textAlign: TextAlign.center),
+            const SizedBox(height: 90),
+            Container(
+              width: 90,
+              height: 90,
+              alignment: Alignment.center,
+              decoration:
+                  AppDecorations.softCard(),
+              child: const Icon(
+                Icons.lock_outline,
+                size: 48,
+                color: AppColors.brand,
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'تعذر الوصول إلى البلاغات',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w900,
+                color: AppColors.ink,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _reportsError!,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 13.5,
+                height: 1.6,
+              ),
+            ),
           ],
         ),
       );
     }
 
     return RefreshIndicator(
-      onRefresh: () => _loadAll(showSpinner: false),
+      color: AppColors.brand,
+      onRefresh: () =>
+          _loadAll(showSpinner: false),
       child: _reportGroups.isEmpty
-          ? _emptyState(Icons.flag_outlined, 'لا توجد بلاغات حالياً')
+          ? _emptyState(
+              Icons.flag_outlined,
+              'لا توجد بلاغات حالياً',
+            )
           : ListView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(12),
-              children: _reportGroups.map(_buildReportCard).toList(),
+              physics:
+                  const AlwaysScrollableScrollPhysics(),
+              padding:
+                  const EdgeInsets.fromLTRB(
+                12,
+                12,
+                12,
+                24,
+              ),
+              children:
+                  _reportGroups.map(
+                _buildReportCard,
+              ).toList(),
             ),
     );
   }
@@ -1421,31 +1965,104 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
-          child: ValueListenableBuilder<TextEditingValue>(
-            valueListenable: _searchController,
-            builder: (context, value, _) {
-              return TextField(
-                controller: _searchController,
-                onChanged: _onSearchChanged,
-                textInputAction: TextInputAction.search,
-                decoration: InputDecoration(
-                  hintText: 'ابحث في عناوين الإعلانات المعتمدة...',
-                  prefixIcon: const Icon(Icons.search),
-                  suffixIcon: value.text.isEmpty
-                      ? null
-                      : IconButton(
-                          icon: const Icon(Icons.clear),
-                          onPressed: () {
-                            _searchController.clear();
-                            _onSearchChanged('');
-                          },
-                        ),
-                  filled: true,
-                  isDense: true,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
+          padding:
+              const EdgeInsets.fromLTRB(
+            12,
+            10,
+            12,
+            4,
+          ),
+          child:
+              ValueListenableBuilder<
+                  TextEditingValue>(
+            valueListenable:
+                _searchController,
+            builder: (
+              context,
+              value,
+              _,
+            ) {
+              return Container(
+                decoration:
+                    AppDecorations.card(),
+                child: TextField(
+                  controller:
+                      _searchController,
+                  onChanged:
+                      _onSearchChanged,
+                  textInputAction:
+                      TextInputAction.search,
+                  decoration:
+                      InputDecoration(
+                    hintText:
+                        'ابحث في عناوين الإعلانات المعتمدة...',
+                    hintStyle:
+                        TextStyle(
+                      fontSize: 13,
+                      color:
+                          Colors.grey.shade600,
+                    ),
+                    prefixIcon:
+                        const Icon(
+                      Icons.search,
+                      color:
+                          AppColors.brand,
+                    ),
+                    suffixIcon:
+                        value.text.isEmpty
+                            ? null
+                            : IconButton(
+                                icon:
+                                    const Icon(
+                                  Icons.clear,
+                                ),
+                                onPressed:
+                                    () {
+                                  _searchController
+                                      .clear();
+                                  _onSearchChanged(
+                                    '',
+                                  );
+                                },
+                              ),
+                    filled: true,
+                    fillColor:
+                        Colors.white,
+                    isDense: true,
+                    border:
+                        OutlineInputBorder(
+                      borderRadius:
+                          BorderRadius
+                              .circular(
+                        15,
+                      ),
+                      borderSide:
+                          BorderSide.none,
+                    ),
+                    enabledBorder:
+                        OutlineInputBorder(
+                      borderRadius:
+                          BorderRadius
+                              .circular(
+                        15,
+                      ),
+                      borderSide:
+                          BorderSide.none,
+                    ),
+                    focusedBorder:
+                        OutlineInputBorder(
+                      borderRadius:
+                          BorderRadius
+                              .circular(
+                        15,
+                      ),
+                      borderSide:
+                          const BorderSide(
+                        color:
+                            AppColors.brand,
+                        width: 1.2,
+                      ),
+                    ),
                   ),
                 ),
               );
@@ -1454,7 +2071,11 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
         ),
         Expanded(
           child: RefreshIndicator(
-            onRefresh: () => _loadAll(showSpinner: false),
+            color: AppColors.brand,
+            onRefresh: () =>
+                _loadAll(
+              showSpinner: false,
+            ),
             child: _approved.isEmpty
                 ? _emptyState(
                     Icons.search_off_outlined,
@@ -1463,22 +2084,53 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
                         : 'لا نتائج للبحث',
                   )
                 : ListView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.all(12),
+                    physics:
+                        const AlwaysScrollableScrollPhysics(),
+                    padding:
+                        const EdgeInsets.fromLTRB(
+                      12,
+                      12,
+                      12,
+                      24,
+                    ),
                     children: [
-                      ..._approved.map(_buildApprovedCard),
+                      ..._approved.map(
+                        _buildApprovedCard,
+                      ),
                       if (_approvedHasMore)
                         Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          padding:
+                              const EdgeInsets
+                                  .symmetric(
+                            vertical: 8,
+                          ),
                           child: Center(
-                            child: _approvedLoadingMore
-                                ? const CircularProgressIndicator()
-                                : OutlinedButton.icon(
-                                    onPressed: () =>
-                                        _loadApproved(reset: false),
-                                    icon: const Icon(Icons.expand_more),
-                                    label: const Text('تحميل المزيد'),
-                                  ),
+                            child:
+                                _approvedLoadingMore
+                                    ? const CircularProgressIndicator(
+                                        color:
+                                            AppColors
+                                                .brand,
+                                      )
+                                    : OutlinedButton
+                                        .icon(
+                                        style:
+                                            _compactOutlinedStyle,
+                                        onPressed: () =>
+                                            _loadApproved(
+                                          reset:
+                                              false,
+                                        ),
+                                        icon:
+                                            const Icon(
+                                          Icons
+                                              .expand_more,
+                                        ),
+                                        label:
+                                            const Text(
+                                          'تحميل المزيد',
+                                        ),
+                                      ),
                           ),
                         ),
                     ],
@@ -1491,49 +2143,103 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
 
   Widget _buildPromotionsTab() {
     return RefreshIndicator(
-      onRefresh: () => _loadAll(showSpinner: false),
+      color: AppColors.brand,
+      onRefresh: () =>
+          _loadAll(showSpinner: false),
       child: _promotions.isEmpty
-          ? _emptyState(Icons.campaign_outlined, 'لا توجد إعلانات تجارية نشطة')
+          ? _emptyState(
+              Icons.campaign_outlined,
+              'لا توجد إعلانات تجارية نشطة',
+            )
           : ListView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(12),
-              children: _promotions.map(_buildPromotionCard).toList(),
+              physics:
+                  const AlwaysScrollableScrollPhysics(),
+              padding:
+                  const EdgeInsets.fromLTRB(
+                12,
+                12,
+                12,
+                24,
+              ),
+              children:
+                  _promotions.map(
+                _buildPromotionCard,
+              ).toList(),
             ),
     );
   }
 
   Widget _buildLocked() {
-    return const Center(
+    return Center(
       child: Padding(
-        padding: EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.lock_outline, size: 64),
-            SizedBox(height: 16),
-            Text(
-              'هذه الصفحة مخصصة للأدمن فقط',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-          ],
+        padding: const EdgeInsets.all(24),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: AppDecorations.card(),
+          child: Column(
+            mainAxisSize:
+                MainAxisSize.min,
+            children: [
+              Container(
+                width: 82,
+                height: 82,
+                decoration:
+                    AppDecorations.softCard(),
+                child: const Icon(
+                  Icons.lock_outline,
+                  size: 46,
+                  color: AppColors.brand,
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'هذه الصفحة مخصصة للأدمن فقط',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.ink,
+                ),
+              ),
+              const SizedBox(height: 7),
+              Text(
+                'لا تملك صلاحية الوصول إلى لوحة التحكم.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.grey.shade700,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  String _tabLabel(String title, int count) {
-    return count > 0 ? '$title ($count)' : title;
+  String _tabLabel(
+    String title,
+    int count,
+  ) {
+    return count > 0
+        ? '$title ($count)'
+        : title;
   }
 
   @override
   Widget build(BuildContext context) {
-    final showTabs = !_checkingAdmin && _isAdmin;
+    final showTabs =
+        !_checkingAdmin && _isAdmin;
 
     final Widget body;
 
-    if (_checkingAdmin || (_isAdmin && _loading)) {
-      body = const Center(child: CircularProgressIndicator());
+    if (_checkingAdmin ||
+        (_isAdmin && _loading)) {
+      body = const Center(
+        child: CircularProgressIndicator(
+          color: AppColors.brand,
+        ),
+      );
     } else if (!_isAdmin) {
       body = _buildLocked();
     } else {
@@ -1552,21 +2258,73 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
       child: DefaultTabController(
         length: 4,
         child: Scaffold(
+          backgroundColor:
+              AppColors.pageBackground,
           appBar: AppBar(
-            title: const Text('لوحة تحكم الأدمن'),
+            backgroundColor:
+                AppColors.brand,
+            foregroundColor:
+                Colors.white,
+            elevation: 0,
+            title: const Text(
+              'لوحة تحكم الأدمن',
+              style: TextStyle(
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            centerTitle: false,
             bottom: showTabs
                 ? TabBar(
-                    tabAlignment: TabAlignment.fill,
-                    labelStyle: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
+                    indicatorColor:
+                        AppColors.gold,
+                    indicatorWeight: 3,
+                    dividerColor:
+                        Colors.transparent,
+                    tabAlignment:
+                        TabAlignment.fill,
+                    labelColor:
+                        Colors.white,
+                    unselectedLabelColor:
+                        Colors.white70,
+                    labelStyle:
+                        const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight:
+                          FontWeight.w900,
                     ),
-                    labelPadding: const EdgeInsets.symmetric(horizontal: 4),
+                    unselectedLabelStyle:
+                        const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight:
+                          FontWeight.w600,
+                    ),
+                    labelPadding:
+                        const EdgeInsets
+                            .symmetric(
+                      horizontal: 3,
+                    ),
                     tabs: [
-                      Tab(text: _tabLabel('المراجعة', _pending.length)),
-                      Tab(text: _tabLabel('البلاغات', _reportGroups.length)),
-                      const Tab(text: 'المعتمدة'),
-                      Tab(text: _tabLabel('التجارية', _promotions.length)),
+                      Tab(
+                        text: _tabLabel(
+                          'المراجعة',
+                          _pending.length,
+                        ),
+                      ),
+                      Tab(
+                        text: _tabLabel(
+                          'البلاغات',
+                          _reportGroups.length,
+                        ),
+                      ),
+                      const Tab(
+                        text: 'المعتمدة',
+                      ),
+                      Tab(
+                        text: _tabLabel(
+                          'التجارية',
+                          _promotions.length,
+                        ),
+                      ),
                     ],
                   )
                 : null,
@@ -1581,16 +2339,22 @@ class _AdminListingsScreenState extends State<AdminListingsScreen> {
 // =========================
 // حوار سبب الرفض
 // =========================
-class _RejectReasonDialog extends StatefulWidget {
+
+class _RejectReasonDialog
+    extends StatefulWidget {
   final String initialReason;
 
-  const _RejectReasonDialog({this.initialReason = ''});
+  const _RejectReasonDialog({
+    this.initialReason = '',
+  });
 
   @override
-  State<_RejectReasonDialog> createState() => _RejectReasonDialogState();
+  State<_RejectReasonDialog> createState() =>
+      _RejectReasonDialogState();
 }
 
-class _RejectReasonDialogState extends State<_RejectReasonDialog> {
+class _RejectReasonDialogState
+    extends State<_RejectReasonDialog> {
   static const _presets = [
     'صور غير واضحة أو غير مناسبة',
     'معلومات ناقصة أو غير صحيحة',
@@ -1599,8 +2363,11 @@ class _RejectReasonDialogState extends State<_RejectReasonDialog> {
     'مخالف لسياسة التطبيق',
   ];
 
-  late final TextEditingController _noteController =
-      TextEditingController(text: widget.initialReason);
+  late final TextEditingController
+      _noteController =
+      TextEditingController(
+    text: widget.initialReason,
+  );
 
   String? _selected;
 
@@ -1613,7 +2380,10 @@ class _RejectReasonDialogState extends State<_RejectReasonDialog> {
   void _submit() {
     final reason = [
       if (_selected != null) _selected!,
-      if (_noteController.text.trim().isNotEmpty) _noteController.text.trim(),
+      if (_noteController.text
+          .trim()
+          .isNotEmpty)
+        _noteController.text.trim(),
     ].join(' - ');
 
     Navigator.pop(context, reason);
@@ -1624,36 +2394,117 @@ class _RejectReasonDialogState extends State<_RejectReasonDialog> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: AlertDialog(
-        title: const Text('رفض / إخفاء الإعلان'),
+        shape: RoundedRectangleBorder(
+          borderRadius:
+              BorderRadius.circular(22),
+        ),
+        title: Row(
+          children: [
+            Icon(
+              Icons.visibility_off_outlined,
+              color: Colors.red.shade700,
+            ),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text(
+                'رفض / إخفاء الإعلان',
+              ),
+            ),
+          ],
+        ),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment:
+                CrossAxisAlignment.start,
             children: [
-              const Text('اختر السبب (يظهر لصاحب الإعلان):'),
+              const Text(
+                'اختر السبب (يظهر لصاحب الإعلان):',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
               const SizedBox(height: 10),
               Wrap(
                 spacing: 8,
                 runSpacing: 6,
                 children: [
-                  for (final preset in _presets)
+                  for (final preset
+                      in _presets)
                     ChoiceChip(
-                      label: Text(preset, style: const TextStyle(fontSize: 12.5)),
-                      selected: _selected == preset,
-                      onSelected: (selected) {
-                        setState(() => _selected = selected ? preset : null);
+                      label: Text(
+                        preset,
+                        style:
+                            const TextStyle(
+                          fontSize: 12.5,
+                          fontWeight:
+                              FontWeight.w600,
+                        ),
+                      ),
+                      selected:
+                          _selected == preset,
+                      selectedColor:
+                          AppColors.brandSoft,
+                      checkmarkColor:
+                          AppColors.brand,
+                      onSelected:
+                          (selected) {
+                        setState(
+                          () => _selected =
+                              selected
+                                  ? preset
+                                  : null,
+                        );
                       },
                     ),
                 ],
               ),
               const SizedBox(height: 12),
               TextField(
-                controller: _noteController,
+                controller:
+                    _noteController,
                 maxLines: 2,
                 maxLength: 200,
-                decoration: const InputDecoration(
-                  hintText: 'ملاحظة إضافية (اختياري)',
-                  border: OutlineInputBorder(),
+                decoration:
+                    InputDecoration(
+                  hintText:
+                      'ملاحظة إضافية (اختياري)',
+                  filled: true,
+                  fillColor:
+                      AppColors.pageBackground,
+                  border:
+                      OutlineInputBorder(
+                    borderRadius:
+                        BorderRadius.circular(
+                      13,
+                    ),
+                    borderSide:
+                        BorderSide.none,
+                  ),
+                  enabledBorder:
+                      OutlineInputBorder(
+                    borderRadius:
+                        BorderRadius.circular(
+                      13,
+                    ),
+                    borderSide:
+                        BorderSide(
+                      color: Colors.grey
+                          .shade300,
+                    ),
+                  ),
+                  focusedBorder:
+                      OutlineInputBorder(
+                    borderRadius:
+                        BorderRadius.circular(
+                      13,
+                    ),
+                    borderSide:
+                        const BorderSide(
+                      color:
+                          AppColors.brand,
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -1661,15 +2512,22 @@ class _RejectReasonDialogState extends State<_RejectReasonDialog> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () =>
+                Navigator.pop(context),
             child: const Text('إلغاء'),
           ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.red.shade700,
+          FilledButton.icon(
+            style:
+                FilledButton.styleFrom(
+              backgroundColor:
+                  Colors.red.shade700,
             ),
             onPressed: _submit,
-            child: const Text('رفض'),
+            icon: const Icon(
+              Icons.visibility_off_outlined,
+              size: 18,
+            ),
+            label: const Text('رفض'),
           ),
         ],
       ),
