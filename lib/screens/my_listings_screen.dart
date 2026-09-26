@@ -344,25 +344,29 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
   }
 
   Future<void> _openListing(Map<String, dynamic> listing) async {
-  final rawId = listing['id'];
+    final rawId = listing['id'];
 
-  if (rawId == null) return;
+    if (rawId == null) return;
 
-  final int? listingId = rawId is int
-      ? rawId
-      : int.tryParse(rawId.toString());
+    final int? listingId = rawId is int
+        ? rawId
+        : int.tryParse(rawId.toString());
 
-  if (listingId == null) return;
+    if (listingId == null) return;
 
-  await Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => ListingDetailsScreen(
-        listingId: listingId,
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ListingDetailsScreen(
+          listingId: listingId,
+        ),
       ),
-    ),
-  );
-}
+    );
+
+    if (mounted) {
+      _loadListings();
+    }
+  }
 
   Future<void> _addListing() async {
     await Navigator.push(
@@ -476,7 +480,7 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
       });
 
       _showSnack('تم تحديث حالة الإعلان بنجاح');
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
 
       setState(() {
@@ -535,7 +539,7 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
       });
 
       _showSnack('تم حذف الإعلان بنجاح');
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
 
       setState(() {
@@ -591,11 +595,7 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
   ) {
     switch (value) {
       case 'view':
-        final id = listing['id']?.toString();
-
-        if (id != null && id.isNotEmpty) {
-          _openListing(id);
-        }
+        _openListing(listing);
         break;
 
       case 'edit':
@@ -826,7 +826,7 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
           borderRadius: BorderRadius.circular(18),
           onTap: busy || listingId.isEmpty
               ? null
-              : () => _openListing(listingId),
+              : () => _openListing(listing),
           child: Padding(
             padding: const EdgeInsets.all(12),
             child: Column(
