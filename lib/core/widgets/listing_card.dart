@@ -38,7 +38,8 @@ class ListingCard extends StatelessWidget {
   final String formatPrice;
   final String timeAgo;
 
-  static const double imageHeight = 122;
+  // تم تقليل ارتفاع الصورة قليلًا لتقليل الارتفاع الكلي للبطاقة.
+  static const double imageHeight = 116;
 
   Widget _buildImage(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -69,7 +70,8 @@ class ListingCard extends StatelessWidget {
       fit: BoxFit.cover,
       memCacheWidth: 400,
       placeholder: (_, __) => placeholder(Icons.image_outlined),
-      errorWidget: (_, __, ___) => placeholder(Icons.broken_image_outlined),
+      errorWidget: (_, __, ___) =>
+          placeholder(Icons.broken_image_outlined),
     );
   }
 
@@ -79,7 +81,8 @@ class ListingCard extends StatelessWidget {
 
     final id = listing['id'] as int?;
     final rawTitle = listing['title']?.toString().trim() ?? '';
-    final title = rawTitle.isEmpty ? 'إعلان بدون عنوان' : rawTitle;
+    final title =
+        rawTitle.isEmpty ? 'إعلان بدون عنوان' : rawTitle;
     final area = listing['area']?.toString().trim() ?? '';
 
     final meta = [
@@ -87,14 +90,17 @@ class ListingCard extends StatelessWidget {
       timeAgo,
     ].where((part) => part.isNotEmpty).join(' - ');
 
-    final isNegotiable = listing['price_type'] == 'negotiable';
-    final isContactPrice = formatPrice == 'السعر عند التواصل';
+    final isNegotiable =
+        listing['price_type'] == 'negotiable';
+
+    final isContactPrice =
+        formatPrice == 'السعر عند التواصل';
 
     return SizedBox(
       width: width,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
               color: AppColors.brand.withValues(alpha: 0.12),
@@ -105,38 +111,46 @@ class ListingCard extends StatelessWidget {
         ),
         child: Material(
           color: cardColor,
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: BorderRadius.circular(20),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
             onTap: onTap,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                // =========================
+                // الصورة
+                // =========================
                 Stack(
                   children: [
                     _buildImage(context),
+
+                    // القسم
                     if (categoryName.isNotEmpty)
                       Positioned(
-                        top: 9,
-                        right: 9,
-                        left: 48,
+                        top: 8,
+                        right: 8,
+                        left: 46,
                         child: Align(
-                          alignment: AlignmentDirectional.centerStart,
+                          alignment:
+                              AlignmentDirectional.centerStart,
                           child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 9,
-                              vertical: 5,
+                            padding:
+                                const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
                             ),
                             decoration: BoxDecoration(
                               color: AppColors.brand,
-                              borderRadius: BorderRadius.circular(16),
+                              borderRadius:
+                                  BorderRadius.circular(15),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Icon(
                                   categoryIcon,
-                                  size: 14,
+                                  size: 13,
                                   color: Colors.white,
                                 ),
                                 const SizedBox(width: 4),
@@ -144,11 +158,13 @@ class ListingCard extends StatelessWidget {
                                   child: Text(
                                     categoryName,
                                     maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
+                                    overflow:
+                                        TextOverflow.ellipsis,
                                     style: const TextStyle(
                                       color: Colors.white,
-                                      fontSize: 11.5,
-                                      fontWeight: FontWeight.w700,
+                                      fontSize: 11,
+                                      fontWeight:
+                                          FontWeight.w700,
                                     ),
                                   ),
                                 ),
@@ -157,24 +173,33 @@ class ListingCard extends StatelessWidget {
                           ),
                         ),
                       ),
-                    if (id != null && onToggleFavorite != null)
+
+                    // المفضلة
+                    if (id != null &&
+                        onToggleFavorite != null)
                       Positioned(
                         top: 3,
                         left: 3,
                         child: GestureDetector(
-                          behavior: HitTestBehavior.opaque,
+                          behavior:
+                              HitTestBehavior.opaque,
                           onTap: onToggleFavorite,
                           child: Padding(
-                            padding: const EdgeInsets.all(6),
+                            padding:
+                                const EdgeInsets.all(5),
                             child: Container(
-                              width: 34,
-                              height: 34,
-                              decoration: BoxDecoration(
+                              width: 33,
+                              height: 33,
+                              decoration:
+                                  BoxDecoration(
                                 color: Colors.white,
                                 shape: BoxShape.circle,
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.14),
+                                    color: Colors.black
+                                        .withValues(
+                                      alpha: 0.14,
+                                    ),
                                     blurRadius: 6,
                                   ),
                                 ],
@@ -182,8 +207,9 @@ class ListingCard extends StatelessWidget {
                               child: Icon(
                                 isFavorite
                                     ? Icons.favorite_rounded
-                                    : Icons.favorite_border_rounded,
-                                size: 20,
+                                    : Icons
+                                        .favorite_border_rounded,
+                                size: 19,
                                 color: isFavorite
                                     ? Colors.red
                                     : AppColors.brand,
@@ -192,34 +218,40 @@ class ListingCard extends StatelessWidget {
                           ),
                         ),
                       ),
+
+                    // الإعلان المميز
                     if (isCommercial)
                       Positioned(
-                        bottom: 8,
-                        right: 9,
+                        bottom: 7,
+                        right: 8,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
+                          padding:
+                              const EdgeInsets.symmetric(
+                            horizontal: 7,
                             vertical: 3,
                           ),
                           decoration: BoxDecoration(
                             color: AppColors.gold,
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius:
+                                BorderRadius.circular(11),
                           ),
                           child: const Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(
                                 Icons.star_rounded,
-                                size: 13,
+                                size: 12,
                                 color: AppColors.brandDark,
                               ),
                               SizedBox(width: 3),
                               Text(
                                 'مميز',
                                 style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w800,
-                                  color: AppColors.brandDark,
+                                  fontSize: 10.5,
+                                  fontWeight:
+                                      FontWeight.w800,
+                                  color:
+                                      AppColors.brandDark,
                                 ),
                               ),
                             ],
@@ -228,40 +260,59 @@ class ListingCard extends StatelessWidget {
                       ),
                   ],
                 ),
+
+                // =========================
+                // معلومات الإعلان
+                // =========================
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                  padding: const EdgeInsets.fromLTRB(
+                    11,
+                    8,
+                    11,
+                    8,
+                  ),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment:
+                        CrossAxisAlignment.start,
                     children: [
+                      // العنوان
                       Text(
                         title,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: 15,
-                          height: 1.25,
+                          fontSize: 14.5,
+                          height: 1.18,
                           fontWeight: FontWeight.w800,
                           color: titleColor,
                         ),
                       ),
-                      const SizedBox(height: 7),
+
+                      const SizedBox(height: 5),
+
+                      // السعر
                       Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 5,
+                        padding:
+                            const EdgeInsets.symmetric(
+                          horizontal: 9,
+                          vertical: 4,
                         ),
                         decoration: BoxDecoration(
                           color: isDark
-                              ? colorScheme.primary.withValues(alpha: 0.18)
+                              ? colorScheme.primary
+                                  .withValues(alpha: 0.18)
                               : AppColors.brandSoft,
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius:
+                              BorderRadius.circular(9),
                         ),
                         child: Text(
                           formatPrice,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            fontSize: isContactPrice ? 12.5 : 14.5,
+                            fontSize: isContactPrice
+                                ? 12
+                                : 14,
                             fontWeight: FontWeight.w800,
                             color: isDark
                                 ? colorScheme.primary
@@ -269,47 +320,58 @@ class ListingCard extends StatelessWidget {
                           ),
                         ),
                       ),
+
+                      // الموقع والوقت
                       if (meta.isNotEmpty) ...[
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 6),
                         Row(
                           children: [
                             const Icon(
                               Icons.location_on_rounded,
-                              size: 15,
+                              size: 14,
                               color: AppColors.brand,
                             ),
-                            const SizedBox(width: 4),
+                            const SizedBox(width: 3),
                             Expanded(
                               child: Text(
                                 meta,
                                 maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                                overflow:
+                                    TextOverflow.ellipsis,
                                 style: TextStyle(
-                                  fontSize: 12,
-                                  color: colorScheme.onSurfaceVariant,
+                                  fontSize: 11.5,
+                                  color: colorScheme
+                                      .onSurfaceVariant,
                                 ),
                               ),
                             ),
                           ],
                         ),
                       ],
+
+                      // قابل للتفاوض
                       if (isNegotiable) ...[
-                        const SizedBox(height: 7),
+                        const SizedBox(height: 5),
                         Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 9,
-                            vertical: 3,
+                          padding:
+                              const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
                           ),
                           decoration: BoxDecoration(
                             color: isDark
-                                ? colorScheme.primary.withValues(alpha: 0.18)
+                                ? colorScheme.primary
+                                    .withValues(
+                                    alpha: 0.18,
+                                  )
                                 : AppColors.brandSoft,
-                            borderRadius: BorderRadius.circular(14),
+                            borderRadius:
+                                BorderRadius.circular(12),
                           ),
                           child: Text(
                             'سعر قابل للتفاوض',
                             style: TextStyle(
-                              fontSize: 11.5,
+                              fontSize: 11,
                               fontWeight: FontWeight.w700,
                               color: isDark
                                   ? colorScheme.primary

@@ -4,7 +4,9 @@ import '../theme/app_colors.dart';
 import 'home_decorative_painters.dart';
 
 class HomeHeader extends StatelessWidget {
-  static const headerContentHeight = 200.0;
+  // تم تقليل ارتفاع الترويسة قليلًا لتقليل المساحة الرأسية.
+  static const headerContentHeight = 160.0;
+
   static const headerAsset =
       'assets/images/home_header.jpg';
 
@@ -65,7 +67,6 @@ class HomeHeader extends StatelessWidget {
 
           // =========================
           // تدرج علوي خفيف
-          // لتحسين وضوح العناصر
           // =========================
           Positioned(
             top: 0,
@@ -100,11 +101,13 @@ class HomeHeader extends StatelessWidget {
 
           // =========================
           // مربع البحث
+          // تم رفعه للأعلى ليكون أقرب
+          // إلى عنوان التطبيق.
           // =========================
           Positioned(
             left: 16,
             right: 16,
-            bottom: 36,
+            bottom: 42,
             child: _buildSearchField(context),
           ),
 
@@ -240,15 +243,13 @@ class HomeHeader extends StatelessWidget {
               height: 46,
               decoration:
                   BoxDecoration(
-                color: Colors.white
-                    .withValues(
+                color: Colors.white.withValues(
                   alpha: 0.94,
                 ),
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black
-                        .withValues(
+                    color: Colors.black.withValues(
                       alpha: 0.15,
                     ),
                     blurRadius: 10,
@@ -260,8 +261,7 @@ class HomeHeader extends StatelessWidget {
               child: Icon(
                 isSignedIn
                     ? Icons.person_rounded
-                    : Icons
-                        .person_outline_rounded,
+                    : Icons.person_outline_rounded,
                 size: 26,
                 color:
                     AppColors.brandDark,
@@ -344,8 +344,7 @@ class HomeHeader extends StatelessWidget {
             BorderRadius.circular(30),
         boxShadow: [
           BoxShadow(
-            color: AppColors.brand
-                .withValues(
+            color: AppColors.brand.withValues(
               alpha: 0.20,
             ),
             blurRadius: 18,
@@ -404,8 +403,7 @@ class HomeHeader extends StatelessWidget {
                               'مسح البحث',
                           icon:
                               const Icon(
-                            Icons
-                                .close_rounded,
+                            Icons.close_rounded,
                             size: 21,
                           ),
                         )
@@ -424,8 +422,7 @@ class HomeHeader extends StatelessWidget {
                   InputBorder.none,
 
               contentPadding:
-                  const EdgeInsets
-                      .symmetric(
+                  const EdgeInsets.symmetric(
                 vertical: 17,
               ),
             ),
