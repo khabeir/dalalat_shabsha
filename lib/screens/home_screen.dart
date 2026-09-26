@@ -30,6 +30,7 @@ import '../core/widgets/home_greeting.dart';
 import '../core/widgets/home_error_state.dart';
 import '../core/widgets/home_empty_state.dart';
 import '../core/widgets/home_loading.dart';
+import '../core/widgets/home_search_results.dart';
 import '../core/widgets/home_bottom_navigation.dart';
 import '../core/widgets/categories_section.dart';
 import '../core/widgets/listing_section.dart';
@@ -1360,154 +1361,41 @@ class _HomeScreenState extends State<HomeScreen>
   // نتائج البحث / القسم / عرض الكل
   // =========================
   Widget _buildSearchResults() {
-    final colorScheme =
-        Theme.of(context).colorScheme;
-
     final results = _visibleResults;
 
-    final promotedIds =
-        _activePromoted
-            .map(
-              (listing) => listing['id'],
-            )
-            .toSet();
-
-    final showSpinner =
-        _listingsLoading ||
-        (_isSearching &&
-            _searchPoolLoading);
+    final promotedIds = _activePromoted
+        .map((listing) => listing['id'])
+        .toSet();
 
     final String title;
 
     if (_isSearching) {
       title = 'نتائج البحث';
     } else if (_selectedCategoryId != null) {
-      title =
-          _selectedCategoryName ??
-          'إعلانات القسم';
-    } else if (_mode ==
-        _ListMode.featured) {
+      title = _selectedCategoryName ?? 'إعلانات القسم';
+    } else if (_mode == _ListMode.featured) {
       title = 'إعلانات مميزة';
     } else {
       title = 'أحدث الإعلانات';
     }
 
-    return Column(
-      crossAxisAlignment:
-          CrossAxisAlignment.stretch,
-      children: [
-        Padding(
-          padding:
-              const EdgeInsets.symmetric(
-            horizontal: 16,
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  title,
-                  maxLines: 1,
-                  overflow:
-                      TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 19,
-                    fontWeight:
-                        FontWeight.w900,
-                    color: _titleColor,
-                  ),
-                ),
-              ),
-              Text(
-                '${results.length} إعلان',
-                style: TextStyle(
-                  fontSize: 12.5,
-                  color: colorScheme
-                      .onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(width: 6),
-              TextButton.icon(
-                onPressed:
-                    _clearFilters,
-                style: TextButton.styleFrom(
-                  visualDensity:
-                      VisualDensity.compact,
-                  padding:
-                      const EdgeInsets.symmetric(
-                    horizontal: 8,
-                  ),
-                ),
-                icon: const Icon(
-                  Icons.close_rounded,
-                  size: 17,
-                ),
-                label: const Text(
-                  'إلغاء التصفية',
-                  style: TextStyle(
-                    fontSize: 12.5,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 12),
-        if (showSpinner &&
-            results.isEmpty)
-          const Padding(
-            padding:
-                EdgeInsets.symmetric(
-              vertical: 40,
-            ),
-            child: HomeLoading(),
-          )
-        else if (results.isEmpty)
-  HomeEmptyState(
-    message: _isSearching
-        ? 'لم نجد إعلانات تطابق بحثك'
-        : 'لا توجد إعلانات هنا حالياً',
-  )
-        else
-          Padding(
-            padding:
-                const EdgeInsets.symmetric(
-              horizontal: 16,
-            ),
-            child: GridView.builder(
-              shrinkWrap: true,
-              physics:
-                  const NeverScrollableScrollPhysics(),
-              itemCount: results.length,
-              gridDelegate:
-                  const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                mainAxisSpacing: 14,
-                crossAxisSpacing: 12,
-                mainAxisExtent:
-                    _cardHeight,
-              ),
-              itemBuilder:
-                  (context, index) {
-                final listing =
-                    results[index];
-
-                return _buildListingCard(
-                  listing,
-                  fillWidth: true,
-                  isCommercial:
-                      promotedIds.contains(
-                    listing['id'],
-                  ),
-                );
-              },
-            ),
-          ),
-       if (_loadingMore)
-  const Padding(
-    padding: EdgeInsets.all(16),
-    child: HomeLoading(),
-  ),
-      ],
+    return HomeSearchResults(
+      results: results,
+      promotedIds: promotedIds,
+      title: title,
+      titleColor: _titleColor,
+      isSearching: _isSearching,
+      isLoading: _listingsLoading,
+      searchPoolLoading: _searchPoolLoading,
+      loadingMore: _loadingMore,
+      onClearFilters: _clearFilters,
+      buildListingCard: (listing, isCommercial) {
+        return _buildListingCard(
+          listing,
+          fillWidth: true,
+          isCommercial: isCommercial,
+        );
+      },
     );
   }
 
@@ -1766,15 +1654,16 @@ class _HomeScreenState extends State<HomeScreen>
             body: _buildBody(
               topPadding,
             ),
-            bottomNavigationBar: HomeBottomNavigation(
-              isDark: _isDark,
-              cardColor: _cardColor,
-              onHome: _clearFilters,
-              onMyListings: _openMyListings,
-              onAddListing: _openAddListing,
-              onFavorites: _openFavorites,
-              onProfile: _openProfile,
-            ),
+            bottomNavigationBar:
+    HomeBottomNavigation(
+  isDark: _isDark,
+  cardColor: _cardColor,
+  onHome: _clearFilters,
+  onMyListings: _openMyListings,
+  onAddListing: _openAddListing,
+  onFavorites: _openFavorites,
+  onProfile: _openProfile,
+),
           ),
         ),
       ),
