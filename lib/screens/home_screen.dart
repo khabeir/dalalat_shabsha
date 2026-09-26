@@ -1766,16 +1766,15 @@ class _HomeScreenState extends State<HomeScreen>
             body: _buildBody(
               topPadding,
             ),
-            bottomNavigationBar:
-    HomeBottomNavigation(
-  isDark: _isDark,
-  cardColor: _cardColor,
-  onHome: _clearFilters,
-  onMyListings: _openMyListings,
-  onAddListing: _openAddListing,
-  onFavorites: _openFavorites,
-  onProfile: _openProfile,
-),
+            bottomNavigationBar: HomeBottomNavigation(
+              isDark: _isDark,
+              cardColor: _cardColor,
+              onHome: _clearFilters,
+              onMyListings: _openMyListings,
+              onAddListing: _openAddListing,
+              onFavorites: _openFavorites,
+              onProfile: _openProfile,
+            ),
           ),
         ),
       ),
