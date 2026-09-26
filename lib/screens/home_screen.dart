@@ -26,13 +26,9 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart' show NumberFormat;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../core/widgets/home_greeting.dart';
-import '../core/widgets/home_error_state.dart';
-import '../core/widgets/home_loading.dart';
 import '../core/widgets/home_search_results.dart';
+import '../core/widgets/home_body.dart';
 import '../core/widgets/home_bottom_navigation.dart';
-import '../core/widgets/categories_section.dart';
-import '../core/widgets/listing_section.dart';
 import '../core/theme/app_colors.dart';
 import '../core/widgets/home_banner.dart';
 import '../core/widgets/home_drawer.dart';
@@ -1404,163 +1400,42 @@ class _HomeScreenState extends State<HomeScreen>
   Widget _buildBody(
     double topPadding,
   ) {
-    final bottomInset =
-        MediaQuery.of(context)
-            .padding
-            .bottom;
+    final user = _supabase.auth.currentUser;
+    final name =
+        (user?.userMetadata?['full_name'] as String?)?.trim();
 
-    final Widget content;
-
-    if (_loading) {
-      content = const Padding(
-        padding:
-            EdgeInsets.symmetric(
-          vertical: 90,
-        ),
-        child: HomeLoading(),
-      );
-    } else if (_error != null) {
-  content = HomeErrorState(
-    message: _error!,
-    onRetry: _loadAll,
-  );
-    } else {
-      final user =
-          _supabase.auth.currentUser;
-
-      final name =
-          (user?.userMetadata?[
-                      'full_name']
-                  as String?)
-              ?.trim();
-
-      content = Column(
-        crossAxisAlignment:
-            CrossAxisAlignment.stretch,
-        children: [
-          if (!_isFiltering) ...[
-            if (name != null &&
-    name.isNotEmpty)
-  HomeGreeting(
-    name: name,
-  ),
-            _buildBannerCarousel(),
-            const SizedBox(height: 16),
-          ],
-
-          CategoriesSection(
-            sectionKey:
-                _categoriesKey,
-            categories: _categories,
-            selectedCategoryId:
-                _selectedCategoryId,
-            isDark: _isDark,
-            titleColor: _titleColor,
-            categoryIcon:
-                _filledCategoryIcon,
-            categoryColor:
-                (name, index) {
-              return _toneFor(
-                name,
-                index,
-              ).fg;
-            },
-            onSelectCategory:
-                (categoryId) {
-              if (categoryId < 0) {
-                _selectCategory(null);
-              } else {
-                _selectCategory(
-                  categoryId,
-                  clearSearch: true,
-                );
-              }
-            },
-          ),
-
-          const SizedBox(height: 8),
-
-          if (_isFiltering)
-            _buildSearchResults()
-          else
-            ListingSection(
-              loading:
-                  _listingsLoading,
-              promotedListings:
-                  _activePromoted,
-              listings: _listings,
-              categories: _categories,
-              isDark: _isDark,
-              titleColor:
-                  _titleColor,
-              cardHeight:
-                  _cardHeight,
-              buildListingCard: (
-                listing, {
-                bool isCommercial =
-                    false,
-              }) {
-                return _buildListingCard(
-                  listing,
-                  isCommercial:
-                      isCommercial,
-                );
-              },
-              categoryIcon:
-                  _filledCategoryIcon,
-              categoryColor:
-                  (name, index) {
-                return _toneFor(
-                  name,
-                  index,
-                ).fg;
-              },
-              onShowFeatured: () {
-                _showAll(
-                  _ListMode.featured,
-                );
-              },
-              onShowLatest: () {
-                _showAll(
-                  _ListMode.latest,
-                );
-              },
-              onSelectCategory:
-                  (categoryId) {
-                _selectCategory(
-                  categoryId,
-                );
-              },
-            ),
-        ],
-      );
-    }
-
-    return RefreshIndicator(
-      displacement:
-          topPadding + 50,
-      onRefresh: () =>
-          _loadAll(
-        showSpinner: false,
-      ),
-      child: ListView(
-        controller:
-            _scrollController,
-        keyboardDismissBehavior:
-            ScrollViewKeyboardDismissBehavior
-                .onDrag,
-        physics:
-            const AlwaysScrollableScrollPhysics(),
-        padding: EdgeInsets.only(
-          bottom: 112 + bottomInset,
-        ),
-        children: [
-          _buildHeader(
-            topPadding,
-          ),
-          content,
-        ],
-      ),
+    return HomeBody(
+      topPadding: topPadding,
+      loading: _loading,
+      error: _error,
+      isFiltering: _isFiltering,
+      userName: name,
+      categories: _categories,
+      promotedListings: _activePromoted,
+      listings: _listings,
+      selectedCategoryId: _selectedCategoryId,
+      isDark: _isDark,
+      titleColor: _titleColor,
+      cardHeight: _cardHeight,
+      categoriesKey: _categoriesKey,
+      buildHeader: _buildHeader,
+      buildListingCard: (listing, {bool isCommercial = false}) {
+        return _buildListingCard(
+          listing,
+          isCommercial: isCommercial,
+        );
+      },
+      banner: _buildBannerCarousel(),
+      searchResults: _buildSearchResults(),
+      categoryIcon: _filledCategoryIcon,
+      categoryColor: (name, index) => _toneFor(name, index).fg,
+      onRetry: _loadAll,
+      onRefresh: () => _loadAll(showSpinner: false),
+      onSelectCategory: (id, {bool clearSearch = false}) =>
+          _selectCategory(id, clearSearch: clearSearch),
+      onShowFeatured: () => _showAll(_ListMode.featured),
+      onShowLatest: () => _showAll(_ListMode.latest),
+      listingsLoading: _listingsLoading,
     );
   }
 
