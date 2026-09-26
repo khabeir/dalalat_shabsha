@@ -5,7 +5,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/theme/app_colors.dart';
 import '../core/theme/app_decorations.dart';
-
 import 'add_listing_screen.dart';
 import 'edit_listing_screen.dart';
 import 'listing_details_screen.dart';
@@ -18,10 +17,9 @@ class MyListingsScreen extends StatefulWidget {
 }
 
 class _MyListingsScreenState extends State<MyListingsScreen> {
-  static const _bucket = 'listing-images';
+  static const String _bucket = 'listing-images';
 
-  // ترتيب ظهور الحالات في شريط التصفية.
-  static const _statusOrder = [
+  static const List<String> _statusOrder = [
     'approved',
     'pending',
     'sold',
@@ -29,17 +27,12 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
     'rejected',
   ];
 
-  static final _numberFormat = NumberFormat('#,##0.##', 'en');
-
+  final NumberFormat _numberFormat = NumberFormat('#,##0.##', 'en');
   final SupabaseClient _supabase = Supabase.instance.client;
 
   List<Map<String, dynamic>> _listings = [];
-
-  // رابط الصورة الأولى لكل إعلان.
-  Map<int, String> _imageUrls = {};
-
-  // إعلانات جارٍ تنفيذ عملية عليها.
-  final Set<int> _busyIds = {};
+  Map<String, String?> _imageUrls = {};
+  final Set<String> _busyIds = {};
 
   bool _loading = true;
   String? _error;
@@ -51,23 +44,8 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
     _loadListings();
   }
 
-  // =========================
-  // تحميل البيانات
-  // =========================
-  Future<void> _loadListings({bool silent = false}) async {
-    final user = _supabase.auth.currentUser;
-
-    if (user == null) {
-      if (!mounted) return;
-
-      setState(() {
-        _loading = false;
-        _error = 'يجب تسجيل الدخول أولاً.';
-      });
-      return;
-    }
-
-    if (!silent) {
+  Future<void> _loadListings() async {
+    if (mounted) {
       setState(() {
         _loading = true;
         _error = null;
@@ -75,105 +53,123 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
     }
 
     try {
-      final response = await _supabase
+      final user = _supabase.auth.currentUser;
+
+      if (user == null) {
+        throw Exception('يجب تسجيل الدخول أولاً.');
+      }
+
+      final data = await _supabase
           .from('listings')
           .select()
           .eq('seller_id', user.id)
           .order('created_at', ascending: false);
 
-      final listings = List<Map<String, dynamic>>.from(response);
+      final rows = List<Map<String, dynamic>>.from(data);
 
-      final imageUrls = await _loadImageUrls(listings);
+      final imageUrls = await _loadImageUrls(
+        rows.map((item) => item['id'].toString()).toList(),
+      );
 
       if (!mounted) return;
 
       setState(() {
-        _listings = listings;
+        _listings = rows;
         _imageUrls = imageUrls;
+        _filter = _normalizeFilter(_filter);
         _loading = false;
-        _error = null;
-        _normalizeFilter();
       });
     } catch (e) {
-      debugPrint('loadMyListings error: $e');
-
       if (!mounted) return;
 
-      if (silent && _listings.isNotEmpty) {
-        _showSnack('تعذر تحديث الإعلانات');
-        return;
-      }
-
       setState(() {
-        _error =
-            'تعذر تحميل إعلاناتك. تحقق من اتصال الإنترنت وحاول مجدداً.';
         _loading = false;
+        _error = e.toString().replaceFirst('Exception: ', '');
       });
+
+      if (_listings.isNotEmpty) {
+        _showSnack(
+          'تعذر تحديث الإعلانات حالياً',
+          isError: true,
+        );
+      }
     }
   }
 
-  // أول صورة لكل إعلان. الصور اختيارية فلا نفشل إن تعذّرت.
-  Future<Map<int, String>> _loadImageUrls(
-    List<Map<String, dynamic>> listings,
-  ) async {
-    final urls = <int, String>{};
-
-    final ids = listings.map((l) => l['id']).whereType<int>().toList();
-
-    if (ids.isEmpty) return urls;
+  Future<Map<String, String?>> _loadImageUrls(List<String> listingIds) async {
+    if (listingIds.isEmpty) return {};
 
     try {
-      final response = await _supabase
+      final data = await _supabase
           .from('listing_images')
           .select('listing_id, image_path, sort_order')
-          .inFilter('listing_id', ids)
+          .inFilter('listing_id', listingIds)
           .order('sort_order', ascending: true);
 
-      for (final image in List<Map<String, dynamic>>.from(response)) {
-        final listingId = image['listing_id'];
-        final path = image['image_path']?.toString().trim() ?? '';
+      final result = <String, String?>{};
 
-        if (listingId is int &&
-            path.isNotEmpty &&
-            !urls.containsKey(listingId)) {
-          urls[listingId] = path.startsWith('http')
-              ? path
-              : _supabase.storage.from(_bucket).getPublicUrl(path);
+      for (final row in List<Map<String, dynamic>>.from(data)) {
+        final listingId = row['listing_id']?.toString();
+        final path = row['image_path']?.toString();
+
+        if (listingId == null || path == null || path.isEmpty) {
+          continue;
+        }
+
+        if (result.containsKey(listingId)) {
+          continue;
+        }
+
+        if (path.startsWith('http://') || path.startsWith('https://')) {
+          result[listingId] = path;
+        } else {
+          result[listingId] = _supabase.storage
+              .from(_bucket)
+              .getPublicUrl(path);
         }
       }
-    } catch (e) {
-      debugPrint('my listings images error: $e');
+
+      return result;
+    } catch (_) {
+      return {};
     }
-
-    return urls;
   }
 
-  // إن أصبحت الحالة المختارة بلا إعلانات نعود إلى "الكل".
-  void _normalizeFilter() {
-    if (_filter == 'all') return;
+  String _normalizeFilter(String value) {
+    if (value == 'all') return value;
 
-    final hasAny = _listings.any((l) => l['status'] == _filter);
+    final exists = _listings.any(
+      (listing) => (listing['status'] ?? '').toString() == value,
+    );
 
-    if (!hasAny) _filter = 'all';
+    return exists ? value : 'all';
   }
 
-  // =========================
-  // أدوات مساعدة
-  // =========================
-  void _showSnack(String message) {
+  void _showSnack(
+    String message, {
+    bool isError = false,
+  }) {
     if (!mounted) return;
 
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
-          content: Text(message),
+          content: Text(
+            message,
+            textAlign: TextAlign.right,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
           behavior: SnackBarBehavior.floating,
-          backgroundColor: AppColors.ink,
+          backgroundColor:
+              isError ? Colors.red.shade700 : AppColors.ink,
+          margin: const EdgeInsets.all(14),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
           ),
-          margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         ),
       );
   }
@@ -181,66 +177,61 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
   Future<bool> _confirm({
     required String title,
     required String message,
-    required String confirmLabel,
+    required String confirmText,
     bool destructive = false,
   }) async {
     final result = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) {
+      builder: (context) {
         return Directionality(
           textDirection: TextDirection.rtl,
           child: AlertDialog(
-            backgroundColor: Theme.of(context).colorScheme.surface,
-            title: Row(
-              children: [
-                Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                    color: destructive
-                        ? Colors.red.withValues(alpha: 0.10)
-                        : AppColors.brandSoft,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    destructive
-                        ? Icons.warning_amber_rounded
-                        : Icons.help_outline_rounded,
-                    color: destructive ? Colors.red.shade700 : AppColors.brand,
-                    size: 22,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ),
-              ],
+            backgroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(22),
+            ),
+            title: Text(
+              title,
+              style: const TextStyle(
+                color: AppColors.ink,
+                fontWeight: FontWeight.w900,
+              ),
             ),
             content: Text(
               message,
-              style: const TextStyle(
-                fontSize: 14,
+              style: TextStyle(
+                color: AppColors.ink.withValues(alpha: 0.72),
                 height: 1.6,
               ),
             ),
+            actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
             actions: [
               TextButton(
-                onPressed: () => Navigator.pop(dialogContext, false),
-                child: const Text('إلغاء'),
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text(
+                  'إلغاء',
+                  style: TextStyle(
+                    color: AppColors.ink,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
               FilledButton(
                 style: FilledButton.styleFrom(
                   backgroundColor:
                       destructive ? Colors.red.shade700 : AppColors.brand,
                   foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
-                onPressed: () => Navigator.pop(dialogContext, true),
-                child: Text(confirmLabel),
+                onPressed: () => Navigator.pop(context, true),
+                child: Text(
+                  confirmText,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
               ),
             ],
           ),
@@ -248,132 +239,149 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
       },
     );
 
-    return result == true;
+    return result ?? false;
   }
 
   String _statusText(String? status) {
     switch (status) {
+      case 'approved':
+        return 'منشور';
       case 'pending':
         return 'قيد المراجعة';
-      case 'approved':
-        return 'متاح';
-      case 'rejected':
-        return 'مرفوض';
       case 'sold':
         return 'تم البيع';
       case 'archived':
         return 'مؤرشف';
+      case 'rejected':
+        return 'مرفوض';
       default:
-        return 'غير معروف';
+        return 'غير محدد';
     }
   }
 
   Color _statusColor(String? status) {
     switch (status) {
-      case 'pending':
-        return Colors.orange.shade800;
       case 'approved':
         return Colors.green.shade700;
+      case 'pending':
+        return AppColors.orange;
+      case 'sold':
+        return AppColors.brand;
+      case 'archived':
+        return Colors.blueGrey.shade600;
       case 'rejected':
         return Colors.red.shade700;
-      case 'sold':
-        return Colors.blue.shade700;
-      case 'archived':
-        return Colors.blueGrey;
       default:
-        return Colors.grey;
-    }
-  }
-
-  IconData _statusIcon(String? status) {
-    switch (status) {
-      case 'pending':
-        return Icons.hourglass_top_rounded;
-      case 'approved':
-        return Icons.check_circle_outline;
-      case 'rejected':
-        return Icons.cancel_outlined;
-      case 'sold':
-        return Icons.sell_outlined;
-      case 'archived':
-        return Icons.archive_outlined;
-      default:
-        return Icons.help_outline;
+        return AppColors.ink.withValues(alpha: 0.55);
     }
   }
 
   String _priceText(Map<String, dynamic> listing) {
     final price = listing['price'];
+    final priceType = listing['price_type']?.toString();
 
-    final currency = listing['currency']?.toString().trim().isNotEmpty == true
-        ? listing['currency'].toString().trim()
-        : 'SDG';
-
-    if (listing['price_type'] == 'contact' || price == null) {
+    if (price == null ||
+        priceType == 'contact' ||
+        priceType == 'contact_only') {
       return 'السعر عند التواصل';
     }
 
-    final number = num.tryParse(price.toString());
+    final numericPrice = double.tryParse(price.toString());
 
-    final formatted =
-        number == null ? price.toString() : _numberFormat.format(number);
+    if (numericPrice == null) {
+      return 'السعر عند التواصل';
+    }
 
-    final suffix =
-        listing['price_type'] == 'negotiable' ? ' · قابل للتفاوض' : '';
+    final formatted = _numberFormat.format(numericPrice);
+    final currency = listing['currency']?.toString();
 
-    return '$formatted $currency$suffix';
+    if (currency == null || currency.isEmpty) {
+      return formatted;
+    }
+
+    return '$formatted $currency';
   }
 
   String _timeAgo(dynamic value) {
-    final date = DateTime.tryParse(value?.toString() ?? '')?.toLocal();
+    if (value == null) return '';
 
-    if (date == null) return '';
+    DateTime? date;
 
-    final diff = DateTime.now().difference(date);
+    try {
+      date = DateTime.parse(value.toString()).toLocal();
+    } catch (_) {
+      return '';
+    }
 
-    if (diff.inMinutes < 1) return 'الآن';
-    if (diff.inMinutes < 60) return 'قبل ${diff.inMinutes} د';
-    if (diff.inHours < 24) return 'قبل ${diff.inHours} س';
-    if (diff.inDays < 30) return 'قبل ${diff.inDays} يوم';
+    final difference = DateTime.now().difference(date);
 
-    return 'قبل ${diff.inDays ~/ 30} شهر';
+    if (difference.inMinutes < 1) {
+      return 'الآن';
+    }
+
+    if (difference.inMinutes < 60) {
+      return 'منذ ${difference.inMinutes} دقيقة';
+    }
+
+    if (difference.inHours < 24) {
+      return 'منذ ${difference.inHours} ساعة';
+    }
+
+    if (difference.inDays < 7) {
+      return 'منذ ${difference.inDays} يوم';
+    }
+
+    if (difference.inDays < 30) {
+      return 'منذ ${(difference.inDays / 7).floor()} أسبوع';
+    }
+
+    if (difference.inDays < 365) {
+      return 'منذ ${(difference.inDays / 30).floor()} شهر';
+    }
+
+    return 'منذ ${(difference.inDays / 365).floor()} سنة';
   }
 
-  // =========================
-  // العمليات
-  // =========================
-  void _openListing(Map<String, dynamic> listing) {
-    final id = listing['id'];
-
-    if (id is! int) return;
-
-    Navigator.push(
+  Future<void> _openListing(String listingId) async {
+    await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => ListingDetailsScreen(listingId: id),
+        builder: (_) => ListingDetailsScreen(
+          listingId: listingId,
+        ),
       ),
     );
+
+    if (mounted) {
+      _loadListings();
+    }
   }
 
   Future<void> _addListing() async {
     await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const AddListingScreen()),
-    );
-
-    if (mounted) await _loadListings(silent: true);
-  }
-
-  Future<void> _editListing(Map<String, dynamic> listing) async {
-    final result = await Navigator.push(
-      context,
       MaterialPageRoute(
-        builder: (_) => EditListingScreen(listing: listing),
+        builder: (_) => const AddListingScreen(),
       ),
     );
 
-    if (result == true && mounted) {
-      await _loadListings(silent: true);
+    if (mounted) {
+      _loadListings();
+    }
+  }
+
+  Future<void> _editListing(String listingId) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => EditListingScreen(
+          listingId: listingId,
+        ),
+      ),
+    );
+
+    if (mounted) {
+      _loadListings();
     }
   }
 
@@ -381,204 +389,284 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
     Map<String, dynamic> listing,
     String newStatus,
   ) async {
+    final listingId = listing['id']?.toString();
+
+    if (listingId == null || listingId.isEmpty) return;
+
     final title = listing['title']?.toString() ?? 'هذا الإعلان';
 
-    final String actionTitle;
-    final String message;
+    String message;
+    String confirmText;
 
     switch (newStatus) {
       case 'sold':
-        actionTitle = 'تم البيع';
-        message = 'هل تريد تغيير حالة الإعلان إلى "تم البيع"؟\n\n$title';
+        message =
+            'هل تريد تحديد الإعلان "$title" على أنه تم بيعه؟';
+        confirmText = 'تم البيع';
         break;
+
       case 'archived':
-        actionTitle = 'أرشفة';
-        message = 'هل تريد أرشفة هذا الإعلان؟\n\n$title\n\n'
-            'يمكنك إعادته إلى "متاح" لاحقاً.';
+        message =
+            'هل تريد أرشفة الإعلان "$title"؟';
+        confirmText = 'أرشفة';
         break;
+
       case 'approved':
-        actionTitle = 'إعادة إلى متاح';
-        message = 'هل تريد إعادة هذا الإعلان إلى حالة "متاح"؟\n\n$title';
+        message =
+            'هل تريد إعادة نشر الإعلان "$title"؟';
+        confirmText = 'نشر';
         break;
+
       default:
         return;
     }
 
     final confirmed = await _confirm(
-      title: actionTitle,
+      title: 'تأكيد الإجراء',
       message: message,
-      confirmLabel: actionTitle,
+      confirmText: confirmText,
     );
 
-    if (confirmed && mounted) {
-      await _changeStatus(listing, newStatus);
-    }
+    if (!confirmed) return;
+
+    await _changeStatus(
+      listingId,
+      newStatus,
+    );
   }
 
   Future<void> _changeStatus(
-    Map<String, dynamic> listing,
+    String listingId,
     String newStatus,
   ) async {
-    final id = listing['id'];
+    if (_busyIds.contains(listingId)) return;
 
-    if (id is! int || _busyIds.contains(id)) return;
-
-    final String message;
-
-    switch (newStatus) {
-      case 'sold':
-        message = 'تم تغيير حالة الإعلان إلى "تم البيع".';
-        break;
-      case 'archived':
-        message = 'تمت أرشفة الإعلان.';
-        break;
-      case 'approved':
-        message = 'تمت إعادة الإعلان إلى "متاح".';
-        break;
-      default:
-        message = 'تم تحديث حالة الإعلان.';
-    }
-
-    setState(() => _busyIds.add(id));
+    setState(() {
+      _busyIds.add(listingId);
+    });
 
     try {
       await _supabase
           .from('listings')
-          .update({'status': newStatus}).eq('id', id);
+          .update({
+            'status': newStatus,
+          })
+          .eq('id', listingId);
 
       if (!mounted) return;
 
       setState(() {
-        listing['status'] = newStatus;
-        _normalizeFilter();
+        final index = _listings.indexWhere(
+          (listing) => listing['id']?.toString() == listingId,
+        );
+
+        if (index != -1) {
+          _listings[index] = {
+            ..._listings[index],
+            'status': newStatus,
+          };
+        }
+
+        _busyIds.remove(listingId);
+        _filter = _normalizeFilter(_filter);
       });
 
-      _showSnack(message);
+      _showSnack(
+        'تم تحديث حالة الإعلان بنجاح',
+      );
     } catch (e) {
-      debugPrint('changeStatus error: $e');
-      _showSnack('تعذر تحديث حالة الإعلان، حاول مرة أخرى');
-    } finally {
-      if (mounted) setState(() => _busyIds.remove(id));
+      if (!mounted) return;
+
+      setState(() {
+        _busyIds.remove(listingId);
+      });
+
+      _showSnack(
+        'تعذر تحديث حالة الإعلان',
+        isError: true,
+      );
     }
   }
 
-  Future<void> _deleteListing(Map<String, dynamic> listing) async {
-    final id = listing['id'];
+  Future<void> _deleteListing(
+    Map<String, dynamic> listing,
+  ) async {
+    final listingId = listing['id']?.toString();
 
-    if (id is! int || _busyIds.contains(id)) return;
+    if (listingId == null || listingId.isEmpty) return;
 
     final title = listing['title']?.toString() ?? 'هذا الإعلان';
 
     final confirmed = await _confirm(
       title: 'حذف الإعلان',
-      message: 'هل أنت متأكد من حذف:\n\n$title\n\n'
-          'سيُحذف الإعلان وصوره نهائياً ولا يمكن التراجع.',
-      confirmLabel: 'حذف',
+      message:
+          'هل أنت متأكد من حذف "$title"؟\n\nلا يمكن التراجع عن هذا الإجراء.',
+      confirmText: 'حذف نهائياً',
       destructive: true,
     );
 
-    if (!confirmed || !mounted) return;
+    if (!confirmed) return;
 
-    setState(() => _busyIds.add(id));
+    if (_busyIds.contains(listingId)) return;
+
+    setState(() {
+      _busyIds.add(listingId);
+    });
 
     try {
-      await _deleteImageFiles(id);
+      await _deleteImageFiles(listingId);
 
-      await _supabase.from('listings').delete().eq('id', id);
+      await _supabase
+          .from('listings')
+          .delete()
+          .eq('id', listingId);
 
       if (!mounted) return;
 
       setState(() {
-        _listings.removeWhere((l) => l['id'] == id);
-        _imageUrls.remove(id);
-        _normalizeFilter();
+        _listings.removeWhere(
+          (item) => item['id']?.toString() == listingId,
+        );
+        _imageUrls.remove(listingId);
+        _busyIds.remove(listingId);
+        _filter = _normalizeFilter(_filter);
       });
 
-      _showSnack('تم حذف الإعلان بنجاح.');
+      _showSnack(
+        'تم حذف الإعلان بنجاح',
+      );
     } catch (e) {
-      debugPrint('deleteListing error: $e');
-      _showSnack('تعذر حذف الإعلان، حاول مرة أخرى');
+      if (!mounted) return;
 
-      if (mounted) await _loadListings(silent: true);
-    } finally {
-      if (mounted) setState(() => _busyIds.remove(id));
+      setState(() {
+        _busyIds.remove(listingId);
+      });
+
+      _showSnack(
+        'تعذر حذف الإعلان، حاول مرة أخرى',
+        isError: true,
+      );
+
+      await _loadListings();
     }
   }
 
-  // حذف ملفات صور الإعلان من التخزين (لا نوقف الحذف إن فشلت).
-  Future<void> _deleteImageFiles(int listingId) async {
+  Future<void> _deleteImageFiles(String listingId) async {
     try {
-      final response = await _supabase
+      final rows = await _supabase
           .from('listing_images')
           .select('image_path')
           .eq('listing_id', listingId);
 
-      final paths = List<Map<String, dynamic>>.from(response)
-          .map((row) => row['image_path']?.toString().trim() ?? '')
-          .where((path) => path.isNotEmpty && !path.startsWith('http'))
-          .toList();
+      final paths = <String>[];
 
-      if (paths.isEmpty) return;
+      for (final row in List<Map<String, dynamic>>.from(rows)) {
+        final path = row['image_path']?.toString();
 
-      await _supabase.storage.from(_bucket).remove(paths);
-    } catch (e) {
-      debugPrint('deleteImageFiles error: $e');
+        if (path != null &&
+            path.isNotEmpty &&
+            !path.startsWith('http://') &&
+            !path.startsWith('https://')) {
+          paths.add(path);
+        }
+      }
+
+      if (paths.isNotEmpty) {
+        try {
+          await _supabase.storage
+              .from(_bucket)
+              .remove(paths);
+        } catch (_) {
+          // لا نوقف حذف الإعلان إذا فشل حذف الملفات من التخزين.
+        }
+      }
+    } catch (_) {
+      // لا نوقف حذف الإعلان بسبب خطأ في جلب الصور.
     }
   }
 
-  void _onMenuSelected(String value, Map<String, dynamic> listing) {
+  void _onMenuSelected(
+    String value,
+    Map<String, dynamic> listing,
+  ) {
     switch (value) {
       case 'view':
-        _openListing(listing);
+        final id = listing['id']?.toString();
+
+        if (id != null) {
+          _openListing(id);
+        }
         break;
+
       case 'edit':
-        _editListing(listing);
+        final id = listing['id']?.toString();
+
+        if (id != null) {
+          _editListing(id);
+        }
         break;
+
       case 'sold':
-        _confirmChangeStatus(listing, 'sold');
+        _confirmChangeStatus(
+          listing,
+          'sold',
+        );
         break;
+
       case 'archive':
-        _confirmChangeStatus(listing, 'archived');
+        _confirmChangeStatus(
+          listing,
+          'archived',
+        );
         break;
-      case 'restore':
-        _confirmChangeStatus(listing, 'approved');
+
+      case 'publish':
+        _confirmChangeStatus(
+          listing,
+          'approved',
+        );
         break;
+
       case 'delete':
         _deleteListing(listing);
         break;
     }
   }
 
-  // =========================
-  // مكوّنات الواجهة
-  // =========================
   Widget _buildStatusBadge(String? status) {
     final color = _statusColor(status);
+    final text = _statusText(status);
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 10,
+        vertical: 5,
+      ),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(30),
         border: Border.all(
-          color: color.withValues(alpha: 0.18),
+          color: color.withValues(alpha: 0.20),
         ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            _statusIcon(status),
-            size: 14,
-            color: color,
+          Container(
+            width: 7,
+            height: 7,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+            ),
           ),
-          const SizedBox(width: 5),
+          const SizedBox(width: 6),
           Text(
-            _statusText(status),
+            text,
             style: TextStyle(
               color: color,
-              fontSize: 11.5,
-              fontWeight: FontWeight.w800,
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
             ),
           ),
         ],
@@ -586,520 +674,579 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
     );
   }
 
-  Widget _buildThumbnail(int? id) {
-    final url = id == null ? null : _imageUrls[id];
+  Widget _buildThumbnail(
+    String listingId,
+  ) {
+    final imageUrl = _imageUrls[listingId];
 
-    Widget placeholder(IconData icon) {
-      return Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topRight,
-            end: Alignment.bottomLeft,
-            colors: [
-              AppColors.brandSoft,
-              AppColors.pageBackground,
-            ],
-          ),
+    return Container(
+      width: 92,
+      height: 92,
+      decoration: BoxDecoration(
+        color: AppColors.brandSoft,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppColors.brand.withValues(alpha: 0.10),
         ),
-        child: Icon(
-          icon,
-          size: 34,
-          color: AppColors.brand,
-        ),
-      );
-    }
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(14),
-      child: SizedBox(
-        width: 92,
-        height: 92,
-        child: url == null
-            ? placeholder(Icons.image_outlined)
-            : CachedNetworkImage(
-                imageUrl: url,
-                fit: BoxFit.cover,
-                memCacheWidth: 300,
-                placeholder: (_, __) => placeholder(Icons.image_outlined),
-                errorWidget: (_, __, ___) =>
-                    placeholder(Icons.broken_image_outlined),
-              ),
       ),
+      clipBehavior: Clip.antiAlias,
+      child: imageUrl == null || imageUrl.isEmpty
+          ? const Center(
+              child: Icon(
+                Icons.image_outlined,
+                color: AppColors.brand,
+                size: 32,
+              ),
+            )
+          : CachedNetworkImage(
+              imageUrl: imageUrl,
+              fit: BoxFit.cover,
+              placeholder: (_, __) => const Center(
+                child: SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.2,
+                    color: AppColors.brand,
+                  ),
+                ),
+              ),
+              errorWidget: (_, __, ___) => const Center(
+                child: Icon(
+                  Icons.broken_image_outlined,
+                  color: AppColors.brand,
+                  size: 30,
+                ),
+              ),
+            ),
     );
   }
 
-  List<PopupMenuEntry<String>> _menuItems(String? status) {
-    PopupMenuItem<String> item(
-      String value,
-      IconData icon,
-      String label, {
-      Color? color,
-    }) {
-      return PopupMenuItem<String>(
-        value: value,
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              size: 20,
-              color: color ?? AppColors.ink,
-            ),
-            const SizedBox(width: 10),
-            Text(
-              label,
-              style: TextStyle(
-                color: color ?? AppColors.ink,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
+  List<PopupMenuEntry<String>> _menuItems(
+    Map<String, dynamic> listing,
+  ) {
+    final status = listing['status']?.toString();
 
     return [
-      item('view', Icons.visibility_outlined, 'عرض الإعلان'),
-      item('edit', Icons.edit_outlined, 'تعديل'),
-      if (status == 'approved') ...[
-        item('sold', Icons.sell_outlined, 'تم البيع'),
-        item('archive', Icons.archive_outlined, 'أرشفة'),
-      ],
-      if (status == 'sold' || status == 'archived')
-        item('restore', Icons.replay_outlined, 'إعادة إلى متاح'),
+      const PopupMenuItem<String>(
+        value: 'view',
+        child: ListTile(
+          dense: true,
+          contentPadding: EdgeInsets.zero,
+          leading: Icon(
+            Icons.visibility_outlined,
+            color: AppColors.ink,
+          ),
+          title: Text('عرض الإعلان'),
+        ),
+      ),
+      const PopupMenuItem<String>(
+        value: 'edit',
+        child: ListTile(
+          dense: true,
+          contentPadding: EdgeInsets.zero,
+          leading: Icon(
+            Icons.edit_outlined,
+            color: AppColors.brand,
+          ),
+          title: Text('تعديل الإعلان'),
+        ),
+      ),
+      if (status == 'approved')
+        const PopupMenuItem<String>(
+          value: 'sold',
+          child: ListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(
+              Icons.sell_outlined,
+              color: AppColors.brand,
+            ),
+            title: Text('تحديد كمباع'),
+          ),
+        ),
+      if (status == 'approved' || status == 'sold')
+        const PopupMenuItem<String>(
+          value: 'archive',
+          child: ListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(
+              Icons.archive_outlined,
+              color: Colors.blueGrey,
+            ),
+            title: Text('أرشفة'),
+          ),
+        ),
+      if (status == 'archived' || status == 'rejected')
+        const PopupMenuItem<String>(
+          value: 'publish',
+          child: ListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(
+              Icons.publish_outlined,
+              color: AppColors.brand,
+            ),
+            title: Text('إعادة النشر'),
+          ),
+        ),
       const PopupMenuDivider(),
-      item(
-        'delete',
-        Icons.delete_outline,
-        'حذف',
-        color: Colors.red.shade700,
+      const PopupMenuItem<String>(
+        value: 'delete',
+        child: ListTile(
+          dense: true,
+          contentPadding: EdgeInsets.zero,
+          leading: Icon(
+            Icons.delete_outline,
+            color: Colors.red,
+          ),
+          title: Text(
+            'حذف الإعلان',
+            style: TextStyle(
+              color: Colors.red,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
       ),
     ];
   }
 
-  Widget _buildListingCard(Map<String, dynamic> listing) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    final id = listing['id'] as int?;
+  Widget _buildListingCard(
+    Map<String, dynamic> listing,
+  ) {
+    final listingId = listing['id']?.toString() ?? '';
     final status = listing['status']?.toString();
-    final busy = id != null && _busyIds.contains(id);
-
-    final rawTitle = listing['title']?.toString().trim() ?? '';
-    final title = rawTitle.isEmpty ? 'إعلان بدون عنوان' : rawTitle;
-
-    final area = listing['area']?.toString().trim() ?? '';
-    final timeAgo = _timeAgo(listing['created_at']);
-
-    final meta = [
-      if (area.isNotEmpty) area,
-      if (timeAgo.isNotEmpty) timeAgo,
-    ].join(' · ');
-
-    Widget? statusAction;
-
-    if (status == 'approved') {
-      statusAction = FilledButton.tonalIcon(
-        style: FilledButton.styleFrom(
-          foregroundColor: AppColors.brand,
-          backgroundColor: AppColors.brandSoft,
-          padding: const EdgeInsets.symmetric(
-            horizontal: 12,
-            vertical: 11,
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-        onPressed: busy
-            ? null
-            : () => _confirmChangeStatus(listing, 'sold'),
-        icon: const Icon(Icons.sell_outlined, size: 18),
-        label: const Text('تم البيع'),
-      );
-    } else if (status == 'sold' || status == 'archived') {
-      statusAction = FilledButton.tonalIcon(
-        style: FilledButton.styleFrom(
-          foregroundColor: AppColors.brand,
-          backgroundColor: AppColors.brandSoft,
-          padding: const EdgeInsets.symmetric(
-            horizontal: 10,
-            vertical: 11,
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-        onPressed: busy
-            ? null
-            : () => _confirmChangeStatus(listing, 'approved'),
-        icon: const Icon(Icons.replay_outlined, size: 18),
-        label: const Text('إعادة إلى متاح'),
-      );
-    }
+    final title = listing['title']?.toString() ?? 'بدون عنوان';
+    final area = listing['area']?.toString();
+    final time = _timeAgo(listing['created_at']);
+    final busy = _busyIds.contains(listingId);
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      margin: const EdgeInsets.only(bottom: 14),
       decoration: AppDecorations.card(),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: busy ? null : () => _openListing(listing),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (busy)
-              const LinearProgressIndicator(
-                minHeight: 3,
-                color: AppColors.brand,
-                backgroundColor: AppColors.brandSoft,
-              ),
-
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 12, 6, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildThumbnail(id),
-
-                      const SizedBox(width: 12),
-
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              title,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: AppColors.ink,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w900,
-                                height: 1.3,
-                              ),
-                            ),
-                            const SizedBox(height: 5),
-                            Text(
-                              _priceText(listing),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: AppColors.brand,
-                                fontSize: 15,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                            const SizedBox(height: 7),
-                            _buildStatusBadge(status),
-                            if (meta.isNotEmpty) ...[
-                              const SizedBox(height: 7),
-                              Row(
-                                children: [
-                                  const Icon(
-                                    Icons.location_on_outlined,
-                                    size: 14,
-                                    color: AppColors.brand,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: busy || listingId.isEmpty
+              ? null
+              : () => _openListing(listingId),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildThumbnail(listingId),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  title,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: AppColors.ink,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w900,
+                                    height: 1.35,
                                   ),
-                                  const SizedBox(width: 3),
-                                  Expanded(
-                                    child: Text(
-                                      meta,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: colorScheme.onSurfaceVariant,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                                ),
+                              ),
+                              PopupMenuButton<String>(
+                                tooltip: 'خيارات الإعلان',
+                                padding: EdgeInsets.zero,
+                                icon: const Icon(
+                                  Icons.more_vert,
+                                  color: AppColors.ink,
+                                ),
+                                onSelected: busy
+                                    ? null
+                                    : (value) => _onMenuSelected(
+                                          value,
+                                          listing,
+                                        ),
+                                itemBuilder: (_) =>
+                                    _menuItems(listing),
                               ),
                             ],
-                          ],
-                        ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            _priceText(listing),
+                            style: const TextStyle(
+                              color: AppColors.brand,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          _buildStatusBadge(status),
+                        ],
                       ),
-
-                      PopupMenuButton<String>(
-                        enabled: !busy,
-                        tooltip: 'المزيد',
-                        icon: const Icon(
-                          Icons.more_vert_rounded,
-                          color: AppColors.ink,
-                        ),
-                        onSelected: (value) =>
-                            _onMenuSelected(value, listing),
-                        itemBuilder: (_) => _menuItems(status),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.only(top: 10),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      top: BorderSide(
+                        color: AppColors.brand.withValues(alpha: 0.07),
                       ),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      if (area != null && area.isNotEmpty) ...[
+                        Icon(
+                          Icons.location_on_outlined,
+                          size: 16,
+                          color: AppColors.ink.withValues(alpha: 0.52),
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            area,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: AppColors.ink.withValues(alpha: 0.62),
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ] else
+                        const Spacer(),
+                      if (time.isNotEmpty) ...[
+                        Icon(
+                          Icons.schedule_outlined,
+                          size: 15,
+                          color: AppColors.ink.withValues(alpha: 0.45),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          time,
+                          style: TextStyle(
+                            color: AppColors.ink.withValues(alpha: 0.55),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
-
-                  if (status == 'rejected')
-                    Container(
-                      margin: const EdgeInsets.only(top: 10, left: 6),
-                      padding: const EdgeInsets.all(11),
-                      decoration: BoxDecoration(
-                        color: Colors.red.withValues(alpha: 0.07),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: Colors.red.withValues(alpha: 0.14),
-                        ),
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Icon(
-                            Icons.info_outline_rounded,
-                            size: 20,
-                            color: Colors.red.shade700,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              (listing['rejection_reason']
-                                          ?.toString()
-                                          .trim()
-                                          .isNotEmpty ??
-                                      false)
-                                  ? 'سبب الرفض: ${listing['rejection_reason']}\n'
-                                      'عدّل الإعلان ثم احفظ ليُعاد إرساله للمراجعة.'
-                                  : 'تم رفض الإعلان. عدّله ثم احفظ ليُعاد إرساله للمراجعة.',
-                              style: TextStyle(
-                                fontSize: 12.5,
-                                height: 1.5,
-                                color: Colors.red.shade800,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
+                ),
+                if (status == 'rejected') ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(11),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Colors.red.withValues(alpha: 0.12),
                       ),
                     ),
-
-                  if (status == 'pending')
-                    Container(
-                      margin: const EdgeInsets.only(top: 10, left: 6),
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: AppColors.gold.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Icon(
-                            Icons.hourglass_top_rounded,
-                            size: 19,
-                            color: AppColors.orange,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'بانتظار مراجعة الإدارة، وسيظهر للجميع بعد الموافقة.',
-                              style: TextStyle(
-                                fontSize: 12,
-                                height: 1.5,
-                                color: Colors.orange.shade900,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                  const SizedBox(height: 11),
-
-                  Padding(
-                    padding: const EdgeInsets.only(left: 6),
                     child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        Icon(
+                          Icons.info_outline,
+                          color: Colors.red.shade700,
+                          size: 19,
+                        ),
+                        const SizedBox(width: 8),
                         Expanded(
-                          child: OutlinedButton.icon(
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: AppColors.brand,
-                              side: const BorderSide(
-                                color: AppColors.brand,
-                              ),
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 11,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
+                          child: Text(
+                            listing['rejection_reason']?.toString() ??
+                                'تم رفض الإعلان. يمكنك تعديله وإعادة إرساله.',
+                            style: TextStyle(
+                              color: Colors.red.shade800,
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w600,
+                              height: 1.5,
                             ),
-                            onPressed:
-                                busy ? null : () => _editListing(listing),
-                            icon: const Icon(
-                              Icons.edit_outlined,
-                              size: 18,
-                            ),
-                            label: const Text('تعديل'),
                           ),
                         ),
-                        if (statusAction != null) ...[
-                          const SizedBox(width: 8),
-                          Expanded(child: statusAction),
-                        ],
                       ],
                     ),
                   ),
                 ],
-              ),
+                if (status == 'pending') ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(11),
+                    decoration: BoxDecoration(
+                      color: AppColors.brandSoft,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(
+                          Icons.hourglass_top_rounded,
+                          color: AppColors.brand,
+                          size: 18,
+                        ),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'الإعلان قيد المراجعة وسيظهر للمستخدمين بعد اعتماده.',
+                            style: TextStyle(
+                              color: AppColors.ink,
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w600,
+                              height: 1.5,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                if (status == 'rejected' || status == 'pending') ...[
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: busy || listingId.isEmpty
+                          ? null
+                          : () => _editListing(listingId),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.brand,
+                        side: BorderSide(
+                          color: AppColors.brand.withValues(alpha: 0.35),
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 11,
+                        ),
+                      ),
+                      icon: const Icon(
+                        Icons.edit_outlined,
+                        size: 18,
+                      ),
+                      label: const Text(
+                        'تعديل الإعلان',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+                if (status == 'approved') ...[
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: busy || listingId.isEmpty
+                          ? null
+                          : () => _confirmChangeStatus(
+                                listing,
+                                'sold',
+                              ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.brand,
+                        side: BorderSide(
+                          color: AppColors.brand.withValues(alpha: 0.28),
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 11,
+                        ),
+                      ),
+                      icon: const Icon(
+                        Icons.sell_outlined,
+                        size: 18,
+                      ),
+                      label: const Text(
+                        'تم البيع',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+                if (busy) ...[
+                  const SizedBox(height: 10),
+                  const LinearProgressIndicator(
+                    minHeight: 2,
+                    color: AppColors.brand,
+                    backgroundColor: AppColors.brandSoft,
+                  ),
+                ],
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
   }
 
-  // =========================
-  // شريط تصفية الإعلانات
-  // =========================
   Widget _buildFilters() {
-    final counts = <String, int>{};
+    final counts = <String, int>{
+      'all': _listings.length,
+      for (final status in _statusOrder)
+        status: _listings
+            .where(
+              (listing) =>
+                  (listing['status'] ?? '').toString() == status,
+            )
+            .length,
+    };
 
-    for (final listing in _listings) {
-      final status = listing['status']?.toString() ?? '';
-      counts[status] = (counts[status] ?? 0) + 1;
-    }
-
-    final statuses =
-        _statusOrder.where((status) => (counts[status] ?? 0) > 0).toList();
-
-    if (statuses.length < 2) return const SizedBox.shrink();
-
-    final options = <MapEntry<String, String>>[
-      MapEntry('all', 'الكل (${_listings.length})'),
-      for (final status in statuses)
-        MapEntry(
-          status,
-          '${_statusText(status)} (${counts[status]})',
-        ),
+    final filters = <String>[
+      'all',
+      ..._statusOrder,
     ];
 
-    return SizedBox(
-      height: 58,
-      child: ListView.separated(
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 12,
+        vertical: 10,
+      ),
+      decoration: AppDecorations.card(),
+      child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(
-          horizontal: 14,
-          vertical: 9,
-        ),
-        itemCount: options.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (context, index) {
-          final option = options[index];
-          final selected = _filter == option.key;
+        child: Row(
+          children: filters.map((filter) {
+            final selected = _filter == filter;
+            final count = counts[filter] ?? 0;
 
-          final statusColor = option.key == 'all'
-              ? AppColors.brand
-              : _statusColor(option.key);
-
-          return ChoiceChip(
-            label: Text(
-              option.value,
-              style: TextStyle(
-                color: selected ? Colors.white : statusColor,
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
+            return Padding(
+              padding: const EdgeInsetsDirectional.only(
+                end: 8,
               ),
-            ),
-            selected: selected,
-            showCheckmark: false,
-            backgroundColor: Colors.white,
-            selectedColor: statusColor,
-            side: BorderSide(
-              color: selected
-                  ? statusColor
-                  : statusColor.withValues(alpha: 0.20),
-            ),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(22),
-            ),
-            onSelected: (_) => setState(() => _filter = option.key),
-          );
-        },
+              child: ChoiceChip(
+                selected: selected,
+                onSelected: (_) {
+                  setState(() {
+                    _filter = filter;
+                  });
+                },
+                selectedColor: AppColors.brandSoft,
+                backgroundColor: Colors.white,
+                side: BorderSide(
+                  color: selected
+                      ? AppColors.brand
+                      : AppColors.brand.withValues(alpha: 0.12),
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(30),
+                ),
+                label: Text(
+                  '${filter == 'all' ? 'الكل' : _statusText(filter)} ($count)',
+                ),
+                labelStyle: TextStyle(
+                  color: selected
+                      ? AppColors.brand
+                      : AppColors.ink.withValues(alpha: 0.70),
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w800,
+                ),
+                checkmarkColor: AppColors.brand,
+              ),
+            );
+          }).toList(),
+        ),
       ),
     );
   }
 
-  // =========================
-  // الحالات الفارغة والخطأ
-  // =========================
   Widget _buildEmptyState() {
-    return RefreshIndicator(
-      onRefresh: () => _loadListings(silent: true),
-      child: ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 32),
-        children: [
-          const SizedBox(height: 110),
+    final isFiltered = _filter != 'all';
 
-          Container(
-            width: 92,
-            height: 92,
-            margin: const EdgeInsets.symmetric(horizontal: 80),
-            decoration: BoxDecoration(
-              color: AppColors.brandSoft,
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.inventory_2_outlined,
-              size: 48,
-              color: AppColors.brand,
-            ),
-          ),
-
-          const SizedBox(height: 20),
-
-          const Text(
-            'لم تضف أي إعلانات حتى الآن',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: AppColors.ink,
-              fontSize: 19,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-
-          const SizedBox(height: 8),
-
-          Text(
-            'أضف أول إعلان لك ليراه الناس في شبشة.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-              fontSize: 13.5,
-              height: 1.5,
-            ),
-          ),
-
-          const SizedBox(height: 22),
-
-          Center(
-            child: FilledButton.icon(
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.brand,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 13,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 94,
+              height: 94,
+              decoration: BoxDecoration(
+                color: AppColors.brandSoft,
+                shape: BoxShape.circle,
               ),
-              onPressed: _addListing,
-              icon: const Icon(Icons.add),
-              label: const Text(
-                'أضف إعلانك الأول',
-                style: TextStyle(fontWeight: FontWeight.w800),
+              child: const Icon(
+                Icons.inventory_2_outlined,
+                size: 44,
+                color: AppColors.brand,
               ),
             ),
-          ),
-        ],
+            const SizedBox(height: 20),
+            Text(
+              isFiltered
+                  ? 'لا توجد إعلانات بهذه الحالة'
+                  : 'لا توجد لديك إعلانات بعد',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: AppColors.ink,
+                fontSize: 19,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 9),
+            Text(
+              isFiltered
+                  ? 'جرّب اختيار حالة أخرى من الفلاتر أعلاه.'
+                  : 'ابدأ بإضافة أول إعلان لك في دلالة شبشة.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppColors.ink.withValues(alpha: 0.62),
+                fontSize: 13,
+                height: 1.6,
+              ),
+            ),
+            if (!isFiltered) ...[
+              const SizedBox(height: 20),
+              FilledButton.icon(
+                onPressed: _addListing,
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.brand,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 12,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                icon: const Icon(
+                  Icons.add_rounded,
+                ),
+                label: const Text(
+                  'إضافة إعلان',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -1109,27 +1256,42 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Container(
+          width: double.infinity,
           padding: const EdgeInsets.all(22),
-          decoration: AppDecorations.card(),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: Colors.red.withValues(alpha: 0.12),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.brand.withValues(alpha: 0.06),
+                blurRadius: 14,
+                offset: const Offset(0, 5),
+              ),
+            ],
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                width: 64,
-                height: 64,
+                width: 70,
+                height: 70,
                 decoration: BoxDecoration(
-                  color: Colors.red.withValues(alpha: 0.08),
+                  color: Colors.red.withValues(alpha: 0.07),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  Icons.error_outline_rounded,
-                  size: 36,
+                  Icons.cloud_off_outlined,
                   color: Colors.red.shade700,
+                  size: 34,
                 ),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 16),
               const Text(
-                'تعذر تحميل الإعلانات',
+                'تعذر تحميل إعلاناتك',
+                textAlign: TextAlign.center,
                 style: TextStyle(
                   color: AppColors.ink,
                   fontSize: 17,
@@ -1138,16 +1300,17 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                _error ?? 'حدث خطأ غير متوقع',
+                _error ?? 'حدث خطأ غير متوقع.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 13,
+                  color: AppColors.ink.withValues(alpha: 0.62),
+                  fontSize: 12,
                   height: 1.5,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
               const SizedBox(height: 18),
               FilledButton.icon(
+                onPressed: _loadListings,
                 style: FilledButton.styleFrom(
                   backgroundColor: AppColors.brand,
                   foregroundColor: Colors.white,
@@ -1155,9 +1318,15 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
                     borderRadius: BorderRadius.circular(13),
                   ),
                 ),
-                onPressed: _loadListings,
-                icon: const Icon(Icons.refresh),
-                label: const Text('إعادة المحاولة'),
+                icon: const Icon(
+                  Icons.refresh_rounded,
+                ),
+                label: const Text(
+                  'إعادة المحاولة',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
               ),
             ],
           ),
@@ -1175,86 +1344,165 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
       );
     }
 
-    if (_error != null) return _buildErrorState();
+    if (_error != null && _listings.isEmpty) {
+      return _buildErrorState();
+    }
 
-    if (_listings.isEmpty) return _buildEmptyState();
-
-    final visible = _filter == 'all'
+    final filteredListings = _filter == 'all'
         ? _listings
-        : _listings.where((l) => l['status'] == _filter).toList();
+        : _listings
+            .where(
+              (listing) =>
+                  (listing['status'] ?? '').toString() == _filter,
+            )
+            .toList();
 
-    return Column(
-      children: [
-        _buildFilters(),
+    if (_listings.isEmpty) {
+      return _buildEmptyState();
+    }
 
-        Expanded(
-          child: RefreshIndicator(
-            color: AppColors.brand,
-            onRefresh: () => _loadListings(silent: true),
-            child: ListView.builder(
-              physics: const AlwaysScrollableScrollPhysics(),
-
-              // مساحة أسفل القائمة حتى لا يغطي الزر العائم آخر إعلان.
-              padding: const EdgeInsets.only(
-                top: 4,
-                bottom: 90,
+    return RefreshIndicator(
+      color: AppColors.brand,
+      backgroundColor: Colors.white,
+      onRefresh: _loadListings,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(
+          14,
+          14,
+          14,
+          100,
+        ),
+        children: [
+          Container(
+            margin: const EdgeInsets.only(bottom: 14),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [
+                  AppColors.brand,
+                  AppColors.brandDark,
+                ],
+                begin: Alignment.topRight,
+                end: Alignment.bottomLeft,
               ),
-
-              itemCount: visible.length,
-
-              itemBuilder: (context, index) {
-                return _buildListingCard(visible[index]);
-              },
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.brand.withValues(alpha: 0.18),
+                  blurRadius: 16,
+                  offset: const Offset(0, 7),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                  child: const Icon(
+                    Icons.storefront_outlined,
+                    color: Colors.white,
+                    size: 26,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment:
+                        CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'إعلاناتك',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        '${_listings.length} إعلان${_listings.length == 1 ? '' : 'ات'} في حسابك',
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'تحديث',
+                  onPressed: _loading ? null : _loadListings,
+                  icon: const Icon(
+                    Icons.refresh_rounded,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
             ),
           ),
-        ),
-      ],
+          _buildFilters(),
+          if (filteredListings.isEmpty)
+            _buildEmptyState()
+          else
+            ...filteredListings.map(_buildListingCard),
+        ],
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final showFab = !_loading &&
-        _error == null &&
-        _listings.isNotEmpty;
-
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
         backgroundColor: AppColors.pageBackground,
-
         appBar: AppBar(
-          backgroundColor: AppColors.pageBackground,
-          foregroundColor: AppColors.ink,
+          backgroundColor: AppColors.brand,
+          foregroundColor: Colors.white,
           elevation: 0,
           centerTitle: true,
           title: const Text(
             'إعلاناتي',
             style: TextStyle(
-              color: AppColors.ink,
+              color: Colors.white,
+              fontWeight: FontWeight.w900,
               fontSize: 18,
+            ),
+          ),
+          actions: [
+            IconButton(
+              tooltip: 'تحديث',
+              onPressed: _loading ? null : _loadListings,
+              icon: const Icon(
+                Icons.refresh_rounded,
+                color: Colors.white,
+              ),
+            ),
+          ],
+        ),
+        body: _buildBody(),
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: _addListing,
+          backgroundColor: AppColors.brand,
+          foregroundColor: Colors.white,
+          elevation: 5,
+          icon: const Icon(
+            Icons.add_rounded,
+          ),
+          label: const Text(
+            'إعلان جديد',
+            style: TextStyle(
               fontWeight: FontWeight.w900,
             ),
           ),
         ),
-
-        body: _buildBody(),
-
-        floatingActionButton: showFab
-            ? FloatingActionButton.extended(
-                backgroundColor: AppColors.brand,
-                foregroundColor: Colors.white,
-                elevation: 4,
-                onPressed: _addListing,
-                icon: const Icon(Icons.add),
-                label: const Text(
-                  'إعلان جديد',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              )
-            : null,
       ),
     );
   }
