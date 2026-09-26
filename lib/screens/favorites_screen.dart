@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart' show NumberFormat;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../core/theme/app_colors.dart';
+import '../core/theme/app_decorations.dart';
+import '../core/theme/app_text_styles.dart';
 import 'listing_details_screen.dart';
 
 class FavoritesScreen extends StatefulWidget {
@@ -30,14 +33,18 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   // =========================
   // تحميل البيانات
   // =========================
+
   Future<void> _loadFavorites({bool silent = false}) async {
     final user = _supabase.auth.currentUser;
 
     if (user == null) {
+      if (!mounted) return;
+
       setState(() {
         _loading = false;
         _error = 'يجب تسجيل الدخول لعرض المفضلة.';
       });
+
       return;
     }
 
@@ -95,8 +102,9 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     }
   }
 
-  // جلب أول صورة لكل إعلان بطلب واحد. الصور اختيارية، فلا نفشل إن تعذّرت.
-  Future<void> _attachCoverImages(List<Map<String, dynamic>> favorites) async {
+  Future<void> _attachCoverImages(
+    List<Map<String, dynamic>> favorites,
+  ) async {
     try {
       final ids = favorites
           .map((favorite) => favorite['listing_id'])
@@ -114,7 +122,10 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       final covers = <dynamic, dynamic>{};
 
       for (final image in List<Map<String, dynamic>>.from(response)) {
-        covers.putIfAbsent(image['listing_id'], () => image['image_path']);
+        covers.putIfAbsent(
+          image['listing_id'],
+          () => image['image_path'],
+        );
       }
 
       for (final favorite in favorites) {
@@ -128,6 +139,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   // =========================
   // أدوات مساعدة
   // =========================
+
   void _showSnack(String message, {SnackBarAction? action}) {
     if (!mounted) return;
 
@@ -135,7 +147,16 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
-          content: Text(message),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: AppColors.ink,
+          content: Text(
+            message,
+            style: const TextStyle(
+              fontFamily: 'Cairo',
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+            ),
+          ),
           action: action,
         ),
       );
@@ -155,9 +176,11 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
 
   String _priceText(Map<String, dynamic> listing) {
     final price = listing['price'];
-    final currency = listing['currency']?.toString().trim().isNotEmpty == true
-        ? listing['currency'].toString().trim()
-        : 'SDG';
+
+    final currency =
+        listing['currency']?.toString().trim().isNotEmpty == true
+            ? listing['currency'].toString().trim()
+            : 'SDG';
 
     if (listing['price_type'] == 'contact' || price == null) {
       return 'السعر عند التواصل';
@@ -165,13 +188,17 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
 
     final number = num.tryParse(price.toString());
 
-    if (number == null) return '$price $currency';
+    if (number == null) {
+      return '$price $currency';
+    }
 
     return '${_numberFormat.format(number)} $currency';
   }
 
   String _timeAgo(dynamic value) {
-    final date = DateTime.tryParse(value?.toString() ?? '')?.toLocal();
+    final date = DateTime.tryParse(
+      value?.toString() ?? '',
+    )?.toLocal();
 
     if (date == null) return '';
 
@@ -185,31 +212,35 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     return 'قبل ${diff.inDays ~/ 30} شهر';
   }
 
-  // نص حالة الإعلان إن لم يكن متاحاً (null = متاح).
   String? _unavailableText(Map<String, dynamic>? listing) {
-    if (listing == null) return 'هذا الإعلان لم يعد متاحاً';
+    if (listing == null) {
+      return 'هذا الإعلان لم يعد متاحاً';
+    }
 
     switch (listing['status']) {
       case 'approved':
         return null;
+
       case 'sold':
         return 'تم بيع هذا المنتج';
+
       case 'pending':
         return 'الإعلان قيد المراجعة';
+
       default:
         return 'هذا الإعلان غير متاح حالياً';
     }
   }
 
   // =========================
-  // إزالة من المفضلة (مع تراجع)
+  // إزالة من المفضلة
   // =========================
+
   Future<void> _removeFavorite(int listingId) async {
     final user = _supabase.auth.currentUser;
 
     if (user == null) return;
 
-    // نحفظ العنصر ومكانه لنستطيع التراجع.
     final index = _favorites.indexWhere(
       (favorite) => favorite['listing_id'] == listingId,
     );
@@ -218,7 +249,9 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
 
     final removed = _favorites[index];
 
-    setState(() => _favorites.removeAt(index));
+    setState(() {
+      _favorites.removeAt(index);
+    });
 
     try {
       await _supabase
@@ -231,6 +264,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
         'تمت إزالة الإعلان من المفضلة',
         action: SnackBarAction(
           label: 'تراجع',
+          textColor: AppColors.gold,
           onPressed: () => _undoRemove(removed, index),
         ),
       );
@@ -239,16 +273,21 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
 
       if (!mounted) return;
 
-      // نعيد العنصر لمكانه لأن الحذف فشل.
       setState(() {
-        _favorites.insert(index.clamp(0, _favorites.length), removed);
+        _favorites.insert(
+          index.clamp(0, _favorites.length),
+          removed,
+        );
       });
 
       _showSnack('تعذر إزالة الإعلان من المفضلة');
     }
   }
 
-  Future<void> _undoRemove(Map<String, dynamic> removed, int index) async {
+  Future<void> _undoRemove(
+    Map<String, dynamic> removed,
+    int index,
+  ) async {
     final user = _supabase.auth.currentUser;
 
     if (user == null) return;
@@ -262,7 +301,10 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       if (!mounted) return;
 
       setState(() {
-        _favorites.insert(index.clamp(0, _favorites.length), removed);
+        _favorites.insert(
+          index.clamp(0, _favorites.length),
+          removed,
+        );
       });
     } catch (e) {
       debugPrint('undoRemove error: $e');
@@ -274,219 +316,328 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => ListingDetailsScreen(listingId: listingId),
+        builder: (_) => ListingDetailsScreen(
+          listingId: listingId,
+        ),
       ),
     );
 
     if (!mounted) return;
 
-    // قد يكون المستخدم أزال الإعلان من المفضلة داخل صفحة التفاصيل.
     await _loadFavorites(silent: true);
   }
 
   // =========================
-  // الواجهة
+  // صورة الإعلان
   // =========================
-  Widget _buildThumbnail(String url, {required bool unavailable}) {
+
+  Widget _buildThumbnail(
+    String url, {
+    required bool unavailable,
+  }) {
     final colorScheme = Theme.of(context).colorScheme;
 
     Widget placeholder(IconData icon) {
       return Container(
-        color: colorScheme.surfaceContainerHighest,
-        child: Icon(icon, color: colorScheme.onSurfaceVariant),
+        color: AppColors.brandSoft,
+        alignment: Alignment.center,
+        child: Icon(
+          icon,
+          size: 30,
+          color: AppColors.brand.withValues(alpha: 0.65),
+        ),
       );
     }
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: SizedBox(
-        width: 84,
-        height: 84,
-        child: url.isEmpty
-            ? placeholder(Icons.image_outlined)
-            : ColorFiltered(
-                colorFilter: unavailable
-                    ? const ColorFilter.mode(
-                        Colors.grey,
-                        BlendMode.saturation,
-                      )
-                    : const ColorFilter.mode(
-                        Colors.transparent,
-                        BlendMode.dst,
-                      ),
-                child: CachedNetworkImage(
-                  imageUrl: url,
-                  fit: BoxFit.cover,
-                  memCacheWidth: 250,
-                  placeholder: (_, __) => placeholder(Icons.image_outlined),
-                  errorWidget: (_, __, ___) =>
-                      placeholder(Icons.broken_image_outlined),
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: AppColors.brand.withValues(alpha: 0.10),
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(13),
+        child: SizedBox(
+          width: 84,
+          height: 84,
+          child: url.isEmpty
+              ? placeholder(Icons.image_outlined)
+              : ColorFiltered(
+                  colorFilter: unavailable
+                      ? const ColorFilter.mode(
+                          Colors.grey,
+                          BlendMode.saturation,
+                        )
+                      : const ColorFilter.mode(
+                          Colors.transparent,
+                          BlendMode.dst,
+                        ),
+                  child: CachedNetworkImage(
+                    imageUrl: url,
+                    fit: BoxFit.cover,
+                    memCacheWidth: 250,
+                    placeholder: (_, __) =>
+                        placeholder(Icons.image_outlined),
+                    errorWidget: (_, __, ___) =>
+                        placeholder(Icons.broken_image_outlined),
+                  ),
                 ),
-              ),
+        ),
       ),
     );
   }
 
-  Widget _buildFavoriteCard(Map<String, dynamic> favorite) {
+  // =========================
+  // بطاقة المفضلة
+  // =========================
+
+  Widget _buildFavoriteCard(
+    Map<String, dynamic> favorite,
+  ) {
     final colorScheme = Theme.of(context).colorScheme;
 
     final listingId = favorite['listing_id'];
 
-    if (listingId is! int) return const SizedBox.shrink();
+    if (listingId is! int) {
+      return const SizedBox.shrink();
+    }
 
     final rawListing = favorite['listings'];
 
     final listing =
-        rawListing is Map ? Map<String, dynamic>.from(rawListing) : null;
+        rawListing is Map
+            ? Map<String, dynamic>.from(rawListing)
+            : null;
 
     final unavailableText = _unavailableText(listing);
     final unavailable = unavailableText != null;
 
-    final title = listing?['title']?.toString().trim().isNotEmpty == true
-        ? listing!['title'].toString().trim()
-        : 'إعلان بدون عنوان';
+    final title =
+        listing?['title']?.toString().trim().isNotEmpty == true
+            ? listing!['title'].toString().trim()
+            : 'إعلان بدون عنوان';
 
     final area = listing?['area']?.toString().trim() ?? '';
-    final savedAgo = _timeAgo(favorite['created_at']);
+
+    final savedAgo = _timeAgo(
+      favorite['created_at'],
+    );
 
     final meta = [
       if (area.isNotEmpty) area,
       if (savedAgo.isNotEmpty) 'أُضيف $savedAgo',
     ].join(' · ');
 
-    final isNegotiable = listing?['price_type'] == 'negotiable';
+    final isNegotiable =
+        listing?['price_type'] == 'negotiable';
 
     return Dismissible(
       key: ValueKey('favorite_$listingId'),
       direction: DismissDirection.horizontal,
       onDismissed: (_) => _removeFavorite(listingId),
-      background: _dismissBackground(Alignment.centerRight),
-      secondaryBackground: _dismissBackground(Alignment.centerLeft),
-      child: Card(
-        margin: EdgeInsets.zero,
-        elevation: 0,
-        clipBehavior: Clip.antiAlias,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: colorScheme.outlineVariant),
+      background: _dismissBackground(
+        Alignment.centerRight,
+      ),
+      secondaryBackground: _dismissBackground(
+        Alignment.centerLeft,
+      ),
+      child: Container(
+        decoration: AppDecorations.card(
+          color: colorScheme.surface,
         ),
-        child: InkWell(
-          // الإعلان المحذوف نهائياً لا يُفتح، لكن غير المتاح مؤقتاً يُفتح.
-          onTap: listing == null ? null : () => _openListing(listingId),
-          child: Padding(
-            padding: const EdgeInsets.all(10),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildThumbnail(
-                  _imageUrl(favorite['cover_path']),
-                  unavailable: unavailable,
-                ),
-
-                const SizedBox(width: 12),
-
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        listing == null ? 'إعلان محذوف' : title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 15.5,
-                          fontWeight: FontWeight.w700,
-                          height: 1.3,
-                          color: unavailable
-                              ? colorScheme.onSurfaceVariant
-                              : colorScheme.onSurface,
-                        ),
-                      ),
-
-                      const SizedBox(height: 4),
-
-                      if (listing != null)
+        child: Card(
+          margin: EdgeInsets.zero,
+          elevation: 0,
+          color: Colors.transparent,
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: listing == null
+                ? null
+                : () => _openListing(listingId),
+            borderRadius: BorderRadius.circular(18),
+            child: Padding(
+              padding: const EdgeInsets.all(10),
+              child: Row(
+                crossAxisAlignment:
+                    CrossAxisAlignment.start,
+                children: [
+                  _buildThumbnail(
+                    _imageUrl(
+                      favorite['cover_path'],
+                    ),
+                    unavailable: unavailable,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment:
+                          CrossAxisAlignment.start,
+                      children: [
                         Text(
-                          _priceText(listing),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                          listing == null
+                              ? 'إعلان محذوف'
+                              : title,
+                          maxLines: 2,
+                          overflow:
+                              TextOverflow.ellipsis,
                           style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800,
+                            fontFamily: 'Cairo',
+                            fontSize: 14.5,
+                            fontWeight:
+                                FontWeight.w800,
+                            height: 1.35,
                             color: unavailable
-                                ? colorScheme.onSurfaceVariant
-                                : colorScheme.primary,
+                                ? colorScheme
+                                    .onSurfaceVariant
+                                : AppColors.ink,
                           ),
                         ),
 
-                      if (isNegotiable && !unavailable)
-                        Text(
-                          'قابل للتفاوض',
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        ),
+                        const SizedBox(height: 5),
 
-                      if (unavailable)
-                        Container(
-                          margin: const EdgeInsets.only(top: 4),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: colorScheme.errorContainer,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            unavailableText,
+                        if (listing != null)
+                          Text(
+                            _priceText(listing),
+                            maxLines: 1,
+                            overflow:
+                                TextOverflow.ellipsis,
                             style: TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w600,
-                              color: colorScheme.onErrorContainer,
+                              fontFamily: 'Cairo',
+                              fontSize: 14,
+                              fontWeight:
+                                  FontWeight.w900,
+                              color: unavailable
+                                  ? colorScheme
+                                      .onSurfaceVariant
+                                  : AppColors.brand,
                             ),
                           ),
-                        )
-                      else if (meta.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.location_on_outlined,
-                                size: 14,
-                                color: colorScheme.onSurfaceVariant,
+
+                        if (isNegotiable &&
+                            !unavailable)
+                          Padding(
+                            padding:
+                                const EdgeInsets.only(
+                              top: 2,
+                            ),
+                            child: Text(
+                              'قابل للتفاوض',
+                              style:
+                                  TextStyle(
+                                fontFamily:
+                                    'Cairo',
+                                fontSize: 10.5,
+                                fontWeight:
+                                    FontWeight.w700,
+                                color:
+                                    AppColors.orange,
                               ),
-                              const SizedBox(width: 3),
-                              Expanded(
-                                child: Text(
-                                  meta,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+
+                        if (unavailable)
+                          Container(
+                            margin:
+                                const EdgeInsets.only(
+                              top: 5,
+                            ),
+                            padding:
+                                const EdgeInsets
+                                    .symmetric(
+                              horizontal: 9,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: colorScheme
+                                  .errorContainer,
+                              borderRadius:
+                                  BorderRadius
+                                      .circular(20),
+                            ),
+                            child: Text(
+                              unavailableText,
+                              style: TextStyle(
+                                fontFamily:
+                                    'Cairo',
+                                fontSize: 10.5,
+                                fontWeight:
+                                    FontWeight.w700,
+                                color: colorScheme
+                                    .onErrorContainer,
+                              ),
+                            ),
+                          )
+                        else if (meta.isNotEmpty)
+                          Padding(
+                            padding:
+                                const EdgeInsets
+                                    .only(top: 5),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons
+                                      .location_on_outlined,
+                                  size: 14,
+                                  color: AppColors
+                                      .brand
+                                      .withValues(
+                                    alpha: 0.65,
                                   ),
                                 ),
-                              ),
-                            ],
+                                const SizedBox(
+                                  width: 3,
+                                ),
+                                Expanded(
+                                  child: Text(
+                                    meta,
+                                    maxLines: 1,
+                                    overflow:
+                                        TextOverflow
+                                            .ellipsis,
+                                    style: TextStyle(
+                                      fontFamily:
+                                          'Cairo',
+                                      fontSize: 10.5,
+                                      fontWeight:
+                                          FontWeight
+                                              .w600,
+                                      color: colorScheme
+                                          .onSurfaceVariant,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
 
-                IconButton(
-                  tooltip: 'إزالة من المفضلة',
-                  visualDensity: VisualDensity.compact,
-                  onPressed: () => _removeFavorite(listingId),
-                  icon: const Icon(
-                    Icons.favorite,
-                    color: Colors.red,
+                  const SizedBox(width: 2),
+
+                  IconButton(
+                    tooltip: 'إزالة من المفضلة',
+                    visualDensity:
+                        VisualDensity.compact,
+                    onPressed: () =>
+                        _removeFavorite(
+                      listingId,
+                    ),
+                    style: IconButton.styleFrom(
+                      backgroundColor: AppColors
+                          .brandSoft
+                          .withValues(alpha: 0.65),
+                      foregroundColor:
+                          AppColors.brand,
+                    ),
+                    icon: const Icon(
+                      Icons.favorite,
+                      size: 21,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -494,135 +645,310 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     );
   }
 
-  Widget _dismissBackground(Alignment alignment) {
-    final colorScheme = Theme.of(context).colorScheme;
-
+  Widget _dismissBackground(
+    Alignment alignment,
+  ) {
     return Container(
       alignment: alignment,
-      padding: const EdgeInsets.symmetric(horizontal: 22),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 22,
+      ),
       decoration: BoxDecoration(
-        color: colorScheme.errorContainer,
-        borderRadius: BorderRadius.circular(16),
+        color: AppColors.brandSoft,
+        borderRadius: BorderRadius.circular(18),
       ),
       child: Icon(
         Icons.heart_broken_outlined,
-        color: colorScheme.onErrorContainer,
+        color: AppColors.brand,
+        size: 26,
       ),
     );
   }
 
-  Widget _buildBody() {
-    if (_loading) {
-      return const Center(
-        child: CircularProgressIndicator(),
-      );
-    }
+  // =========================
+  // حالة الخطأ
+  // =========================
 
-    if (_error != null) {
-      return Center(
-        child: Padding(
+  Widget _buildErrorState() {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Container(
+          width: double.infinity,
           padding: const EdgeInsets.all(24),
+          decoration: AppDecorations.card(
+            color: colorScheme.surface,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.error_outline, size: 48),
-              const SizedBox(height: 12),
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: colorScheme.errorContainer,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.error_outline,
+                  size: 34,
+                  color: colorScheme.onErrorContainer,
+                ),
+              ),
+              const SizedBox(height: 14),
               Text(
                 _error!,
                 textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontFamily: 'Cairo',
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w700,
+                  height: 1.6,
+                  color: colorScheme.onSurface,
+                ),
               ),
-              const SizedBox(height: 16),
-              FilledButton(
+              const SizedBox(height: 18),
+              FilledButton.icon(
                 onPressed: _loadFavorites,
-                child: const Text('إعادة المحاولة'),
+                icon: const Icon(
+                  Icons.refresh_rounded,
+                ),
+                label: const Text(
+                  'إعادة المحاولة',
+                ),
               ),
             ],
           ),
         ),
-      );
-    }
+      ),
+    );
+  }
 
-    if (_favorites.isEmpty) {
-      final colorScheme = Theme.of(context).colorScheme;
+  // =========================
+  // المفضلة فارغة
+  // =========================
 
-      return RefreshIndicator(
-        onRefresh: () => _loadFavorites(silent: true),
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.symmetric(horizontal: 32),
-          children: [
-            const SizedBox(height: 110),
-            Icon(
-              Icons.favorite_border,
-              size: 72,
+  Widget _buildEmptyState() {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return RefreshIndicator(
+      color: AppColors.brand,
+      onRefresh: () =>
+          _loadFavorites(silent: true),
+      child: ListView(
+        physics:
+            const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.symmetric(
+          horizontal: 28,
+        ),
+        children: [
+          const SizedBox(height: 85),
+
+          Center(
+            child: Container(
+              width: 96,
+              height: 96,
+              decoration: BoxDecoration(
+                color: AppColors.brandSoft,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.favorite_border_rounded,
+                size: 52,
+                color: AppColors.brand,
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          Text(
+            'مفضلتك فارغة',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontFamily: 'Cairo',
+              fontSize: 19,
+              fontWeight: FontWeight.w900,
+              color: AppColors.ink,
+            ),
+          ),
+
+          const SizedBox(height: 8),
+
+          Text(
+            'اضغط على القلب في أي إعلان لتحفظه هنا '
+            'وترجع له بسهولة.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontFamily: 'Cairo',
+              fontSize: 13,
+              height: 1.7,
+              fontWeight: FontWeight.w500,
               color: colorScheme.onSurfaceVariant,
             ),
-            const SizedBox(height: 16),
-            const Text(
-              'مفضلتك فارغة',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
+          ),
+
+          const SizedBox(height: 22),
+
+          Center(
+            child: FilledButton.icon(
+              onPressed: () => Navigator.pop(context),
+              icon: const Icon(
+                Icons.storefront_outlined,
+              ),
+              label: const Text(
+                'تصفح الإعلانات',
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              'اضغط على القلب في أي إعلان لتحفظه هنا وترجع له بسهولة.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
-                height: 1.6,
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 20),
-            Center(
-              child: FilledButton.icon(
-                onPressed: () => Navigator.pop(context),
-                icon: const Icon(Icons.storefront_outlined),
-                label: const Text('تصفح الإعلانات'),
-              ),
-            ),
-          ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // =========================
+  // المحتوى
+  // =========================
+
+  Widget _buildBody() {
+    if (_loading) {
+      return Center(
+        child: CircularProgressIndicator(
+          color: AppColors.brand,
         ),
       );
     }
 
+    if (_error != null) {
+      return _buildErrorState();
+    }
+
+    if (_favorites.isEmpty) {
+      return _buildEmptyState();
+    }
+
     return RefreshIndicator(
-      onRefresh: () => _loadFavorites(silent: true),
+      color: AppColors.brand,
+      onRefresh: () =>
+          _loadFavorites(silent: true),
       child: ListView.separated(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        physics:
+            const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(
+          16,
+          12,
+          16,
+          28,
+        ),
         itemCount: _favorites.length + 1,
-        separatorBuilder: (_, __) => const SizedBox(height: 10),
+        separatorBuilder: (_, __) =>
+            const SizedBox(height: 10),
         itemBuilder: (context, index) {
           if (index == 0) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 2),
-              child: Text(
-                '${_favorites.length} إعلان محفوظ · اسحب البطاقة لإزالتها',
-                style: TextStyle(
-                  fontSize: 12.5,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
+            return Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 10,
+              ),
+              decoration:
+                  AppDecorations.softCard(),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.favorite_rounded,
+                    size: 18,
+                    color: AppColors.brand,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '${_favorites.length} إعلان محفوظ',
+                      style:
+                          AppTextStyles.smallBrand,
+                    ),
+                  ),
+                  Text(
+                    'اسحب البطاقة للإزالة',
+                    style: TextStyle(
+                      fontFamily: 'Cairo',
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurfaceVariant,
+                    ),
+                  ),
+                ],
               ),
             );
           }
 
-          return _buildFavoriteCard(_favorites[index - 1]);
+          return _buildFavoriteCard(
+            _favorites[index - 1],
+          );
         },
       ),
     );
   }
 
+  // =========================
+  // الصفحة
+  // =========================
+
   @override
   Widget build(BuildContext context) {
+    final colorScheme =
+        Theme.of(context).colorScheme;
+
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
+        backgroundColor:
+            Theme.of(context).scaffoldBackgroundColor,
         appBar: AppBar(
-          title: const Text('المفضلة'),
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          backgroundColor:
+              Theme.of(context).scaffoldBackgroundColor,
+          surfaceTintColor: Colors.transparent,
+          centerTitle: true,
+          leading: IconButton(
+            tooltip: 'رجوع',
+            icon: const Icon(
+              Icons.arrow_back_ios_new_rounded,
+            ),
+            onPressed: () => Navigator.pop(context),
+          ),
+          title: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: AppColors.brandSoft,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.favorite_rounded,
+                  size: 19,
+                  color: AppColors.brand,
+                ),
+              ),
+              const SizedBox(width: 9),
+              Text(
+                'المفضلة',
+                style: TextStyle(
+                  fontFamily: 'Cairo',
+                  fontSize: 17,
+                  fontWeight: FontWeight.w900,
+                  color: colorScheme.onSurface,
+                ),
+              ),
+            ],
+          ),
         ),
         body: _buildBody(),
       ),
