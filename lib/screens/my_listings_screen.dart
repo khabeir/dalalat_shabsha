@@ -342,20 +342,20 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
     return 'منذ ${(difference.inDays / 365).floor()} سنة';
   }
 
-  Future<void> _openListing(String listingId) async {
-    await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => ListingDetailsScreen(
-          listingId: listingId,
-        ),
+  Future<void> _openListing(Map<String, dynamic> listing) async {
+  await Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => ListingDetailsScreen(
+        listing: listing,
       ),
-    );
+    ),
+  );
 
-    if (mounted) {
-      _loadListings();
-    }
+  if (mounted) {
+    _loadListings();
   }
+}
 
   Future<void> _addListing() async {
     await Navigator.push(
@@ -370,19 +370,18 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
     }
   }
 
-  Future<void> _editListing(String listingId) async {
-    await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => EditListingScreen(
-          listingId: listingId,
-        ),
+  Future<void> _editListing(Map<String, dynamic> listing) async {
+  await Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => EditListingScreen(
+        listing: listing,
       ),
-    );
+    ),
+  );
 
-    if (mounted) {
-      _loadListings();
-    }
+  if (mounted) {
+    _loadListings();
   }
 
   Future<void> _confirmChangeStatus(
@@ -594,7 +593,7 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
         final id = listing['id']?.toString();
 
         if (id != null) {
-          _openListing(id);
+          _openListing(listing);
         }
         break;
 
@@ -602,7 +601,7 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
         final id = listing['id']?.toString();
 
         if (id != null) {
-          _editListing(id);
+          _openListing(listing);
         }
         break;
 
@@ -832,7 +831,7 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
           borderRadius: BorderRadius.circular(18),
           onTap: busy || listingId.isEmpty
               ? null
-              : () => _openListing(listingId),
+              : () => _openListing(listing),
           child: Padding(
             padding: const EdgeInsets.all(12),
             child: Column(
@@ -1024,7 +1023,7 @@ class _MyListingsScreenState extends State<MyListingsScreen> {
                     child: OutlinedButton.icon(
                       onPressed: busy || listingId.isEmpty
                           ? null
-                          : () => _editListing(listingId),
+                          : () => _editListing(listing),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.brand,
                         side: BorderSide(
